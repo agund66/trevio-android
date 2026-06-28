@@ -63,25 +63,44 @@ class SplashViewModel @Inject constructor(
 @Composable
 fun SplashScreen(
     navController: androidx.navigation.NavHostController,
-    viewModel: SplashViewModel = hiltViewModel()
+    viewModel: SplashViewModel = hiltViewModel(),
+    pendingInviteCode: String? = null
 ) {
     val state by viewModel.state.collectAsState()
 
     LaunchedEffect(state) {
         when (state) {
             is SplashViewModel.SplashState.NotAuthenticated -> {
-                navController.navigate(TrevioRoute.Login.route) {
-                    popUpTo(0) { inclusive = true }
+                if (pendingInviteCode != null) {
+                    navController.navigate(TrevioRoute.JoinGroup.createRoute(pendingInviteCode)) {
+                        popUpTo(0) { inclusive = true }
+                    }
+                } else {
+                    navController.navigate(TrevioRoute.Login.route) {
+                        popUpTo(0) { inclusive = true }
+                    }
                 }
             }
             is SplashViewModel.SplashState.NeedsTnC -> {
-                navController.navigate(TrevioRoute.Terms.route) {
-                    popUpTo(0) { inclusive = true }
+                if (pendingInviteCode != null) {
+                    navController.navigate(TrevioRoute.JoinGroup.createRoute(pendingInviteCode)) {
+                        popUpTo(0) { inclusive = true }
+                    }
+                } else {
+                    navController.navigate(TrevioRoute.Terms.route) {
+                        popUpTo(0) { inclusive = true }
+                    }
                 }
             }
             is SplashViewModel.SplashState.Authenticated -> {
-                navController.navigate(TrevioRoute.Home.route) {
-                    popUpTo(0) { inclusive = true }
+                if (pendingInviteCode != null) {
+                    navController.navigate(TrevioRoute.JoinGroup.createRoute(pendingInviteCode)) {
+                        popUpTo(0) { inclusive = true }
+                    }
+                } else {
+                    navController.navigate(TrevioRoute.Home.route) {
+                        popUpTo(0) { inclusive = true }
+                    }
                 }
             }
             else -> {}

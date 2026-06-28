@@ -80,7 +80,8 @@ class FirebaseSettlementServiceImpl @Inject constructor(
                     username = m["username"] as? String ?: "",
                     photoURL = m["photoURL"] as? String ?: "",
                     balance = (m["balance"] as? Double ?: 0.0),
-                    role = m["role"] as? String ?: "member"
+                    role = m["role"] as? String ?: "member",
+                    status = m["status"] as? String ?: "active"
                 )
             })
         } catch (e: Exception) {

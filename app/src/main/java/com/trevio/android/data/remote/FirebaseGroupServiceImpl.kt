@@ -3,6 +3,7 @@ package com.trevio.android.data.remote
 import com.google.firebase.functions.FirebaseFunctions
 import com.trevio.android.domain.model.Group
 import com.trevio.android.domain.model.GroupTemplate
+import com.trevio.android.domain.repository.GroupInfo
 import com.trevio.android.domain.repository.GroupService
 import kotlinx.coroutines.tasks.await
 import javax.inject.Inject
@@ -109,6 +110,29 @@ class FirebaseGroupServiceImpl @Inject constructor(
                     yourRole = g["yourRole"] as? String ?: "member"
                 )
             })
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    override suspend fun getGroupInfo(groupId: String): Result<GroupInfo> {
+        return try {
+            val result = functions.getHttpsCallable("getGroupInfo")
+                .call(mapOf("groupId" to groupId)).await()
+            val g = result.getData() as Map<*, *>
+            Result.success(
+                GroupInfo(
+                    groupId = g["groupId"] as String,
+                    name = g["name"] as String,
+                    description = g["description"] as? String ?: "",
+                    template = GroupTemplate.valueOf((g["template"] as? String ?: "casual").uppercase()),
+                    currency = g["currency"] as? String ?: "INR",
+                    inviteCode = g["inviteCode"] as? String ?: "",
+                    createdBy = g["createdBy"] as? String ?: "",
+                    memberCount = (g["memberCount"] as? Long ?: 0L).toInt(),
+                    totalExpenses = (g["totalExpenses"] as? Double ?: 0.0)
+                )
+            )
         } catch (e: Exception) {
             Result.failure(e)
         }

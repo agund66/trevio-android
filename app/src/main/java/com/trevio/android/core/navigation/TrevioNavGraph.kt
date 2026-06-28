@@ -21,14 +21,15 @@ import com.trevio.android.ui.splash.SplashScreen
 @Composable
 fun TrevioNavGraph(
     navController: NavHostController,
-    startDestination: String = TrevioRoute.Splash.route
+    startDestination: String = TrevioRoute.Splash.route,
+    pendingInviteCode: String? = null
 ) {
     NavHost(
         navController = navController,
         startDestination = startDestination
     ) {
         composable(TrevioRoute.Splash.route) {
-            SplashScreen(navController = navController)
+            SplashScreen(navController = navController, pendingInviteCode = pendingInviteCode)
         }
 
         composable(TrevioRoute.Login.route) {

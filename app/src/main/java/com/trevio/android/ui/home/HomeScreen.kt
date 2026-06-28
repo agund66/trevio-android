@@ -6,8 +6,10 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Group
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.Logout
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -44,7 +46,8 @@ class HomeViewModel @Inject constructor(
         val totalOwed: Double = 0.0,
         val totalOwing: Double = 0.0,
         val isLoading: Boolean = true,
-        val error: String? = null
+        val error: String? = null,
+        val signedOut: Boolean = false
     )
 
     private val _state = MutableStateFlow(HomeData())
@@ -71,6 +74,13 @@ class HomeViewModel @Inject constructor(
                 }
         }
     }
+
+    fun signOut() {
+        viewModelScope.launch {
+            authService.signOut()
+            _state.value = _state.value.copy(signedOut = true)
+        }
+    }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -80,6 +90,15 @@ fun HomeScreen(
     viewModel: HomeViewModel = hiltViewModel()
 ) {
     val state by viewModel.state.collectAsState()
+    var showMenu by remember { mutableStateOf(false) }
+
+    LaunchedEffect(state.signedOut) {
+        if (state.signedOut) {
+            navController.navigate(TrevioRoute.Login.route) {
+                popUpTo(0) { inclusive = true }
+            }
+        }
+    }
 
     Scaffold(
         topBar = {
@@ -93,6 +112,24 @@ fun HomeScreen(
                     }
                     IconButton(onClick = { navController.navigate(TrevioRoute.Profile.route) }) {
                         Icon(Icons.Default.Person, contentDescription = "Profile")
+                    }
+                    Box {
+                        IconButton(onClick = { showMenu = true }) {
+                            Icon(Icons.Default.MoreVert, contentDescription = "More")
+                        }
+                        DropdownMenu(
+                            expanded = showMenu,
+                            onDismissRequest = { showMenu = false }
+                        ) {
+                            DropdownMenuItem(
+                                text = { Text("Sign Out") },
+                                onClick = {
+                                    showMenu = false
+                                    viewModel.signOut()
+                                },
+                                leadingIcon = { Icon(Icons.Default.Logout, contentDescription = null) }
+                            )
+                        }
                     }
                 }
             )

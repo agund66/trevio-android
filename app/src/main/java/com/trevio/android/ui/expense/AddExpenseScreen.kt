@@ -20,6 +20,7 @@ import androidx.lifecycle.viewModelScope
 import com.trevio.android.core.navigation.TrevioRoute
 import com.trevio.android.domain.model.SplitType
 import com.trevio.android.domain.repository.ExpenseService
+import com.trevio.android.domain.repository.GroupService
 import com.trevio.android.domain.repository.SettlementService
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -31,6 +32,7 @@ import javax.inject.Inject
 class ExpenseViewModel @Inject constructor(
     private val expenseService: ExpenseService,
     private val settlementService: SettlementService,
+    private val groupService: GroupService,
     savedStateHandle: SavedStateHandle
 ) : ViewModel() {
 
@@ -40,7 +42,8 @@ class ExpenseViewModel @Inject constructor(
         val isLoading: Boolean = false,
         val error: String? = null,
         val saved: Boolean = false,
-        val members: List<com.trevio.android.domain.model.Member> = emptyList()
+        val members: List<com.trevio.android.domain.model.Member> = emptyList(),
+        val currency: String = "INR"
     )
 
     private val _state = MutableStateFlow(ExpenseFormState())
@@ -50,6 +53,10 @@ class ExpenseViewModel @Inject constructor(
 
     private fun loadMembers() {
         viewModelScope.launch {
+            groupService.getGroupInfo(groupId)
+                .onSuccess { info ->
+                    _state.value = _state.value.copy(currency = info.currency)
+                }
             settlementService.getGroupBalances(groupId)
                 .onSuccess { members -> _state.value = _state.value.copy(members = members) }
         }
@@ -235,7 +242,7 @@ fun AddExpenseScreen(
                         viewModel.addExpense(
                             description = description,
                             amount = amount,
-                            currency = "INR",
+                            currency = state.currency,
                             paidBy = paidByUid,
                             splitType = splitType,
                             category = category,

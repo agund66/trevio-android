@@ -40,7 +40,8 @@ data class Member(
     val username: String = "",
     val photoURL: String = "",
     val balance: Double = 0.0,
-    val role: String = "member"
+    val role: String = "member",
+    val status: String = "active"
 )
 
 data class SplitEntry(

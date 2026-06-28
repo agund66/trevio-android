@@ -189,6 +189,30 @@ fun CreateGroupScreen(
             )
             Spacer(modifier = Modifier.height(12.dp))
 
+            Text("Currency", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+            Spacer(modifier = Modifier.height(8.dp))
+            val currencies = listOf("INR" to "₹ INR", "USD" to "\$ USD", "EUR" to "€ EUR", "GBP" to "£ GBP", "AED" to "AED", "SGD" to "S\$ SGD", "AUD" to "A\$ AUD", "CAD" to "C\$ CAD", "JPY" to "¥ JPY")
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                currencies.take(5).forEach { (code, label) ->
+                    FilterChip(
+                        selected = currency == code,
+                        onClick = { currency = code },
+                        label = { Text(label) }
+                    )
+                }
+            }
+            Spacer(modifier = Modifier.height(4.dp))
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                currencies.drop(5).forEach { (code, label) ->
+                    FilterChip(
+                        selected = currency == code,
+                        onClick = { currency = code },
+                        label = { Text(label) }
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
             Text("Add members", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
             Spacer(modifier = Modifier.height(8.dp))
             OutlinedTextField(

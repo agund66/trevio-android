@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "17273127103",
+    "project_id": "trevio-split",
+    "storage_bucket": "trevio-split.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:17273127103:android:76159b178de684fe59060a",
+        "android_client_info": {
+          "package_name": "com.trevio.android"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyA60T2G-q9WHf9JXDxMYaQeiK5UsTThxAM"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

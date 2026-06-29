@@ -1,8 +1,5 @@
 package com.trevio.android.ui.auth
 
-import android.app.Activity
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
@@ -18,11 +15,14 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import com.trevio.android.R
-import com.google.android.gms.auth.api.signin.GoogleSignIn
-import com.google.android.gms.auth.api.signin.GoogleSignInOptions
-import com.google.android.gms.common.api.ApiException
+import androidx.credentials.CredentialManager
+import androidx.credentials.GetCredentialRequest
+import androidx.credentials.GetCredentialResponse
+import androidx.credentials.exceptions.GetCredentialException
+import com.google.android.libraries.identity.googleid.GetGoogleIdOption
+import com.google.android.libraries.identity.googleid.GoogleIdTokenCredential
+import com.google.android.libraries.identity.googleid.GoogleIdTokenParsingException
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -81,6 +81,8 @@ fun AuthScreen(
 ) {
     val state by viewModel.state.collectAsState()
     val context = LocalContext.current
+    val coroutineScope = rememberCoroutineScope()
+    val credentialManager = remember { CredentialManager.create(context) }
 
     LaunchedEffect(state) {
         when (state) {
@@ -98,25 +100,28 @@ fun AuthScreen(
         }
     }
 
-    val signInLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.StartActivityForResult()
-    ) { result ->
-        if (result.resultCode == Activity.RESULT_OK) {
-            val task = GoogleSignIn.getSignedInAccountFromIntent(result.data)
+    fun launchGoogleSignIn() {
+        val googleIdOption = GetGoogleIdOption.Builder()
+            .setFilterByAuthorizedAccounts(false)
+            .setServerClientId(context.getString(R.string.default_web_client_id))
+            .build()
+
+        val request = GetCredentialRequest.Builder()
+            .addCredentialOption(googleIdOption)
+            .build()
+
+        coroutineScope.launch {
             try {
-                val account = task.getResult(ApiException::class.java)
-                val idToken = account.idToken
-                if (idToken != null) {
-                    viewModel.signInWithGoogle(idToken)
-                } else {
-                    viewModel.setError("Failed to get authentication token")
-                }
-            } catch (e: ApiException) {
+                val result = credentialManager.getCredential(
+                    request = request,
+                    context = context,
+                )
+                handleCredentialResponse(result, viewModel)
+            } catch (e: GetCredentialException) {
+                viewModel.setError("Sign-in failed: ${e.message}")
+            } catch (e: Exception) {
                 viewModel.setError("Sign-in failed: ${e.message}")
             }
-        } else {
-            val statusCode = result.resultCode
-            viewModel.setError("Sign-in failed (code: $statusCode)")
         }
     }
 
@@ -156,14 +161,7 @@ fun AuthScreen(
                 CircularProgressIndicator(color = Color.White)
             } else {
                 OutlinedButton(
-                    onClick = {
-                        val gso = GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
-                            .requestIdToken(context.getString(R.string.default_web_client_id))
-                            .requestEmail()
-                            .build()
-                        val signInClient = GoogleSignIn.getClient(context, gso)
-                        signInLauncher.launch(signInClient.signInIntent)
-                    },
+                    onClick = { launchGoogleSignIn() },
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(56.dp),
@@ -195,6 +193,26 @@ fun AuthScreen(
                     style = MaterialTheme.typography.bodySmall
                 )
             }
+        }
+    }
+}
+
+private fun handleCredentialResponse(
+    result: GetCredentialResponse,
+    viewModel: AuthViewModel
+) {
+    val credential = result.credential
+    when (credential.type) {
+        GoogleIdTokenCredential.TYPE_GOOGLE_ID_TOKEN_CREDENTIAL -> {
+            try {
+                val googleIdTokenCredential = GoogleIdTokenCredential.createFrom(credential.data)
+                viewModel.signInWithGoogle(googleIdTokenCredential.idToken)
+            } catch (e: GoogleIdTokenParsingException) {
+                viewModel.setError("Failed to parse sign-in token")
+            }
+        }
+        else -> {
+            viewModel.setError("Unexpected credential type: ${credential.type}")
         }
     }
 }

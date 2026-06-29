@@ -22,7 +22,6 @@ import androidx.compose.ui.unit.sp
 import com.trevio.android.R
 import com.google.android.gms.auth.api.signin.GoogleSignIn
 import com.google.android.gms.auth.api.signin.GoogleSignInOptions
-import com.google.android.gms.auth.GoogleAuthUtil
 import com.google.android.gms.common.api.ApiException
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.ViewModel
@@ -31,11 +30,9 @@ import com.trevio.android.core.navigation.TrevioRoute
 import com.trevio.android.domain.repository.AuthService
 import com.trevio.android.domain.repository.UserService
 import dagger.hilt.android.lifecycle.HiltViewModel
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 import javax.inject.Inject
 
 @HiltViewModel
@@ -55,31 +52,10 @@ class AuthViewModel @Inject constructor(
     private val _state = MutableStateFlow<AuthState>(AuthState.Idle)
     val state: StateFlow<AuthState> = _state
 
-    fun signInWithGoogle(idToken: String?) {
-        if (idToken == null) {
-            _state.value = AuthState.Error("No ID token available")
-            return
-        }
+    fun signInWithGoogle(idToken: String) {
         _state.value = AuthState.Loading
         viewModelScope.launch {
             val result = authService.signInWithGoogle(idToken)
-            result.onSuccess {
-                val user = authService.getCurrentUser()
-                if (user != null && !user.acceptedTnC) {
-                    _state.value = AuthState.NeedsTnC
-                } else {
-                    _state.value = AuthState.Authenticated
-                }
-            }.onFailure { e ->
-                _state.value = AuthState.Error(e.message ?: "Sign-in failed")
-            }
-        }
-    }
-
-    fun signInWithAccessToken(accessToken: String) {
-        _state.value = AuthState.Loading
-        viewModelScope.launch {
-            val result = authService.signInWithAccessToken(accessToken)
             result.onSuccess {
                 val user = authService.getCurrentUser()
                 if (user != null && !user.acceptedTnC) {
@@ -122,8 +98,6 @@ fun AuthScreen(
         }
     }
 
-    val coroutineScope = rememberCoroutineScope()
-
     val signInLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.StartActivityForResult()
     ) { result ->
@@ -134,32 +108,15 @@ fun AuthScreen(
                 val idToken = account.idToken
                 if (idToken != null) {
                     viewModel.signInWithGoogle(idToken)
-                } else if (account.account != null) {
-                    // Fallback: get access token via GoogleAuthUtil when idToken is null
-                    coroutineScope.launch {
-                        try {
-                            val accessToken = withContext(Dispatchers.IO) {
-                                GoogleAuthUtil.getToken(
-                                    context,
-                                    account.account!!,
-                                    "oauth2:https://www.googleapis.com/auth/userinfo.email"
-                                )
-                            }
-                            viewModel.signInWithAccessToken(accessToken)
-                        } catch (e: Exception) {
-                            viewModel.setError("Failed to get auth token: ${e.message}")
-                        }
-                    }
                 } else {
-                    viewModel.setError("No authentication token available")
+                    viewModel.setError("Failed to get authentication token")
                 }
             } catch (e: ApiException) {
                 viewModel.setError("Sign-in failed: ${e.message}")
             }
         } else {
-            if (state !is AuthViewModel.AuthState.Loading) {
-                viewModel.setError("Sign-in cancelled")
-            }
+            val statusCode = result.resultCode
+            viewModel.setError("Sign-in failed (code: $statusCode)")
         }
     }
 
@@ -201,6 +158,7 @@ fun AuthScreen(
                 OutlinedButton(
                     onClick = {
                         val gso = GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
+                            .requestIdToken(context.getString(R.string.default_web_client_id))
                             .requestEmail()
                             .build()
                         val signInClient = GoogleSignIn.getClient(context, gso)

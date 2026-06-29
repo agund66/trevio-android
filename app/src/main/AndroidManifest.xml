@@ -24,12 +24,26 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
 
-            <!-- Deep link for group invitations -->
+            <!-- Deep link for group invitations - trevio.app -->
             <intent-filter android:autoVerify="true">
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
                 <data android:scheme="https" android:host="trevio.app" android:pathPrefix="/join" />
+            </intent-filter>
+            <!-- Deep link for group invitations - Netlify domain -->
+            <intent-filter android:autoVerify="true">
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="https" android:host="trevio-split.netlify.app" android:pathPrefix="/join" />
+            </intent-filter>
+            <!-- Deep link for group invitations - Firebase hosting domain -->
+            <intent-filter android:autoVerify="true">
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="https" android:host="trevio-split.firebaseapp.com" android:pathPrefix="/join" />
             </intent-filter>
         </activity>
 

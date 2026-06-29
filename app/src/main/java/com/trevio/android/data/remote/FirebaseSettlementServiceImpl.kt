@@ -1,18 +1,23 @@
 package com.trevio.android.data.remote
 
-import com.google.firebase.functions.FirebaseFunctions
+import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.firestore.Query
 import com.trevio.android.domain.model.Member
 import com.trevio.android.domain.model.Settlement
 import com.trevio.android.domain.model.SettlementMethod
 import com.trevio.android.domain.model.SimplifiedDebt
+import com.trevio.android.domain.model.SplitEntry
 import com.trevio.android.domain.repository.SettlementService
+import com.trevio.android.util.Calculations
 import kotlinx.coroutines.tasks.await
 import javax.inject.Inject
 import javax.inject.Singleton
 
 @Singleton
 class FirebaseSettlementServiceImpl @Inject constructor(
-    private val functions: FirebaseFunctions
+    private val firestore: FirebaseFirestore,
+    private val auth: FirebaseAuth
 ) : SettlementService {
 
     override suspend fun addSettlement(
@@ -25,19 +30,74 @@ class FirebaseSettlementServiceImpl @Inject constructor(
         upiRefId: String?
     ): Result<String> {
         return try {
-            val data = mutableMapOf<String, Any>(
-                "groupId" to groupId,
+            val uid = auth.currentUser?.uid ?: return Result.failure(Exception("User not authenticated"))
+            if (groupId.isBlank() || fromUid.isBlank() || toUid.isBlank() || amount <= 0.0) {
+                return Result.failure(Exception("Missing required fields"))
+            }
+            if (fromUid == toUid) return Result.failure(Exception("Cannot settle with yourself"))
+
+            val groupRef = firestore.collection("groups").document(groupId)
+            val groupDoc = groupRef.get().await()
+            if (!groupDoc.exists()) return Result.failure(Exception("Group not found"))
+
+            val memberDoc = groupRef.collection("members").document(uid).get().await()
+            if (!memberDoc.exists()) return Result.failure(Exception("You are not a member of this group"))
+
+            val now = System.currentTimeMillis()
+            val settlementRef = groupRef.collection("settlements").document()
+
+            val settlementData = mutableMapOf<String, Any>(
                 "fromUid" to fromUid,
                 "toUid" to toUid,
                 "amount" to amount,
                 "currency" to currency,
-                "method" to method.name.lowercase()
+                "method" to method.name.lowercase(),
+                "date" to now,
+                "createdBy" to uid,
+                "createdAt" to now
             )
-            if (upiRefId != null) data["upiRefId"] = upiRefId
+            if (upiRefId != null) settlementData["upiRefId"] = upiRefId
 
-            val result = functions.getHttpsCallable("addSettlement").call(data).await()
-            val res = result.getData() as Map<*, *>
-            Result.success(res["settlementId"] as String)
+            val fromUserDoc = firestore.collection("users").document(fromUid).get().await()
+            val fromUserName = fromUserDoc.data?.get("displayName") as? String ?: "Someone"
+            val toUserDoc = firestore.collection("users").document(toUid).get().await()
+            val toUserName = toUserDoc.data?.get("displayName") as? String ?: "Someone"
+
+            val batch = firestore.runBatch { b ->
+                b.set(settlementRef, settlementData)
+                b.set(groupRef.collection("activities").document(), mapOf(
+                    "type" to "settlement_added",
+                    "description" to "$fromUserName settled $currency $amount with $toUserName",
+                    "userId" to uid,
+                    "data" to mapOf(
+                        "settlementId" to settlementRef.id,
+                        "fromUid" to fromUid,
+                        "toUid" to toUid,
+                        "amount" to amount
+                    ),
+                    "createdAt" to now
+                ))
+            }
+            batch.await()
+
+            recalculateBalances(groupId)
+
+            firestore.collection("users").document(toUid).collection("notifications").document()
+                .set(mapOf(
+                    "type" to "settlement",
+                    "title" to "Payment Received",
+                    "body" to "$fromUserName recorded a payment of $currency $amount to you",
+                    "data" to mapOf(
+                        "groupId" to groupId,
+                        "groupName" to (groupDoc.data?.get("name") as? String ?: ""),
+                        "settlementId" to settlementRef.id,
+                        "type" to "settlement"
+                    ),
+                    "read" to false,
+                    "createdAt" to now
+                )).await()
+
+            Result.success(settlementRef.id)
         } catch (e: Exception) {
             Result.failure(e)
         }
@@ -45,22 +105,33 @@ class FirebaseSettlementServiceImpl @Inject constructor(
 
     override suspend fun getSimplifiedDebts(groupId: String): Result<List<SimplifiedDebt>> {
         return try {
-            val result = functions.getHttpsCallable("getSimplifiedDebts")
-                .call(mapOf("groupId" to groupId)).await()
-            val data = result.getData() as Map<*, *>
-            @Suppress("UNCHECKED_CAST")
-            val debts = data["debts"] as List<Map<*, *>>
-            Result.success(debts.map { d ->
+            val uid = auth.currentUser?.uid ?: return Result.failure(Exception("User not authenticated"))
+            val groupRef = firestore.collection("groups").document(groupId)
+            val memberDoc = groupRef.collection("members").document(uid).get().await()
+            if (!memberDoc.exists()) return Result.failure(Exception("You are not a member of this group"))
+
+            val debts = calculateSimplifiedDebts(groupId)
+
+            val enrichedDebts = debts.map { debt ->
+                val fromDoc = firestore.collection("users").document(debt.fromUid).get().await()
+                val toDoc = firestore.collection("users").document(debt.toUid).get().await()
+                val fromData = fromDoc.data
+                val toData = toDoc.data
                 SimplifiedDebt(
-                    fromUid = d["fromUid"] as String,
-                    toUid = d["toUid"] as String,
-                    fromName = d["fromName"] as String,
-                    toName = d["toName"] as String,
-                    fromPhotoURL = d["fromPhotoURL"] as? String ?: "",
-                    toPhotoURL = d["toPhotoURL"] as? String ?: "",
-                    amount = (d["amount"] as? Double ?: 0.0)
+                    fromUid = debt.fromUid,
+                    toUid = debt.toUid,
+                    fromName = fromData?.get("displayName") as? String ?: "Unknown",
+                    toName = toData?.get("displayName") as? String ?: "Unknown",
+                    fromPhotoURL = fromData?.get("photoURL") as? String ?: "",
+                    toPhotoURL = toData?.get("photoURL") as? String ?: "",
+                    toUpiId = toData?.get("upiId") as? String ?: "",
+                    fromUpiId = fromData?.get("upiId") as? String ?: "",
+                    toPhoneNumber = toData?.get("phoneNumber") as? String ?: "",
+                    toCountryCode = toData?.get("countryCode") as? String ?: "",
+                    amount = debt.amount
                 )
-            })
+            }
+            Result.success(enrichedDebts)
         } catch (e: Exception) {
             Result.failure(e)
         }
@@ -68,22 +139,30 @@ class FirebaseSettlementServiceImpl @Inject constructor(
 
     override suspend fun getGroupBalances(groupId: String): Result<List<Member>> {
         return try {
-            val result = functions.getHttpsCallable("getGroupBalances")
-                .call(mapOf("groupId" to groupId)).await()
-            val data = result.getData() as Map<*, *>
-            @Suppress("UNCHECKED_CAST")
-            val members = data["members"] as List<Map<*, *>>
-            Result.success(members.map { m ->
+            val uid = auth.currentUser?.uid ?: return Result.failure(Exception("User not authenticated"))
+            val groupRef = firestore.collection("groups").document(groupId)
+            val memberDoc = groupRef.collection("members").document(uid).get().await()
+            if (!memberDoc.exists()) return Result.failure(Exception("You are not a member of this group"))
+
+            val membersSnapshot = groupRef.collection("members")
+                .whereIn("status", listOf("active", "pending"))
+                .get().await()
+
+            val members = membersSnapshot.documents.mapNotNull { doc ->
+                val data = doc.data ?: return@mapNotNull null
+                val userDoc = firestore.collection("users").document(doc.id).get().await()
+                val userData = userDoc.data
                 Member(
-                    uid = m["uid"] as String,
-                    displayName = m["displayName"] as String,
-                    username = m["username"] as? String ?: "",
-                    photoURL = m["photoURL"] as? String ?: "",
-                    balance = (m["balance"] as? Double ?: 0.0),
-                    role = m["role"] as? String ?: "member",
-                    status = m["status"] as? String ?: "active"
+                    uid = doc.id,
+                    displayName = userData?.get("displayName") as? String ?: "Unknown",
+                    username = userData?.get("username") as? String ?: "",
+                    photoURL = userData?.get("photoURL") as? String ?: "",
+                    balance = (data["balance"] as? Double ?: 0.0),
+                    role = data["role"] as? String ?: "member",
+                    status = data["status"] as? String ?: "active"
                 )
-            })
+            }
+            Result.success(members)
         } catch (e: Exception) {
             Result.failure(e)
         }
@@ -91,26 +170,117 @@ class FirebaseSettlementServiceImpl @Inject constructor(
 
     override suspend fun getSettlementHistory(groupId: String): Result<List<Settlement>> {
         return try {
-            val result = functions.getHttpsCallable("getSettlementHistory")
-                .call(mapOf("groupId" to groupId)).await()
-            val data = result.getData() as Map<*, *>
-            @Suppress("UNCHECKED_CAST")
-            val settlements = data["settlements"] as List<Map<*, *>>
-            Result.success(settlements.map { s ->
+            val uid = auth.currentUser?.uid ?: return Result.failure(Exception("User not authenticated"))
+            val groupRef = firestore.collection("groups").document(groupId)
+            val memberDoc = groupRef.collection("members").document(uid).get().await()
+            if (!memberDoc.exists()) return Result.failure(Exception("You are not a member of this group"))
+
+            val snapshot = groupRef.collection("settlements")
+                .orderBy("date", Query.Direction.DESCENDING)
+                .limit(50)
+                .get().await()
+
+            val settlements = snapshot.documents.map { doc ->
+                val data = doc.data ?: emptyMap()
+                val fromDoc = firestore.collection("users").document(data["fromUid"] as? String ?: "").get().await()
+                val toDoc = firestore.collection("users").document(data["toUid"] as? String ?: "").get().await()
                 Settlement(
-                    settlementId = s["settlementId"] as String,
-                    fromUid = s["fromUid"] as String,
-                    toUid = s["toUid"] as String,
-                    fromName = s["fromName"] as String,
-                    toName = s["toName"] as String,
-                    amount = (s["amount"] as? Double ?: 0.0),
-                    currency = s["currency"] as? String ?: "INR",
-                    method = SettlementMethod.valueOf((s["method"] as? String ?: "cash").uppercase()),
-                    upiRefId = s["upiRefId"] as? String ?: ""
+                    settlementId = doc.id,
+                    fromUid = data["fromUid"] as? String ?: "",
+                    toUid = data["toUid"] as? String ?: "",
+                    fromName = fromDoc.data?.get("displayName") as? String ?: "Unknown",
+                    toName = toDoc.data?.get("displayName") as? String ?: "Unknown",
+                    amount = (data["amount"] as? Double ?: 0.0),
+                    currency = data["currency"] as? String ?: "INR",
+                    method = SettlementMethod.valueOf((data["method"] as? String ?: "cash").uppercase()),
+                    upiRefId = data["upiRefId"] as? String ?: ""
                 )
-            })
+            }
+            Result.success(settlements)
         } catch (e: Exception) {
             Result.failure(e)
         }
+    }
+
+    private suspend fun calculateSimplifiedDebts(groupId: String): List<Calculations.SimplifiedDebtRaw> {
+        val groupRef = firestore.collection("groups").document(groupId)
+
+        val expensesSnapshot = groupRef.collection("expenses").get().await()
+        val settlementsSnapshot = groupRef.collection("settlements").get().await()
+        val membersSnapshot = groupRef.collection("members").whereEqualTo("status", "active").get().await()
+
+        val memberUids = membersSnapshot.documents.map { it.id }
+
+        val expenses = expensesSnapshot.documents.map { doc ->
+            val data = doc.data ?: emptyMap()
+            @Suppress("UNCHECKED_CAST")
+            val splitsRaw = data["splits"] as? Map<String, Map<String, Any>> ?: emptyMap()
+            Triple(
+                data["paidBy"] as? String ?: "",
+                splitsRaw.mapValues { (_, v) ->
+                    SplitEntry(
+                        amount = (v["amount"] as? Double ?: 0.0),
+                        shareValue = (v["shareValue"] as? Double ?: 0.0)
+                    )
+                },
+                data["amount"] as? Double ?: 0.0
+            )
+        }
+
+        val settlements = settlementsSnapshot.documents.map { doc ->
+            val data = doc.data ?: emptyMap()
+            Triple(
+                data["fromUid"] as? String ?: "",
+                data["toUid"] as? String ?: "",
+                data["amount"] as? Double ?: 0.0
+            )
+        }
+
+        val balances = Calculations.calculateBalances(expenses, settlements, memberUids)
+        return Calculations.simplifyDebts(balances)
+    }
+
+    private suspend fun recalculateBalances(groupId: String) {
+        val groupRef = firestore.collection("groups").document(groupId)
+
+        val expensesSnapshot = groupRef.collection("expenses").get().await()
+        val settlementsSnapshot = groupRef.collection("settlements").get().await()
+        val membersSnapshot = groupRef.collection("members").whereEqualTo("status", "active").get().await()
+
+        val memberUids = membersSnapshot.documents.map { it.id }
+
+        val expenses = expensesSnapshot.documents.map { doc ->
+            val data = doc.data ?: emptyMap()
+            @Suppress("UNCHECKED_CAST")
+            val splitsRaw = data["splits"] as? Map<String, Map<String, Any>> ?: emptyMap()
+            Triple(
+                data["paidBy"] as? String ?: "",
+                splitsRaw.mapValues { (_, v) ->
+                    SplitEntry(
+                        amount = (v["amount"] as? Double ?: 0.0),
+                        shareValue = (v["shareValue"] as? Double ?: 0.0)
+                    )
+                },
+                data["amount"] as? Double ?: 0.0
+            )
+        }
+
+        val settlements = settlementsSnapshot.documents.map { doc ->
+            val data = doc.data ?: emptyMap()
+            Triple(
+                data["fromUid"] as? String ?: "",
+                data["toUid"] as? String ?: "",
+                data["amount"] as? Double ?: 0.0
+            )
+        }
+
+        val balances = Calculations.calculateBalances(expenses, settlements, memberUids)
+
+        val batch = firestore.runBatch { b ->
+            balances.forEach { (memberUid, balance) ->
+                b.update(groupRef.collection("members").document(memberUid), mapOf("balance" to balance))
+            }
+        }
+        batch.await()
     }
 }

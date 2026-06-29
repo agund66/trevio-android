@@ -23,6 +23,7 @@ import androidx.lifecycle.viewModelScope
 import com.trevio.android.core.designsystem.components.MemberAvatar
 import com.trevio.android.core.designsystem.components.formatCurrency
 import com.trevio.android.domain.model.SimplifiedDebt
+import com.trevio.android.domain.repository.GroupService
 import com.trevio.android.domain.repository.SettlementService
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -30,9 +31,18 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
+private fun getUpiVpa(debt: SimplifiedDebt): String {
+    if (debt.toUpiId.isNotEmpty()) return debt.toUpiId
+    if (debt.toPhoneNumber.isNotEmpty() && (debt.toCountryCode.isEmpty() || debt.toCountryCode == "IN")) {
+        return "${debt.toPhoneNumber}@paytm"
+    }
+    return ""
+}
+
 @HiltViewModel
 class SettlementViewModel @Inject constructor(
     private val settlementService: SettlementService,
+    private val groupService: GroupService,
     savedStateHandle: SavedStateHandle
 ) : ViewModel() {
 
@@ -41,6 +51,7 @@ class SettlementViewModel @Inject constructor(
     data class SettlementState(
         val isLoading: Boolean = true,
         val debts: List<SimplifiedDebt> = emptyList(),
+        val currency: String = "INR",
         val error: String? = null
     )
 
@@ -52,21 +63,25 @@ class SettlementViewModel @Inject constructor(
     fun loadDebts() {
         _state.value = _state.value.copy(isLoading = true)
         viewModelScope.launch {
+            groupService.getGroupInfo(groupId)
+                .onSuccess { info ->
+                    _state.value = _state.value.copy(currency = info.currency)
+                }
             settlementService.getSimplifiedDebts(groupId)
-                .onSuccess { debts -> _state.value = SettlementState(isLoading = false, debts = debts) }
+                .onSuccess { debts -> _state.value = SettlementState(isLoading = false, debts = debts, currency = _state.value.currency) }
                 .onFailure { e -> _state.value = SettlementState(isLoading = false, error = e.message) }
         }
     }
 
-    fun settleDebt(debt: SimplifiedDebt) {
+    fun settleDebt(debt: SimplifiedDebt, method: com.trevio.android.domain.model.SettlementMethod = com.trevio.android.domain.model.SettlementMethod.CASH) {
         viewModelScope.launch {
             settlementService.addSettlement(
                 groupId = groupId,
                 fromUid = debt.fromUid,
                 toUid = debt.toUid,
                 amount = debt.amount,
-                currency = "INR",
-                method = com.trevio.android.domain.model.SettlementMethod.CASH,
+                currency = _state.value.currency,
+                method = method,
                 upiRefId = null
             ).onSuccess { loadDebts() }
         }
@@ -122,9 +137,12 @@ fun SettleUpScreen(
                     debt = debt,
                     onSettle = { viewModel.settleDebt(debt) },
                     onPayViaUpi = {
-                        val upiUri = "upi://pay?pa=&pn=${Uri.encode(debt.toName)}&am=${debt.amount}&cu=INR&tn=Trevio"
-                        val intent = Intent(Intent.ACTION_VIEW, Uri.parse(upiUri))
-                        context.startActivity(Intent.createChooser(intent, "Pay with..."))
+                        val vpa = getUpiVpa(debt)
+                        if (vpa.isNotEmpty()) {
+                            val upiUri = "upi://pay?pa=${Uri.encode(vpa)}&pn=${Uri.encode(debt.toName)}&am=${debt.amount}&cu=INR&tn=${Uri.encode("Trevio")}"
+                            val intent = Intent(Intent.ACTION_VIEW, Uri.parse(upiUri))
+                            context.startActivity(Intent.createChooser(intent, "Pay with..."))
+                        }
                     }
                 )
             }
@@ -148,15 +166,27 @@ private fun DebtCard(
                 Column(modifier = Modifier.weight(1f)) {
                     Text("${debt.fromName.split(" ").firstOrNull()} owes ${debt.toName.split(" ").firstOrNull()}", style = MaterialTheme.typography.bodyMedium)
                     Text(formatCurrency(debt.amount), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                    if (debt.toUpiId.isNotEmpty()) {
+                        Text("Pay to: ${debt.toUpiId}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    } else if (debt.toPhoneNumber.isNotEmpty() && (debt.toCountryCode.isEmpty() || debt.toCountryCode == "IN")) {
+                        Text("Pay to: ${debt.toPhoneNumber}@paytm", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
                 }
             }
             Spacer(modifier = Modifier.height(12.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                OutlinedButton(onClick = onPayViaUpi, modifier = Modifier.weight(1f)) {
-                    Text("Pay via UPI")
-                }
-                Button(onClick = onSettle, modifier = Modifier.weight(1f)) {
-                    Text("Mark Settled")
+                val vpa = getUpiVpa(debt)
+                if (vpa.isNotEmpty()) {
+                    OutlinedButton(onClick = onPayViaUpi, modifier = Modifier.weight(1f)) {
+                        Text("Pay via UPI")
+                    }
+                    Button(onClick = onSettle, modifier = Modifier.weight(1f)) {
+                        Text("Mark Settled")
+                    }
+                } else {
+                    Button(onClick = onSettle, modifier = Modifier.fillMaxWidth()) {
+                        Text("Mark Settled")
+                    }
                 }
             }
         }

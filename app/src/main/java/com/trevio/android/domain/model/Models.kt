@@ -17,7 +17,9 @@ data class User(
     val photoURL: String = "",
     val defaultCurrency: String = "INR",
     val acceptedTnC: Boolean = false,
-    val upiId: String = ""
+    val upiId: String = "",
+    val phoneNumber: String = "",
+    val countryCode: String = ""
 )
 
 data class Group(
@@ -84,6 +86,10 @@ data class SimplifiedDebt(
     val toName: String = "",
     val fromPhotoURL: String = "",
     val toPhotoURL: String = "",
+    val toUpiId: String = "",
+    val fromUpiId: String = "",
+    val toPhoneNumber: String = "",
+    val toCountryCode: String = "",
     val amount: Double = 0.0
 )
 
@@ -92,6 +98,8 @@ data class Activity(
     val type: String = "",
     val description: String = "",
     val userId: String = "",
+    val userName: String = "",
+    val userPhotoURL: String = "",
     val createdAt: Long = 0
 )
 

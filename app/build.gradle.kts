@@ -75,7 +75,6 @@ dependencies {
     implementation(platform(libs.firebase.bom))
     implementation(libs.firebase.auth.ktx)
     implementation(libs.firebase.firestore)
-    implementation(libs.firebase.functions)
     implementation(libs.firebase.messaging)
     implementation(libs.firebase.storage)
 

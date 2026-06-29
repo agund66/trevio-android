@@ -49,6 +49,40 @@ class FirebaseAuthServiceImpl @Inject constructor(
         }
     }
 
+    override suspend fun signInWithAccessToken(accessToken: String): Result<String> {
+        return try {
+            val credential = GoogleAuthProvider.getCredential(null, accessToken)
+            val result = auth.signInWithCredential(credential).await()
+            val firebaseUser = result.user!!
+
+            val userDoc = firestore.collection("users").document(firebaseUser.uid).get().await()
+            if (!userDoc.exists()) {
+                val displayName = firebaseUser.displayName ?: ""
+                val nameParts = displayName.split(" ", limit = 2)
+                val firstName = nameParts.getOrElse(0) { "" }
+                val lastName = nameParts.getOrElse(1) { "" }
+
+                val newUser = User(
+                    uid = firebaseUser.uid,
+                    email = firebaseUser.email ?: "",
+                    displayName = displayName,
+                    firstName = firstName,
+                    lastName = lastName,
+                    photoURL = firebaseUser.photoUrl?.toString() ?: "",
+                    defaultCurrency = "INR",
+                    acceptedTnC = false
+                )
+
+                firestore.collection("users").document(firebaseUser.uid)
+                    .set(newUser).await()
+            }
+
+            Result.success(firebaseUser.uid)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
     override suspend fun getCurrentUserId(): String? {
         return auth.currentUser?.uid
     }
@@ -73,7 +107,9 @@ class FirebaseAuthServiceImpl @Inject constructor(
                     photoURL = data["photoURL"] as? String ?: "",
                     defaultCurrency = data["defaultCurrency"] as? String ?: "INR",
                     acceptedTnC = data["acceptedTnC"] as? Boolean ?: false,
-                    upiId = data["upiId"] as? String ?: ""
+                    upiId = data["upiId"] as? String ?: "",
+                    phoneNumber = data["phoneNumber"] as? String ?: "",
+                    countryCode = data["countryCode"] as? String ?: ""
                 )
             } else null
         } catch (e: Exception) {

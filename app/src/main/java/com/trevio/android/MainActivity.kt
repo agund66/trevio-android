@@ -46,7 +46,8 @@ class MainActivity : ComponentActivity() {
 
     private fun extractInviteCode(intent: Intent?): String? {
         val data = intent?.data ?: return null
-        if (data.host == "trevio.app" && data.path?.startsWith("/join/") == true) {
+        val supportedHosts = listOf("trevio.app", "trevio-split.netlify.app", "trevio-split.firebaseapp.com")
+        if (data.host in supportedHosts && data.path?.startsWith("/join/") == true) {
             return data.lastPathSegment
         }
         return null

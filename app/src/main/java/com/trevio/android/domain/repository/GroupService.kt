@@ -1,5 +1,6 @@
 package com.trevio.android.domain.repository
 
+import com.trevio.android.domain.model.Activity
 import com.trevio.android.domain.model.Group
 import com.trevio.android.domain.model.GroupTemplate
 
@@ -31,4 +32,5 @@ interface GroupService {
     suspend fun leaveGroup(groupId: String): Result<Unit>
     suspend fun getUserGroups(): Result<List<Group>>
     suspend fun getGroupInfo(groupId: String): Result<GroupInfo>
+    suspend fun getGroupActivities(groupId: String, pageSize: Int = 50): Result<List<Activity>>
 }

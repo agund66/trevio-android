@@ -4,6 +4,7 @@ import com.trevio.android.domain.model.User
 
 interface AuthService {
     suspend fun signInWithGoogle(idToken: String): Result<String>
+    suspend fun signInWithAccessToken(accessToken: String): Result<String>
     suspend fun getCurrentUserId(): String?
     suspend fun signOut()
     suspend fun getCurrentUser(): User?

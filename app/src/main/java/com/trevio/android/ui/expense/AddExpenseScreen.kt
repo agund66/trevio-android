@@ -18,6 +18,8 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.trevio.android.core.navigation.TrevioRoute
+import com.trevio.android.core.designsystem.components.formatCurrency
+import com.trevio.android.domain.model.SplitEntry
 import com.trevio.android.domain.model.SplitType
 import com.trevio.android.domain.repository.ExpenseService
 import com.trevio.android.domain.repository.GroupService
@@ -68,6 +70,7 @@ class ExpenseViewModel @Inject constructor(
         currency: String,
         paidBy: String,
         splitType: SplitType,
+        splits: Map<String, SplitEntry>,
         category: String,
         isRecurring: Boolean,
         recurringFrequency: String?
@@ -82,7 +85,7 @@ class ExpenseViewModel @Inject constructor(
                 currency = currency,
                 paidBy = paidBy,
                 splitType = splitType,
-                splits = emptyMap(),
+                splits = splits,
                 memberUids = memberUids,
                 category = category,
                 date = System.currentTimeMillis(),
@@ -112,6 +115,7 @@ fun AddExpenseScreen(
     val state by viewModel.state.collectAsState()
     val members = state.members
     var paidByUid by remember { mutableStateOf("") }
+    val splitValues = remember { mutableStateMapOf<String, String>() }
 
     LaunchedEffect(state.saved) {
         if (state.saved) { navController.popBackStack() }
@@ -120,6 +124,53 @@ fun AddExpenseScreen(
     LaunchedEffect(members) {
         if (paidByUid.isEmpty() && members.isNotEmpty()) {
             paidByUid = members.first().uid
+        }
+    }
+
+    val amount = amountStr.toDoubleOrNull() ?: 0.0
+    val activeMembers = members.filter { it.status == "active" }
+
+    val splitSummary = remember(splitType, splitValues.toMap(), amount, activeMembers) {
+        if (splitType == SplitType.EQUAL || amount <= 0.0) null
+        else {
+            var totalEntered = 0.0
+            for (m in activeMembers) {
+                totalEntered += splitValues[m.uid]?.toDoubleOrNull() ?: 0.0
+            }
+            when (splitType) {
+                SplitType.PERCENT -> Pair(totalEntered, 100.0)
+                SplitType.EXACT -> Pair(totalEntered, amount)
+                SplitType.SHARES -> Pair(totalEntered, 0.0)
+                else -> null
+            }
+        }
+    }
+
+    val isSplitValid = remember(splitType, splitValues.toMap(), amount, activeMembers, splitSummary) {
+        if (splitType == SplitType.EQUAL) true
+        else if (amount <= 0.0 || activeMembers.isEmpty()) false
+        else if (splitType == SplitType.SHARES) {
+            splitValues.values.any { (it.toDoubleOrNull() ?: 0.0) > 0.0 }
+        }
+        else splitSummary != null && kotlin.math.abs(splitSummary.first - splitSummary.second) < 0.01
+    }
+
+    val buildSplits: () -> Map<String, SplitEntry> = {
+        if (splitType == SplitType.EQUAL) emptyMap()
+        else {
+            val result = mutableMapOf<String, SplitEntry>()
+            for (m in activeMembers) {
+                val v = splitValues[m.uid]?.toDoubleOrNull() ?: 0.0
+                if (v > 0.0) {
+                    when (splitType) {
+                        SplitType.SHARES -> result[m.uid] = SplitEntry(amount = 0.0, shareValue = v)
+                        SplitType.PERCENT -> result[m.uid] = SplitEntry(amount = 0.0, shareValue = v)
+                        SplitType.EXACT -> result[m.uid] = SplitEntry(amount = v)
+                        else -> {}
+                    }
+                }
+            }
+            result
         }
     }
 
@@ -205,6 +256,67 @@ fun AddExpenseScreen(
                 }
             }
 
+            if (splitType != SplitType.EQUAL && amount > 0.0 && activeMembers.isNotEmpty()) {
+                Spacer(modifier = Modifier.height(12.dp))
+                Card(modifier = Modifier.fillMaxWidth(), shape = MaterialTheme.shapes.medium) {
+                    Column(modifier = Modifier.padding(12.dp)) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Text(
+                                when (splitType) {
+                                    SplitType.EXACT -> "Enter exact amount per member"
+                                    SplitType.PERCENT -> "Enter percentage per member"
+                                    SplitType.SHARES -> "Enter shares per member"
+                                    else -> ""
+                                },
+                                style = MaterialTheme.typography.bodySmall
+                            )
+                            if (splitSummary != null && splitType != SplitType.SHARES) {
+                                Text(
+                                    "${splitSummary.first}/${splitSummary.second}" + if (splitType == SplitType.PERCENT) "%" else "",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = if (isSplitValid) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error
+                                )
+                            }
+                        }
+                        Spacer(modifier = Modifier.height(8.dp))
+                        activeMembers.forEach { member ->
+                            val value = splitValues[member.uid] ?: ""
+                            val totalShares = splitValues.values.sumOf { it.toDoubleOrNull() ?: 0.0 }
+                            val displayAmount = when (splitType) {
+                                SplitType.PERCENT -> if (value.isNotEmpty()) " = ${formatCurrency((value.toDoubleOrNull() ?: 0.0) / 100 * amount)}" else ""
+                                SplitType.SHARES -> if (value.isNotEmpty() && totalShares > 0) " = ${formatCurrency((value.toDoubleOrNull() ?: 0.0) / totalShares * amount)}" else ""
+                                else -> ""
+                            }
+                            Row(
+                                modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(member.displayName.split(" ").firstOrNull() ?: "", modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)
+                                if (displayAmount.isNotEmpty()) {
+                                    Text(displayAmount, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                }
+                                OutlinedTextField(
+                                    value = value,
+                                    onValueChange = { v -> splitValues[member.uid] = v.filter { c -> c.isDigit() || c == '.' } },
+                                    modifier = Modifier.width(100.dp),
+                                    singleLine = true,
+                                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                                    textStyle = MaterialTheme.typography.bodyMedium
+                                )
+                            }
+                        }
+                        if (splitType == SplitType.SHARES) {
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Text("Amounts are split proportionally based on share values.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                    }
+                }
+            }
+
             Spacer(modifier = Modifier.height(16.dp))
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -245,13 +357,14 @@ fun AddExpenseScreen(
                             currency = state.currency,
                             paidBy = paidByUid,
                             splitType = splitType,
+                            splits = buildSplits(),
                             category = category,
                             isRecurring = isRecurring,
                             recurringFrequency = if (isRecurring) recurringFrequency else null
                         )
                     }
                 },
-                enabled = description.isNotBlank() && amountStr.isNotBlank() && !state.isLoading,
+                enabled = description.isNotBlank() && amountStr.isNotBlank() && isSplitValid && !state.isLoading,
                 modifier = Modifier.fillMaxWidth().height(56.dp),
                 shape = MaterialTheme.shapes.medium
             ) {

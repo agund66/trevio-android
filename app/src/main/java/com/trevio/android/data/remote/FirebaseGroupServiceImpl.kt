@@ -24,47 +24,48 @@ class FirebaseGroupServiceImpl @Inject constructor(
         name: String,
         description: String,
         template: GroupTemplate,
-        currency: String,
         memberUids: List<String>
     ): Result<Pair<String, String>> {
         return try {
             val uid = auth.currentUser?.uid ?: return Result.failure(Exception("User not authenticated"))
             if (name.isBlank()) return Result.failure(Exception("Group name is required"))
 
+            val userDoc = firestore.collection("users").document(uid).get().await()
+            val userCurrency = userDoc.getString("defaultCurrency") ?: "INR"
+
             val now = System.currentTimeMillis()
             val inviteCode = Calculations.generateInviteCode()
             val groupRef = firestore.collection("groups").document()
             val groupId = groupRef.id
 
-            val batch = firestore.runBatch { b ->
-                b.set(groupRef, mapOf(
-                    "name" to name.trim(),
-                    "description" to description.trim(),
-                    "template" to template.name.lowercase(),
-                    "currency" to (currency.ifEmpty { "INR" }),
-                    "createdBy" to uid,
-                    "inviteCode" to inviteCode,
-                    "memberCount" to 1,
-                    "totalExpenses" to 0.0,
-                    "createdAt" to now,
-                    "updatedAt" to now
-                ))
-                b.set(groupRef.collection("members").document(uid), mapOf(
-                    "uid" to uid,
-                    "role" to "admin",
-                    "joinedAt" to now,
-                    "balance" to 0.0,
-                    "status" to "active"
-                ))
-                b.set(groupRef.collection("activities").document(), mapOf(
-                    "type" to "group_created",
-                    "description" to "Group created",
-                    "userId" to uid,
-                    "data" to mapOf("groupName" to name.trim()),
-                    "createdAt" to now
-                ))
-            }
-            batch.await()
+            val batch = firestore.batch()
+            batch.set(groupRef, mapOf(
+                "name" to name.trim(),
+                "description" to description.trim(),
+                "template" to template.name.lowercase(),
+                "currency" to userCurrency,
+                "createdBy" to uid,
+                "inviteCode" to inviteCode,
+                "memberCount" to 1,
+                "totalExpenses" to 0.0,
+                "createdAt" to now,
+                "updatedAt" to now
+            ))
+            batch.set(groupRef.collection("members").document(uid), mapOf(
+                "uid" to uid,
+                "role" to "admin",
+                "joinedAt" to now,
+                "balance" to 0.0,
+                "status" to "active"
+            ))
+            batch.set(groupRef.collection("activities").document(), mapOf(
+                "type" to "group_created",
+                "description" to "Group created",
+                "userId" to uid,
+                "data" to mapOf("groupName" to name.trim()),
+                "createdAt" to now
+            ))
+            batch.commit().await()
 
             for (memberUid in memberUids) {
                 if (memberUid != uid) {
@@ -97,27 +98,21 @@ class FirebaseGroupServiceImpl @Inject constructor(
             if (memberDoc.exists()) return Result.failure(Exception("You are already a member of this group"))
 
             val now = System.currentTimeMillis()
-            val batch = firestore.runBatch { b ->
-                b.set(groupDoc.reference.collection("members").document(uid), mapOf(
-                    "uid" to uid,
-                    "role" to "member",
-                    "joinedAt" to now,
-                    "balance" to 0.0,
-                    "status" to "active"
-                ))
-                b.update(groupDoc.reference, mapOf(
-                    "memberCount" to ((groupData["memberCount"] as? Long ?: 0L) + 1),
-                    "updatedAt" to now
-                ))
-                b.set(groupDoc.reference.collection("activities").document(), mapOf(
-                    "type" to "member_joined",
-                    "description" to "Member joined via invite code",
-                    "userId" to uid,
-                    "data" to mapOf("groupId" to groupId),
-                    "createdAt" to now
-                ))
-            }
-            batch.await()
+            val batch = firestore.batch()
+            batch.set(groupDoc.reference.collection("members").document(uid), mapOf(
+                "uid" to uid,
+                "role" to "member",
+                "joinedAt" to now,
+                "balance" to 0.0,
+                "status" to "active"
+            ))
+            batch.update(groupDoc.reference, mapOf(
+                "memberCount" to ((groupData["memberCount"] as? Number)?.toLong() ?: 0L) + 1,
+                "userId" to uid,
+                "data" to mapOf("groupId" to groupId),
+                "createdAt" to now
+            ))
+            batch.commit().await()
 
             Result.success(Pair(groupId, groupData["name"] as? String ?: ""))
         } catch (e: Exception) {
@@ -183,7 +178,7 @@ class FirebaseGroupServiceImpl @Inject constructor(
                 "status" to "pending"
             )).await()
             val groupDoc = groupRef.get().await()
-            val currentCount = groupDoc.data?.get("memberCount") as? Long ?: 1L
+            val currentCount = (groupDoc.data?.get("memberCount") as? Number)?.toLong() ?: 1L
             groupRef.update(mapOf("memberCount" to (currentCount + 1), "updatedAt" to now)).await()
         }
 
@@ -218,29 +213,28 @@ class FirebaseGroupServiceImpl @Inject constructor(
             val now = System.currentTimeMillis()
 
             val existingMemberDoc = groupDoc.reference.collection("members").document(uid).get().await()
-            val batch = firestore.runBatch { b ->
-                b.update(inviteDoc.reference, mapOf("status" to "accepted"))
+            val batch = firestore.batch()
+            batch.update(inviteDoc.reference, mapOf("status" to "accepted"))
 
-                if (existingMemberDoc.exists() && existingMemberDoc.data?.get("status") == "pending") {
-                    b.update(groupDoc.reference.collection("members").document(uid), mapOf("status" to "active", "joinedAt" to now))
-                } else {
-                    b.set(groupDoc.reference.collection("members").document(uid), mapOf(
-                        "uid" to uid, "role" to "member", "joinedAt" to now, "balance" to 0.0, "status" to "active"
-                    ))
-                    b.update(groupDoc.reference, mapOf(
-                        "memberCount" to ((groupData["memberCount"] as? Long ?: 0L) + 1),
-                        "updatedAt" to now
-                    ))
-                }
-                b.set(groupDoc.reference.collection("activities").document(), mapOf(
-                    "type" to "member_joined",
-                    "description" to "Member joined via invitation",
-                    "userId" to uid,
-                    "data" to mapOf("groupId" to groupId, "invitationId" to invitationId),
-                    "createdAt" to now
+            if (existingMemberDoc.exists() && existingMemberDoc.data?.get("status") == "pending") {
+                batch.update(groupDoc.reference.collection("members").document(uid), mapOf("status" to "active", "joinedAt" to now))
+            } else {
+                batch.set(groupDoc.reference.collection("members").document(uid), mapOf(
+                    "uid" to uid, "role" to "member", "joinedAt" to now, "balance" to 0.0, "status" to "active"
+                ))
+                batch.update(groupDoc.reference, mapOf(
+                    "memberCount" to ((groupData["memberCount"] as? Number)?.toLong() ?: 0L) + 1,
+                    "updatedAt" to now
                 ))
             }
-            batch.await()
+            batch.set(groupDoc.reference.collection("activities").document(), mapOf(
+                "type" to "member_joined",
+                "description" to "Member joined via invitation",
+                "userId" to uid,
+                "data" to mapOf("groupId" to groupId, "invitationId" to invitationId),
+                "createdAt" to now
+            ))
+            batch.commit().await()
 
             Result.success(Pair(groupId, groupData["name"] as? String ?: ""))
         } catch (e: Exception) {
@@ -283,21 +277,20 @@ class FirebaseGroupServiceImpl @Inject constructor(
             }
 
             val now = System.currentTimeMillis()
-            val batch = firestore.runBatch { b ->
-                b.update(memberDoc.reference, mapOf("status" to "left"))
-                b.update(groupDoc.reference, mapOf(
-                    "memberCount" to ((groupDoc.data?.get("memberCount") as? Long ?: 1L) - 1),
-                    "updatedAt" to now
-                ))
-                b.set(groupDoc.reference.collection("activities").document(), mapOf(
-                    "type" to "member_left",
-                    "description" to "Member left the group",
-                    "userId" to uid,
-                    "data" to mapOf("groupId" to groupId),
-                    "createdAt" to now
-                ))
-            }
-            batch.await()
+            val batch = firestore.batch()
+            batch.update(memberDoc.reference, mapOf("status" to "left"))
+            batch.update(groupDoc.reference, mapOf(
+                "memberCount" to ((groupDoc.data?.get("memberCount") as? Number)?.toLong() ?: 1L) - 1,
+                "updatedAt" to now
+            ))
+            batch.set(groupDoc.reference.collection("activities").document(), mapOf(
+                "type" to "member_left",
+                "description" to "Member left the group",
+                "userId" to uid,
+                "data" to mapOf("groupId" to groupId),
+                "createdAt" to now
+            ))
+            batch.commit().await()
 
             Result.success(Unit)
         } catch (e: Exception) {
@@ -342,10 +335,11 @@ class FirebaseGroupServiceImpl @Inject constructor(
                     currency = data["currency"] as? String ?: "INR",
                     createdBy = data["createdBy"] as? String ?: "",
                     inviteCode = data["inviteCode"] as? String ?: "",
-                    memberCount = (data["memberCount"] as? Long ?: 0L).toInt(),
-                    totalExpenses = (data["totalExpenses"] as? Double ?: 0.0),
-                    yourBalance = (memberData["balance"] as? Double ?: 0.0),
-                    yourRole = memberData["role"] as? String ?: "member"
+                    memberCount = (data["memberCount"] as? Number)?.toInt() ?: 0,
+                    totalExpenses = (data["totalExpenses"] as? Number)?.toDouble() ?: 0.0,
+                    yourBalance = (memberData["balance"] as? Number)?.toDouble() ?: 0.0,
+                    yourRole = memberData["role"] as? String ?: "member",
+                    archived = data["archived"] as? Boolean ?: false
                 )
             }
             Result.success(groups)
@@ -373,8 +367,9 @@ class FirebaseGroupServiceImpl @Inject constructor(
                     currency = data["currency"] as? String ?: "INR",
                     inviteCode = data["inviteCode"] as? String ?: "",
                     createdBy = data["createdBy"] as? String ?: "",
-                    memberCount = (data["memberCount"] as? Long ?: 0L).toInt(),
-                    totalExpenses = (data["totalExpenses"] as? Double ?: 0.0)
+                    memberCount = (data["memberCount"] as? Number)?.toInt() ?: 0,
+                    totalExpenses = (data["totalExpenses"] as? Number)?.toDouble() ?: 0.0,
+                    archived = data["archived"] as? Boolean ?: false
                 )
             )
         } catch (e: Exception) {
@@ -413,6 +408,34 @@ class FirebaseGroupServiceImpl @Inject constructor(
                 )
             }
             Result.success(activities)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    override suspend fun archiveGroup(groupId: String): Result<Unit> {
+        return try {
+            val uid = auth.currentUser?.uid ?: return Result.failure(Exception("User not authenticated"))
+            val groupRef = firestore.collection("groups").document(groupId)
+            val memberDoc = groupRef.collection("members").document(uid).get().await()
+            if (!memberDoc.exists()) return Result.failure(Exception("You are not a member of this group"))
+
+            groupRef.update(mapOf("archived" to true, "updatedAt" to System.currentTimeMillis())).await()
+            Result.success(Unit)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    override suspend fun unarchiveGroup(groupId: String): Result<Unit> {
+        return try {
+            val uid = auth.currentUser?.uid ?: return Result.failure(Exception("User not authenticated"))
+            val groupRef = firestore.collection("groups").document(groupId)
+            val memberDoc = groupRef.collection("members").document(uid).get().await()
+            if (!memberDoc.exists()) return Result.failure(Exception("You are not a member of this group"))
+
+            groupRef.update(mapOf("archived" to false, "updatedAt" to System.currentTimeMillis())).await()
+            Result.success(Unit)
         } catch (e: Exception) {
             Result.failure(e)
         }

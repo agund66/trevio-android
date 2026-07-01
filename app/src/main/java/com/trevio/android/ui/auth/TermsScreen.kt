@@ -1,12 +1,26 @@
 package com.trevio.android.ui.auth
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Gavel
+import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.filled.Payments
+import androidx.compose.material.icons.filled.PersonOff
+import androidx.compose.material.icons.filled.VerifiedUser
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -56,80 +70,111 @@ fun TermsScreen(
 
     LaunchedEffect(state) {
         if (state is TermsViewModel.TermsState.Accepted) {
-            navController.navigate(TrevioRoute.Home.route) {
+            navController.navigate(TrevioRoute.Main.route) {
                 popUpTo(0) { inclusive = true }
             }
         }
     }
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text("Terms & Conditions") }
-            )
+    val gradient = Brush.verticalGradient(
+        colors = listOf(
+            MaterialTheme.colorScheme.primary,
+            MaterialTheme.colorScheme.primary.copy(alpha = 0.85f)
+        )
+    )
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .verticalScroll(rememberScrollState())
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(gradient)
+                .padding(horizontal = 24.dp, vertical = 32.dp)
+        ) {
+            Column {
+                Text(
+                    text = "Welcome to Trevio",
+                    style = MaterialTheme.typography.headlineMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = Color.White
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    text = "Before you get started, please review and accept our terms.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = Color.White.copy(alpha = 0.85f)
+                )
+            }
         }
-    ) { padding ->
+
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(padding)
-                .padding(24.dp)
-                .verticalScroll(rememberScrollState())
+                .padding(20.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            Text(
-                text = "Welcome to Trevio",
-                style = MaterialTheme.typography.headlineMedium,
-                fontWeight = FontWeight.Bold
-            )
-            Spacer(modifier = Modifier.height(16.dp))
-            Text(
-                text = "Before you get started, please read and accept our terms:",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-            Spacer(modifier = Modifier.height(24.dp))
-
-            TermsSection(
+            TermsSectionCard(
+                icon = Icons.Default.VerifiedUser,
+                iconColor = Color(0xFF6366F1),
                 title = "1. Acceptance of Terms",
                 body = "By using Trevio, you agree to these terms and conditions. If you do not agree, please do not use the app."
             )
-            Spacer(modifier = Modifier.height(16.dp))
-            TermsSection(
+            TermsSectionCard(
+                icon = Icons.Default.Lock,
+                iconColor = Color(0xFF22C55E),
                 title = "2. Privacy & Data",
                 body = "Trevio stores your name, email, and profile photo from your Google account. We use this to identify you and facilitate group expense splitting. Your data is stored securely in Firebase."
             )
-            Spacer(modifier = Modifier.height(16.dp))
-            TermsSection(
+            TermsSectionCard(
+                icon = Icons.Default.Payments,
+                iconColor = Color(0xFFF59E0B),
                 title = "3. Financial Data",
                 body = "Trevio helps track expenses and settlements between users. We do not process actual payments. All settlements are tracked in-app. UPI deep links redirect you to your preferred payment app."
             )
-            Spacer(modifier = Modifier.height(16.dp))
-            TermsSection(
+            TermsSectionCard(
+                icon = Icons.Default.Gavel,
+                iconColor = Color(0xFFEC4899),
                 title = "4. User Conduct",
                 body = "You are responsible for the expenses and settlements you add. Do not create fraudulent or misleading expense entries."
             )
-            Spacer(modifier = Modifier.height(16.dp))
-            TermsSection(
+            TermsSectionCard(
+                icon = Icons.Default.PersonOff,
+                iconColor = Color(0xFFEF4444),
                 title = "5. Account Termination",
                 body = "You can delete your account at any time. Upon deletion, your data will be removed from our servers."
             )
 
-            Spacer(modifier = Modifier.height(32.dp))
+            Spacer(modifier = Modifier.height(8.dp))
 
-            Row(
-                verticalAlignment = Alignment.CenterVertically
+            Surface(
+                shape = RoundedCornerShape(12.dp),
+                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                modifier = Modifier.fillMaxWidth()
             ) {
-                Checkbox(
-                    checked = checked,
-                    onCheckedChange = { checked = it }
-                )
-                Text(
-                    text = "I have read and agree to the Terms & Conditions",
-                    style = MaterialTheme.typography.bodyMedium
-                )
+                Row(
+                    modifier = Modifier.padding(16.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Checkbox(
+                        checked = checked,
+                        onCheckedChange = { checked = it },
+                        colors = CheckboxDefaults.colors(
+                            checkedColor = MaterialTheme.colorScheme.primary,
+                            uncheckedColor = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    )
+                    Text(
+                        text = "I have read and agree to the Terms & Conditions",
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = FontWeight.Medium
+                    )
+                }
             }
 
-            Spacer(modifier = Modifier.height(24.dp))
+            Spacer(modifier = Modifier.height(8.dp))
 
             Button(
                 onClick = { viewModel.acceptTnC() },
@@ -137,7 +182,7 @@ fun TermsScreen(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(56.dp),
-                shape = MaterialTheme.shapes.medium
+                shape = RoundedCornerShape(16.dp)
             ) {
                 if (state is TermsViewModel.TermsState.Loading) {
                     CircularProgressIndicator(
@@ -146,12 +191,14 @@ fun TermsScreen(
                         modifier = Modifier.size(24.dp)
                     )
                 } else {
+                    Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(20.dp))
+                    Spacer(modifier = Modifier.width(8.dp))
                     Text("Accept & Continue", style = MaterialTheme.typography.titleMedium)
                 }
             }
 
             if (state is TermsViewModel.TermsState.Error) {
-                Spacer(modifier = Modifier.height(12.dp))
+                Spacer(modifier = Modifier.height(8.dp))
                 Text(
                     text = (state as TermsViewModel.TermsState.Error).message,
                     color = MaterialTheme.colorScheme.error,
@@ -159,24 +206,59 @@ fun TermsScreen(
                 )
             }
 
-            Spacer(modifier = Modifier.height(32.dp))
+            Spacer(modifier = Modifier.height(24.dp))
         }
     }
 }
 
 @Composable
-private fun TermsSection(title: String, body: String) {
-    Column {
-        Text(
-            text = title,
-            style = MaterialTheme.typography.titleMedium,
-            fontWeight = FontWeight.SemiBold
-        )
-        Spacer(modifier = Modifier.height(4.dp))
-        Text(
-            text = body,
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
+private fun TermsSectionCard(
+    icon: ImageVector,
+    iconColor: Color,
+    title: String,
+    body: String
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surface
+        ),
+        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp)
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(40.dp)
+                    .clip(CircleShape)
+                    .background(iconColor.copy(alpha = 0.12f)),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = icon,
+                    contentDescription = null,
+                    tint = iconColor,
+                    modifier = Modifier.size(20.dp)
+                )
+            }
+            Spacer(modifier = Modifier.width(14.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = title,
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.SemiBold
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = body,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
     }
 }

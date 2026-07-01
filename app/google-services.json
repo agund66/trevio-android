@@ -14,6 +14,14 @@
       },
       "oauth_client": [
         {
+          "client_id": "17273127103-o5lu8f03npl2n771vrgpusguvlael88a.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.trevio.android",
+            "certificate_hash": "f92f266166be5e65dabbe6125660a18a16faa455"
+          }
+        },
+        {
           "client_id": "17273127103-elm7vf5ge4gqn00jbctag7polph2kbsl.apps.googleusercontent.com",
           "client_type": 3
         }

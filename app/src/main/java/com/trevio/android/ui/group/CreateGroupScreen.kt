@@ -1,9 +1,13 @@
 package com.trevio.android.ui.group
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.ContentCopy
@@ -16,12 +20,15 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.trevio.android.core.designsystem.components.MemberAvatar
+import com.trevio.android.core.designsystem.components.TrevioHeader
 import com.trevio.android.core.navigation.TrevioRoute
 import com.trevio.android.domain.model.GroupTemplate
 import com.trevio.android.domain.model.UserSearchResult
@@ -81,14 +88,13 @@ class CreateGroupViewModel @Inject constructor(
         )
     }
 
-    fun createGroup(name: String, description: String, template: GroupTemplate, currency: String) {
+    fun createGroup(name: String, description: String, template: GroupTemplate) {
         _state.value = _state.value.copy(isLoading = true, error = null)
         viewModelScope.launch {
             groupService.createGroup(
                 name = name,
                 description = description,
                 template = template,
-                currency = currency,
                 memberUids = _state.value.selectedMembers.map { it.uid }
             ).onSuccess { (groupId, inviteCode) ->
                 _state.value = _state.value.copy(
@@ -112,45 +118,36 @@ fun CreateGroupScreen(
     var name by remember { mutableStateOf("") }
     var description by remember { mutableStateOf("") }
     var selectedTemplate by remember { mutableStateOf(GroupTemplate.CASUAL) }
-    var currency by remember { mutableStateOf("INR") }
     var searchQuery by remember { mutableStateOf("") }
     val state by viewModel.state.collectAsState()
 
     LaunchedEffect(state.createdGroupId) {
         if (state.createdGroupId != null) {
-            navController.navigate(TrevioRoute.Home.route) {
-                popUpTo(TrevioRoute.Home.route) { inclusive = true }
-            }
+            navController.popBackStack(TrevioRoute.Home.route, inclusive = false)
         }
     }
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text("Create Group") },
-                navigationIcon = {
-                    TextButton(onClick = { navController.popBackStack() }) {
-                        Text("Cancel")
-                    }
-                }
-            )
-        }
-    ) { padding ->
+    Column(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
+        TrevioHeader(
+            title = "Create Group",
+            onBack = { navController.popBackStack() }
+        )
         Column(
             modifier = Modifier
-                .fillMaxSize()
-                .padding(padding)
-                .padding(16.dp)
+                .weight(1f)
+                .verticalScroll(rememberScrollState())
+                .padding(20.dp)
         ) {
-            Text("Choose a template", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+            SectionLabel("Choose a template")
             Spacer(modifier = Modifier.height(12.dp))
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
             ) {
                 TemplateCard(
                     icon = Icons.Default.TravelExplore,
                     title = "Trip",
+                    iconColor = Color(0xFF6366F1),
                     selected = selectedTemplate == GroupTemplate.TRIP,
                     onClick = { selectedTemplate = GroupTemplate.TRIP },
                     modifier = Modifier.weight(1f)
@@ -158,6 +155,7 @@ fun CreateGroupScreen(
                 TemplateCard(
                     icon = Icons.Default.Sports,
                     title = "Turf",
+                    iconColor = Color(0xFF22C55E),
                     selected = selectedTemplate == GroupTemplate.TURF,
                     onClick = { selectedTemplate = GroupTemplate.TURF },
                     modifier = Modifier.weight(1f)
@@ -165,6 +163,7 @@ fun CreateGroupScreen(
                 TemplateCard(
                     icon = Icons.Default.Group,
                     title = "Casual",
+                    iconColor = Color(0xFFF59E0B),
                     selected = selectedTemplate == GroupTemplate.CASUAL,
                     onClick = { selectedTemplate = GroupTemplate.CASUAL },
                     modifier = Modifier.weight(1f)
@@ -177,7 +176,8 @@ fun CreateGroupScreen(
                 onValueChange = { name = it },
                 label = { Text("Group name") },
                 modifier = Modifier.fillMaxWidth(),
-                singleLine = true
+                singleLine = true,
+                shape = RoundedCornerShape(12.dp)
             )
             Spacer(modifier = Modifier.height(12.dp))
             OutlinedTextField(
@@ -185,35 +185,11 @@ fun CreateGroupScreen(
                 onValueChange = { description = it },
                 label = { Text("Description (optional)") },
                 modifier = Modifier.fillMaxWidth(),
-                maxLines = 2
+                maxLines = 2,
+                shape = RoundedCornerShape(12.dp)
             )
-            Spacer(modifier = Modifier.height(12.dp))
-
-            Text("Currency", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-            Spacer(modifier = Modifier.height(8.dp))
-            val currencies = listOf("INR" to "₹ INR", "USD" to "\$ USD", "EUR" to "€ EUR", "GBP" to "£ GBP", "AED" to "AED", "SGD" to "S\$ SGD", "AUD" to "A\$ AUD", "CAD" to "C\$ CAD", "JPY" to "¥ JPY")
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                currencies.take(5).forEach { (code, label) ->
-                    FilterChip(
-                        selected = currency == code,
-                        onClick = { currency = code },
-                        label = { Text(label) }
-                    )
-                }
-            }
-            Spacer(modifier = Modifier.height(4.dp))
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                currencies.drop(5).forEach { (code, label) ->
-                    FilterChip(
-                        selected = currency == code,
-                        onClick = { currency = code },
-                        label = { Text(label) }
-                    )
-                }
-            }
-
             Spacer(modifier = Modifier.height(16.dp))
-            Text("Add members", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+            SectionLabel("Add members")
             Spacer(modifier = Modifier.height(8.dp))
             OutlinedTextField(
                 value = searchQuery,
@@ -221,12 +197,17 @@ fun CreateGroupScreen(
                 label = { Text("Search by username") },
                 leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
                 modifier = Modifier.fillMaxWidth(),
-                singleLine = true
+                singleLine = true,
+                shape = RoundedCornerShape(12.dp)
             )
 
             if (state.searchResults.isNotEmpty()) {
                 Spacer(modifier = Modifier.height(8.dp))
-                Card(modifier = Modifier.fillMaxWidth()) {
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+                ) {
                     Column {
                         state.searchResults.forEach { user ->
                             Row(
@@ -242,7 +223,15 @@ fun CreateGroupScreen(
                                     Text(user.displayName, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium)
                                     Text("@${user.username}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                                 }
-                                Icon(Icons.Default.PersonAdd, contentDescription = "Add", tint = MaterialTheme.colorScheme.primary)
+                                Box(
+                                    modifier = Modifier
+                                        .size(32.dp)
+                                        .clip(CircleShape)
+                                        .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.1f)),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Icon(Icons.Default.PersonAdd, contentDescription = "Add", tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(18.dp))
+                                }
                             }
                         }
                     }
@@ -251,22 +240,29 @@ fun CreateGroupScreen(
 
             if (state.selectedMembers.isNotEmpty()) {
                 Spacer(modifier = Modifier.height(12.dp))
-                Text("Selected (${state.selectedMembers.size})", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text("Selected (${state.selectedMembers.size})", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, fontWeight = FontWeight.SemiBold)
                 Spacer(modifier = Modifier.height(8.dp))
                 state.selectedMembers.forEach { user ->
-                    Row(
+                    Card(
                         modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
-                        verticalAlignment = Alignment.CenterVertically
+                        shape = RoundedCornerShape(10.dp),
+                        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
                     ) {
-                        MemberAvatar(name = user.displayName, photoURL = user.photoURL, size = 32)
-                        Spacer(modifier = Modifier.width(12.dp))
-                        Text(user.displayName, modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)
-                        TextButton(onClick = { viewModel.removeMember(user) }) { Text("Remove") }
+                        Row(
+                            modifier = Modifier.fillMaxWidth().padding(12.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            MemberAvatar(name = user.displayName, photoURL = user.photoURL, size = 32)
+                            Spacer(modifier = Modifier.width(12.dp))
+                            Text(user.displayName, modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium)
+                            TextButton(onClick = { viewModel.removeMember(user) }) { Text("Remove") }
+                        }
                     }
                 }
             }
 
-            Spacer(modifier = Modifier.weight(1f))
+            Spacer(modifier = Modifier.height(24.dp))
 
             if (state.error != null) {
                 Text(state.error!!, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
@@ -274,10 +270,10 @@ fun CreateGroupScreen(
             }
 
             Button(
-                onClick = { viewModel.createGroup(name, description, selectedTemplate, currency) },
+                onClick = { viewModel.createGroup(name, description, selectedTemplate) },
                 enabled = name.isNotBlank() && !state.isLoading,
                 modifier = Modifier.fillMaxWidth().height(56.dp),
-                shape = MaterialTheme.shapes.medium
+                shape = RoundedCornerShape(16.dp)
             ) {
                 if (state.isLoading) {
                     CircularProgressIndicator(color = MaterialTheme.colorScheme.onPrimary, strokeWidth = 2.dp, modifier = Modifier.size(24.dp))
@@ -285,14 +281,27 @@ fun CreateGroupScreen(
                     Text("Create Group", style = MaterialTheme.typography.titleMedium)
                 }
             }
+
+            Spacer(modifier = Modifier.height(24.dp))
         }
     }
+}
+
+@Composable
+private fun SectionLabel(text: String) {
+    Text(
+        text = text,
+        style = MaterialTheme.typography.titleSmall,
+        fontWeight = FontWeight.SemiBold,
+        color = MaterialTheme.colorScheme.onSurfaceVariant
+    )
 }
 
 @Composable
 private fun TemplateCard(
     icon: androidx.compose.ui.graphics.vector.ImageVector,
     title: String,
+    iconColor: Color,
     selected: Boolean,
     onClick: () -> Unit,
     modifier: Modifier = Modifier
@@ -303,20 +312,29 @@ private fun TemplateCard(
         modifier = modifier,
         border = CardDefaults.outlinedCardBorder(true),
         colors = CardDefaults.cardColors(
-            containerColor = if (selected) MaterialTheme.colorScheme.primary.copy(alpha = 0.1f) else MaterialTheme.colorScheme.surface
+            containerColor = if (selected) MaterialTheme.colorScheme.primary.copy(alpha = 0.08f) else MaterialTheme.colorScheme.surface
         ),
-        shape = MaterialTheme.shapes.medium
+        shape = RoundedCornerShape(14.dp),
+        elevation = CardDefaults.cardElevation(defaultElevation = if (selected) 2.dp else 1.dp)
     ) {
         Column(
             modifier = Modifier.padding(16.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Icon(
-                imageVector = icon,
-                contentDescription = null,
-                tint = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.size(28.dp)
-            )
+            Box(
+                modifier = Modifier
+                    .size(44.dp)
+                    .clip(CircleShape)
+                    .background(iconColor.copy(alpha = if (selected) 0.15f else 0.1f)),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = icon,
+                    contentDescription = null,
+                    tint = iconColor,
+                    modifier = Modifier.size(22.dp)
+                )
+            }
             Spacer(modifier = Modifier.height(8.dp))
             Text(title, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Medium)
         }

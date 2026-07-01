@@ -7,6 +7,7 @@ import com.trevio.android.domain.model.Expense
 import com.trevio.android.domain.model.SplitEntry
 import com.trevio.android.domain.model.SplitType
 import com.trevio.android.domain.repository.ExpenseService
+import com.trevio.android.domain.repository.ExchangeRateService
 import com.trevio.android.util.Calculations
 import kotlinx.coroutines.tasks.await
 import javax.inject.Inject
@@ -15,7 +16,8 @@ import javax.inject.Singleton
 @Singleton
 class FirebaseExpenseServiceImpl @Inject constructor(
     private val firestore: FirebaseFirestore,
-    private val auth: FirebaseAuth
+    private val auth: FirebaseAuth,
+    private val exchangeRateService: ExchangeRateService
 ) : ExpenseService {
 
     override suspend fun addExpense(
@@ -46,6 +48,7 @@ class FirebaseExpenseServiceImpl @Inject constructor(
             if (!memberDoc.exists()) return Result.failure(Exception("You are not a member of this group"))
 
             val calculatedSplits = Calculations.calculateSplits(amount, splitType, memberUids, splits)
+            val exchangeRateToBase = exchangeRateService.getRateToBase(currency).getOrDefault(1.0)
             val now = System.currentTimeMillis()
             val expenseRef = groupRef.collection("expenses").document()
 
@@ -62,7 +65,8 @@ class FirebaseExpenseServiceImpl @Inject constructor(
                 "date" to now,
                 "isRecurring" to isRecurring,
                 "createdBy" to uid,
-                "createdAt" to now
+                "createdAt" to now,
+                "exchangeRateToBase" to exchangeRateToBase
             )
 
             if (isRecurring && recurringFrequency != null) {
@@ -74,21 +78,22 @@ class FirebaseExpenseServiceImpl @Inject constructor(
                 )
             }
 
-            val batch = firestore.runBatch { b ->
-                b.set(expenseRef, expenseData)
-                b.set(groupRef.collection("activities").document(), mapOf(
-                    "type" to "expense_added",
-                    "description" to "Added expense: $description ($currency $amount)",
-                    "userId" to uid,
-                    "data" to mapOf("expenseId" to expenseRef.id, "amount" to amount, "description" to description),
-                    "createdAt" to now
-                ))
-                b.update(groupRef, mapOf(
-                    "totalExpenses" to ((groupDoc.data?.get("totalExpenses") as? Double ?: 0.0) + amount),
-                    "updatedAt" to now
-                ))
-            }
-            batch.await()
+            val amountInBase = amount * exchangeRateToBase
+
+            val batch = firestore.batch()
+            batch.set(expenseRef, expenseData)
+            batch.set(groupRef.collection("activities").document(), mapOf(
+                "type" to "expense_added",
+                "description" to "Added expense: $description ($currency $amount)",
+                "userId" to uid,
+                "data" to mapOf("expenseId" to expenseRef.id, "amount" to amount, "description" to description),
+                "createdAt" to now
+            ))
+            batch.update(groupRef, mapOf(
+                "totalExpenses" to ((groupDoc.data?.get("totalExpenses") as? Number)?.toDouble() ?: 0.0) + amountInBase,
+                "updatedAt" to now
+            ))
+            batch.commit().await()
 
             recalculateBalances(groupId)
 
@@ -133,7 +138,14 @@ class FirebaseExpenseServiceImpl @Inject constructor(
             if (paidBy.isNotBlank()) updateData["paidBy"] = paidBy
             if (category.isNotBlank()) updateData["category"] = category
 
-            val effectiveAmount = if (amount > 0) amount else (oldExpense["amount"] as? Double ?: 0.0)
+            val oldCurrency = oldExpense["currency"] as? String ?: "INR"
+            val newCurrency = if (currency.isNotBlank()) currency else oldCurrency
+            if (newCurrency != oldCurrency) {
+                val newRate = exchangeRateService.getRateToBase(newCurrency).getOrDefault(1.0)
+                updateData["exchangeRateToBase"] = newRate
+            }
+
+            val effectiveAmount = if (amount > 0) amount else (oldExpense["amount"] as? Number)?.toDouble() ?: 0.0
 
             if (memberUids.isNotEmpty()) {
                 updateData["splitType"] = splitType.name.lowercase()
@@ -143,30 +155,33 @@ class FirebaseExpenseServiceImpl @Inject constructor(
                 }
             }
 
-            val oldAmount = oldExpense["amount"] as? Double ?: 0.0
-            val amountDiff = effectiveAmount - oldAmount
+            val oldAmount = (oldExpense["amount"] as? Number)?.toDouble() ?: 0.0
+            val oldRate = (oldExpense["exchangeRateToBase"] as? Number)?.toDouble() ?: 1.0
+            val newRate = (updateData["exchangeRateToBase"] as? Number)?.toDouble() ?: oldRate
+            val oldAmountInBase = oldAmount * oldRate
+            val newAmountInBase = effectiveAmount * newRate
+            val amountDiffInBase = newAmountInBase - oldAmountInBase
 
-            val currentTotalExpenses = if (amountDiff != 0.0) {
-                (groupRef.get().await().data?.get("totalExpenses") as? Double ?: 0.0)
+            val currentTotalExpenses = if (amountDiffInBase != 0.0) {
+                (groupRef.get().await().data?.get("totalExpenses") as? Number)?.toDouble() ?: 0.0
             } else 0.0
 
-            val batch = firestore.runBatch { b ->
-                b.update(expenseRef, updateData)
-                if (amountDiff != 0.0) {
-                    b.update(groupRef, mapOf(
-                        "totalExpenses" to (currentTotalExpenses + amountDiff),
-                        "updatedAt" to now
-                    ))
-                }
-                b.set(groupRef.collection("activities").document(), mapOf(
-                    "type" to "expense_updated",
-                    "description" to "Updated expense: ${if (description.isNotBlank()) description else oldExpense["description"]}",
-                    "userId" to uid,
-                    "data" to mapOf("expenseId" to expenseId, "groupId" to groupId),
-                    "createdAt" to now
+            val batch = firestore.batch()
+            batch.update(expenseRef, updateData)
+            if (amountDiffInBase != 0.0) {
+                batch.update(groupRef, mapOf(
+                    "totalExpenses" to (currentTotalExpenses + amountDiffInBase),
+                    "updatedAt" to now
                 ))
             }
-            batch.await()
+            batch.set(groupRef.collection("activities").document(), mapOf(
+                "type" to "expense_updated",
+                "description" to "Updated expense: ${if (description.isNotBlank()) description else oldExpense["description"]}",
+                "userId" to uid,
+                "data" to mapOf("expenseId" to expenseId, "groupId" to groupId),
+                "createdAt" to now
+            ))
+            batch.commit().await()
 
             recalculateBalances(groupId)
 
@@ -191,24 +206,25 @@ class FirebaseExpenseServiceImpl @Inject constructor(
             if (!memberDoc.exists()) return Result.failure(Exception("You are not a member of this group"))
 
             val now = System.currentTimeMillis()
-            val expenseAmount = expenseData["amount"] as? Double ?: 0.0
+            val expenseAmount = (expenseData["amount"] as? Number)?.toDouble() ?: 0.0
+            val expenseRate = (expenseData["exchangeRateToBase"] as? Number)?.toDouble() ?: 1.0
+            val amountInBase = expenseAmount * expenseRate
             val groupDoc = groupRef.get().await()
 
-            val batch = firestore.runBatch { b ->
-                b.delete(expenseRef)
-                b.update(groupRef, mapOf(
-                    "totalExpenses" to maxOf(0.0, (groupDoc.data?.get("totalExpenses") as? Double ?: 0.0) - expenseAmount),
-                    "updatedAt" to now
-                ))
-                b.set(groupRef.collection("activities").document(), mapOf(
-                    "type" to "expense_deleted",
-                    "description" to "Deleted expense: ${expenseData["description"]}",
-                    "userId" to uid,
-                    "data" to mapOf("expenseId" to expenseId, "groupId" to groupId, "amount" to expenseAmount),
-                    "createdAt" to now
-                ))
-            }
-            batch.await()
+            val batch = firestore.batch()
+            batch.delete(expenseRef)
+            batch.update(groupRef, mapOf(
+                "totalExpenses" to maxOf(0.0, ((groupDoc.data?.get("totalExpenses") as? Number)?.toDouble() ?: 0.0) - amountInBase),
+                "updatedAt" to now
+            ))
+            batch.set(groupRef.collection("activities").document(), mapOf(
+                "type" to "expense_deleted",
+                "description" to "Deleted expense: ${expenseData["description"]}",
+                "userId" to uid,
+                "data" to mapOf("expenseId" to expenseId, "groupId" to groupId, "amount" to expenseAmount),
+                "createdAt" to now
+            ))
+            batch.commit().await()
 
             recalculateBalances(groupId)
 
@@ -247,19 +263,20 @@ class FirebaseExpenseServiceImpl @Inject constructor(
                 Expense(
                     expenseId = doc.id,
                     description = data["description"] as? String ?: "",
-                    amount = (data["amount"] as? Double ?: 0.0),
+                    amount = (data["amount"] as? Number)?.toDouble() ?: 0.0,
                     currency = data["currency"] as? String ?: "INR",
                     paidBy = data["paidBy"] as? String ?: "",
                     splitType = SplitType.valueOf((data["splitType"] as? String ?: "equal").uppercase()),
                     splits = splitsRaw.mapValues { (_, v) ->
                         SplitEntry(
-                            amount = (v["amount"] as? Double ?: 0.0),
-                            shareValue = (v["shareValue"] as? Double ?: 0.0)
+                            amount = (v["amount"] as? Number)?.toDouble() ?: 0.0,
+                            shareValue = (v["shareValue"] as? Number)?.toDouble() ?: 0.0
                         )
                     },
                     category = data["category"] as? String ?: "other",
                     isRecurring = data["isRecurring"] as? Boolean ?: false,
-                    createdBy = data["createdBy"] as? String ?: ""
+                    createdBy = data["createdBy"] as? String ?: "",
+                    exchangeRateToBase = (data["exchangeRateToBase"] as? Number)?.toDouble() ?: 1.0
                 )
             }
             Result.success(expenses)
@@ -281,15 +298,16 @@ class FirebaseExpenseServiceImpl @Inject constructor(
             val data = doc.data ?: emptyMap()
             @Suppress("UNCHECKED_CAST")
             val splitsRaw = data["splits"] as? Map<String, Map<String, Any>> ?: emptyMap()
-            Triple(
-                data["paidBy"] as? String ?: "",
-                splitsRaw.mapValues { (_, v) ->
+            Calculations.ExpenseBalanceData(
+                paidBy = data["paidBy"] as? String ?: "",
+                splits = splitsRaw.mapValues { (_, v) ->
                     SplitEntry(
-                        amount = (v["amount"] as? Double ?: 0.0),
-                        shareValue = (v["shareValue"] as? Double ?: 0.0)
+                        amount = (v["amount"] as? Number)?.toDouble() ?: 0.0,
+                        shareValue = (v["shareValue"] as? Number)?.toDouble() ?: 0.0
                     )
                 },
-                data["amount"] as? Double ?: 0.0
+                amount = (data["amount"] as? Number)?.toDouble() ?: 0.0,
+                exchangeRateToBase = (data["exchangeRateToBase"] as? Number)?.toDouble() ?: 1.0
             )
         }
 
@@ -298,17 +316,17 @@ class FirebaseExpenseServiceImpl @Inject constructor(
             Triple(
                 data["fromUid"] as? String ?: "",
                 data["toUid"] as? String ?: "",
-                data["amount"] as? Double ?: 0.0
+                (data["amount"] as? Number)?.toDouble() ?: 0.0
             )
         }
 
         val balances = Calculations.calculateBalances(expenses, settlements, memberUids)
 
-        val batch = firestore.runBatch { b ->
-            balances.forEach { (memberUid, balance) ->
-                b.update(groupRef.collection("members").document(memberUid), mapOf("balance" to balance))
-            }
+        val batch = firestore.batch()
+        balances.forEach { (memberUid, balance) ->
+            val roundedBalance = kotlin.math.round(balance * 100) / 100
+            batch.update(groupRef.collection("members").document(memberUid), mapOf("balance" to roundedBalance))
         }
-        batch.await()
+        batch.commit().await()
     }
 }

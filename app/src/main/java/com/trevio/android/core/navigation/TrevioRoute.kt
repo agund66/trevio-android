@@ -4,7 +4,9 @@ sealed class TrevioRoute(val route: String) {
     data object Splash : TrevioRoute("splash")
     data object Login : TrevioRoute("login")
     data object Terms : TrevioRoute("terms")
+    data object Main : TrevioRoute("main")
     data object Home : TrevioRoute("home")
+    data object Groups : TrevioRoute("groups")
     data object Notifications : TrevioRoute("notifications")
     data object Profile : TrevioRoute("profile")
     data object CreateGroup : TrevioRoute("create_group")
@@ -19,5 +21,8 @@ sealed class TrevioRoute(val route: String) {
     }
     data object SettleUp : TrevioRoute("settle_up/{groupId}") {
         fun createRoute(groupId: String) = "settle_up/$groupId"
+    }
+    data object PublicProfile : TrevioRoute("user/{uid}") {
+        fun createRoute(uid: String) = "user/$uid"
     }
 }

@@ -11,4 +11,5 @@ interface UserService {
     suspend fun updateUsername(username: String): Result<String>
     suspend fun searchUsers(query: String): Result<List<UserSearchResult>>
     suspend fun updateFcmToken(token: String): Result<Unit>
+    suspend fun deleteAccount(): Result<Unit>
 }

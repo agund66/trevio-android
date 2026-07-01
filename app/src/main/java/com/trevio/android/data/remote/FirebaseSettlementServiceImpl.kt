@@ -9,6 +9,7 @@ import com.trevio.android.domain.model.SettlementMethod
 import com.trevio.android.domain.model.SimplifiedDebt
 import com.trevio.android.domain.model.SplitEntry
 import com.trevio.android.domain.repository.SettlementService
+import com.trevio.android.domain.repository.ExchangeRateService
 import com.trevio.android.util.Calculations
 import kotlinx.coroutines.tasks.await
 import javax.inject.Inject
@@ -17,7 +18,8 @@ import javax.inject.Singleton
 @Singleton
 class FirebaseSettlementServiceImpl @Inject constructor(
     private val firestore: FirebaseFirestore,
-    private val auth: FirebaseAuth
+    private val auth: FirebaseAuth,
+    private val exchangeRateService: ExchangeRateService
 ) : SettlementService {
 
     override suspend fun addSettlement(
@@ -43,14 +45,19 @@ class FirebaseSettlementServiceImpl @Inject constructor(
             val memberDoc = groupRef.collection("members").document(uid).get().await()
             if (!memberDoc.exists()) return Result.failure(Exception("You are not a member of this group"))
 
+            val rateToBase = exchangeRateService.getRateToBase(currency).getOrDefault(1.0)
+            val amountInBase = kotlin.math.round(amount * rateToBase * 100) / 100
+
             val now = System.currentTimeMillis()
             val settlementRef = groupRef.collection("settlements").document()
 
             val settlementData = mutableMapOf<String, Any>(
                 "fromUid" to fromUid,
                 "toUid" to toUid,
-                "amount" to amount,
-                "currency" to currency,
+                "amount" to amountInBase,
+                "currency" to "INR",
+                "originalAmount" to amount,
+                "originalCurrency" to currency,
                 "method" to method.name.lowercase(),
                 "date" to now,
                 "createdBy" to uid,
@@ -63,22 +70,21 @@ class FirebaseSettlementServiceImpl @Inject constructor(
             val toUserDoc = firestore.collection("users").document(toUid).get().await()
             val toUserName = toUserDoc.data?.get("displayName") as? String ?: "Someone"
 
-            val batch = firestore.runBatch { b ->
-                b.set(settlementRef, settlementData)
-                b.set(groupRef.collection("activities").document(), mapOf(
-                    "type" to "settlement_added",
-                    "description" to "$fromUserName settled $currency $amount with $toUserName",
-                    "userId" to uid,
-                    "data" to mapOf(
-                        "settlementId" to settlementRef.id,
-                        "fromUid" to fromUid,
-                        "toUid" to toUid,
-                        "amount" to amount
-                    ),
-                    "createdAt" to now
-                ))
-            }
-            batch.await()
+            val batch = firestore.batch()
+            batch.set(settlementRef, settlementData)
+            batch.set(groupRef.collection("activities").document(), mapOf(
+                "type" to "settlement_added",
+                "description" to "$fromUserName settled ₹$amountInBase with $toUserName",
+                "userId" to uid,
+                "data" to mapOf(
+                    "settlementId" to settlementRef.id,
+                    "fromUid" to fromUid,
+                    "toUid" to toUid,
+                    "amount" to amountInBase
+                ),
+                "createdAt" to now
+            ))
+            batch.commit().await()
 
             recalculateBalances(groupId)
 
@@ -86,7 +92,7 @@ class FirebaseSettlementServiceImpl @Inject constructor(
                 .set(mapOf(
                     "type" to "settlement",
                     "title" to "Payment Received",
-                    "body" to "$fromUserName recorded a payment of $currency $amount to you",
+                    "body" to "$fromUserName recorded a payment of ₹$amountInBase to you",
                     "data" to mapOf(
                         "groupId" to groupId,
                         "groupName" to (groupDoc.data?.get("name") as? String ?: ""),
@@ -157,7 +163,7 @@ class FirebaseSettlementServiceImpl @Inject constructor(
                     displayName = userData?.get("displayName") as? String ?: "Unknown",
                     username = userData?.get("username") as? String ?: "",
                     photoURL = userData?.get("photoURL") as? String ?: "",
-                    balance = (data["balance"] as? Double ?: 0.0),
+                    balance = (data["balance"] as? Number)?.toDouble() ?: 0.0,
                     role = data["role"] as? String ?: "member",
                     status = data["status"] as? String ?: "active"
                 )
@@ -190,7 +196,7 @@ class FirebaseSettlementServiceImpl @Inject constructor(
                     toUid = data["toUid"] as? String ?: "",
                     fromName = fromDoc.data?.get("displayName") as? String ?: "Unknown",
                     toName = toDoc.data?.get("displayName") as? String ?: "Unknown",
-                    amount = (data["amount"] as? Double ?: 0.0),
+                    amount = (data["amount"] as? Number)?.toDouble() ?: 0.0,
                     currency = data["currency"] as? String ?: "INR",
                     method = SettlementMethod.valueOf((data["method"] as? String ?: "cash").uppercase()),
                     upiRefId = data["upiRefId"] as? String ?: ""
@@ -215,15 +221,16 @@ class FirebaseSettlementServiceImpl @Inject constructor(
             val data = doc.data ?: emptyMap()
             @Suppress("UNCHECKED_CAST")
             val splitsRaw = data["splits"] as? Map<String, Map<String, Any>> ?: emptyMap()
-            Triple(
-                data["paidBy"] as? String ?: "",
-                splitsRaw.mapValues { (_, v) ->
+            Calculations.ExpenseBalanceData(
+                paidBy = data["paidBy"] as? String ?: "",
+                splits = splitsRaw.mapValues { (_, v) ->
                     SplitEntry(
-                        amount = (v["amount"] as? Double ?: 0.0),
-                        shareValue = (v["shareValue"] as? Double ?: 0.0)
+                        amount = (v["amount"] as? Number)?.toDouble() ?: 0.0,
+                        shareValue = (v["shareValue"] as? Number)?.toDouble() ?: 0.0
                     )
                 },
-                data["amount"] as? Double ?: 0.0
+                amount = (data["amount"] as? Number)?.toDouble() ?: 0.0,
+                exchangeRateToBase = (data["exchangeRateToBase"] as? Number)?.toDouble() ?: 1.0
             )
         }
 
@@ -232,7 +239,7 @@ class FirebaseSettlementServiceImpl @Inject constructor(
             Triple(
                 data["fromUid"] as? String ?: "",
                 data["toUid"] as? String ?: "",
-                data["amount"] as? Double ?: 0.0
+                (data["amount"] as? Number)?.toDouble() ?: 0.0
             )
         }
 
@@ -253,15 +260,16 @@ class FirebaseSettlementServiceImpl @Inject constructor(
             val data = doc.data ?: emptyMap()
             @Suppress("UNCHECKED_CAST")
             val splitsRaw = data["splits"] as? Map<String, Map<String, Any>> ?: emptyMap()
-            Triple(
-                data["paidBy"] as? String ?: "",
-                splitsRaw.mapValues { (_, v) ->
+            Calculations.ExpenseBalanceData(
+                paidBy = data["paidBy"] as? String ?: "",
+                splits = splitsRaw.mapValues { (_, v) ->
                     SplitEntry(
-                        amount = (v["amount"] as? Double ?: 0.0),
-                        shareValue = (v["shareValue"] as? Double ?: 0.0)
+                        amount = (v["amount"] as? Number)?.toDouble() ?: 0.0,
+                        shareValue = (v["shareValue"] as? Number)?.toDouble() ?: 0.0
                     )
                 },
-                data["amount"] as? Double ?: 0.0
+                amount = (data["amount"] as? Number)?.toDouble() ?: 0.0,
+                exchangeRateToBase = (data["exchangeRateToBase"] as? Number)?.toDouble() ?: 1.0
             )
         }
 
@@ -270,17 +278,17 @@ class FirebaseSettlementServiceImpl @Inject constructor(
             Triple(
                 data["fromUid"] as? String ?: "",
                 data["toUid"] as? String ?: "",
-                data["amount"] as? Double ?: 0.0
+                (data["amount"] as? Number)?.toDouble() ?: 0.0
             )
         }
 
         val balances = Calculations.calculateBalances(expenses, settlements, memberUids)
 
-        val batch = firestore.runBatch { b ->
-            balances.forEach { (memberUid, balance) ->
-                b.update(groupRef.collection("members").document(memberUid), mapOf("balance" to balance))
-            }
+        val batch = firestore.batch()
+        balances.forEach { (memberUid, balance) ->
+            val roundedBalance = kotlin.math.round(balance * 100) / 100
+            batch.update(groupRef.collection("members").document(memberUid), mapOf("balance" to roundedBalance))
         }
-        batch.await()
+        batch.commit().await()
     }
 }

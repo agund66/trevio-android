@@ -1,7 +1,9 @@
 package com.trevio.android.data.remote
 
+import android.app.Activity
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.GoogleAuthProvider
+import com.google.firebase.auth.OAuthProvider
 import com.google.firebase.firestore.FirebaseFirestore
 import com.trevio.android.domain.model.User
 import com.trevio.android.domain.repository.AuthService
@@ -20,6 +22,48 @@ class FirebaseAuthServiceImpl @Inject constructor(
             val credential = GoogleAuthProvider.getCredential(idToken, null)
             val result = auth.signInWithCredential(credential).await()
             val firebaseUser = result.user!!
+
+            val userDoc = firestore.collection("users").document(firebaseUser.uid).get().await()
+            if (!userDoc.exists()) {
+                val displayName = firebaseUser.displayName ?: ""
+                val nameParts = displayName.split(" ", limit = 2)
+                val firstName = nameParts.getOrElse(0) { "" }
+                val lastName = nameParts.getOrElse(1) { "" }
+
+                val newUser = User(
+                    uid = firebaseUser.uid,
+                    email = firebaseUser.email ?: "",
+                    displayName = displayName,
+                    firstName = firstName,
+                    lastName = lastName,
+                    photoURL = firebaseUser.photoUrl?.toString() ?: "",
+                    defaultCurrency = "INR",
+                    acceptedTnC = false
+                )
+
+                firestore.collection("users").document(firebaseUser.uid)
+                    .set(newUser).await()
+            }
+
+            Result.success(firebaseUser.uid)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    override suspend fun signInWithGoogleWeb(activity: Activity): Result<String> {
+        return try {
+            val provider = OAuthProvider.newBuilder("google.com")
+            provider.addCustomParameter("prompt", "select_account")
+
+            val pendingResult = auth.pendingAuthResult
+            if (pendingResult != null) {
+                pendingResult.await()
+            } else {
+                auth.startActivityForSignInWithProvider(activity, provider.build()).await()
+            }
+
+            val firebaseUser = auth.currentUser!!
 
             val userDoc = firestore.collection("users").document(firebaseUser.uid).get().await()
             if (!userDoc.exists()) {

@@ -41,3 +41,7 @@ val TrevioOnSurfaceVariantDark = Color(0xFF94A3B8)
 // Accent colors
 val TrevioAccent = Color(0xFFF59E0B)
 val TrevioAccentLight = Color(0xFFFCD34D)
+
+// Border / divider (slate-200 equivalent)
+val TrevioBorder = Color(0xFFE2E8F0)
+val TrevioBorderDark = Color(0xFF334155)

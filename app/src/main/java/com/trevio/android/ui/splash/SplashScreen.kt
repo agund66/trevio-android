@@ -1,15 +1,17 @@
 package com.trevio.android.ui.splash
 
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import com.trevio.android.R
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.ViewModel
@@ -101,7 +103,7 @@ fun SplashScreen(
                         popUpTo(0) { inclusive = true }
                     }
                 } else {
-                    navController.navigate(TrevioRoute.Home.route) {
+                    navController.navigate(TrevioRoute.Main.route) {
                         popUpTo(0) { inclusive = true }
                     }
                 }
@@ -110,8 +112,18 @@ fun SplashScreen(
         }
     }
 
+    val gradient = Brush.verticalGradient(
+        colors = listOf(
+            MaterialTheme.colorScheme.primary,
+            MaterialTheme.colorScheme.primary.copy(alpha = 0.8f),
+            MaterialTheme.colorScheme.primaryContainer
+        )
+    )
+
     Box(
-        modifier = Modifier.fillMaxSize(),
+        modifier = Modifier
+            .fillMaxSize()
+            .background(gradient),
         contentAlignment = Alignment.Center
     ) {
         Column(
@@ -125,12 +137,13 @@ fun SplashScreen(
             Spacer(modifier = Modifier.height(12.dp))
             Text(
                 text = "Split bills. Simplify life.",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+                style = MaterialTheme.typography.bodyLarge,
+                color = Color.White.copy(alpha = 0.9f),
+                fontWeight = FontWeight.Medium
             )
             Spacer(modifier = Modifier.height(32.dp))
             if (state is SplashViewModel.SplashState.Loading) {
-                CircularProgressIndicator()
+                CircularProgressIndicator(color = Color.White)
             }
         }
     }

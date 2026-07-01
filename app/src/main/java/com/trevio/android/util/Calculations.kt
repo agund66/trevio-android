@@ -69,17 +69,20 @@ object Calculations {
     }
 
     fun calculateBalances(
-        expenses: List<Triple<String, Map<String, SplitEntry>, Double>>,
+        expenses: List<ExpenseBalanceData>,
         settlements: List<Triple<String, String, Double>>,
         memberUids: List<String>
     ): Map<String, Double> {
         val balances = mutableMapOf<String, Double>()
         memberUids.forEach { balances[it] = 0.0 }
 
-        for ((paidBy, splits, amount) in expenses) {
-            balances[paidBy] = (balances[paidBy] ?: 0.0) + amount
-            for ((uid, split) in splits) {
-                balances[uid] = (balances[uid] ?: 0.0) - split.amount
+        for (expense in expenses) {
+            val rate = expense.exchangeRateToBase
+            val amountInBase = expense.amount * rate
+            balances[expense.paidBy] = (balances[expense.paidBy] ?: 0.0) + amountInBase
+            for ((uid, split) in expense.splits) {
+                val splitInBase = split.amount * rate
+                balances[uid] = (balances[uid] ?: 0.0) - splitInBase
             }
         }
 
@@ -90,6 +93,13 @@ object Calculations {
 
         return balances
     }
+
+    data class ExpenseBalanceData(
+        val paidBy: String,
+        val splits: Map<String, SplitEntry>,
+        val amount: Double,
+        val exchangeRateToBase: Double = 1.0
+    )
 
     data class SimplifiedDebtRaw(
         val fromUid: String,

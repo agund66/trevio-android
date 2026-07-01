@@ -13,7 +13,8 @@ data class GroupInfo(
     val inviteCode: String = "",
     val createdBy: String = "",
     val memberCount: Int = 0,
-    val totalExpenses: Double = 0.0
+    val totalExpenses: Double = 0.0,
+    val archived: Boolean = false
 )
 
 interface GroupService {
@@ -21,7 +22,6 @@ interface GroupService {
         name: String,
         description: String,
         template: GroupTemplate,
-        currency: String,
         memberUids: List<String>
     ): Result<Pair<String, String>>
 
@@ -30,6 +30,8 @@ interface GroupService {
     suspend fun acceptInvitation(invitationId: String): Result<Pair<String, String>>
     suspend fun declineInvitation(invitationId: String): Result<Unit>
     suspend fun leaveGroup(groupId: String): Result<Unit>
+    suspend fun archiveGroup(groupId: String): Result<Unit>
+    suspend fun unarchiveGroup(groupId: String): Result<Unit>
     suspend fun getUserGroups(): Result<List<Group>>
     suspend fun getGroupInfo(groupId: String): Result<GroupInfo>
     suspend fun getGroupActivities(groupId: String, pageSize: Int = 50): Result<List<Activity>>

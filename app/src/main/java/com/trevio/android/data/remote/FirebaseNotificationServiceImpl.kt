@@ -74,12 +74,11 @@ class FirebaseNotificationServiceImpl @Inject constructor(
             val snapshot = firestore.collection("users").document(uid).collection("notifications")
                 .whereEqualTo("read", false).get().await()
 
-            val batch = firestore.runBatch { b ->
-                snapshot.documents.forEach { doc ->
-                    b.update(doc.reference, "read", true)
-                }
+            val batch = firestore.batch()
+            snapshot.documents.forEach { doc ->
+                batch.update(doc.reference, "read", true)
             }
-            batch.await()
+            batch.commit().await()
 
             Result.success(Unit)
         } catch (e: Exception) {

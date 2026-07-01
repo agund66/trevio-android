@@ -33,7 +33,8 @@ data class Group(
     val memberCount: Int = 0,
     val totalExpenses: Double = 0.0,
     val yourBalance: Double = 0.0,
-    val yourRole: String = "member"
+    val yourRole: String = "member",
+    val archived: Boolean = false
 )
 
 data class Member(
@@ -63,7 +64,8 @@ data class Expense(
     val category: String = "other",
     val date: Long = 0,
     val isRecurring: Boolean = false,
-    val createdBy: String = ""
+    val createdBy: String = "",
+    val exchangeRateToBase: Double = 1.0
 )
 
 data class Settlement(
@@ -118,4 +120,11 @@ data class UserSearchResult(
     val username: String = "",
     val displayName: String = "",
     val photoURL: String = ""
+)
+
+data class ExchangeRates(
+    val base: String = "INR",
+    val date: String = "",
+    val rates: Map<String, Double> = emptyMap(),
+    val updatedAt: Long = 0
 )

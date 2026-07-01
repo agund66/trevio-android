@@ -1,15 +1,22 @@
 package com.trevio.android.ui.group
 
 import android.content.Intent
+import android.widget.Toast
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.text.font.FontWeight
@@ -20,10 +27,11 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.trevio.android.core.designsystem.components.BalanceChip
 import com.trevio.android.core.designsystem.components.LoadingIndicator
 import com.trevio.android.core.designsystem.components.MemberAvatar
-import com.trevio.android.core.designsystem.components.formatCurrency
+import com.trevio.android.core.designsystem.components.TrevioCard
+import com.trevio.android.core.designsystem.components.TrevioHeader
+import com.trevio.android.core.designsystem.theme.TrevioBorder
 import com.trevio.android.core.navigation.TrevioRoute
 import com.trevio.android.domain.model.Activity
 import com.trevio.android.domain.model.Expense
@@ -36,6 +44,7 @@ import com.trevio.android.domain.repository.GroupInfo
 import com.trevio.android.domain.repository.GroupService
 import com.trevio.android.domain.repository.SettlementService
 import com.trevio.android.domain.repository.UserService
+import com.trevio.android.util.rememberCurrencyFormatter
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -129,6 +138,18 @@ class GroupViewModel @Inject constructor(
         _state.value = _state.value.copy(searchResults = emptyList(), inviteError = null)
     }
 
+    fun toggleArchive() {
+        val isArchived = _state.value.groupInfo?.archived ?: false
+        viewModelScope.launch {
+            if (isArchived) {
+                groupService.unarchiveGroup(groupId)
+            } else {
+                groupService.archiveGroup(groupId)
+            }
+            loadData()
+        }
+    }
+
     fun loadActivities() {
         _state.value = _state.value.copy(activitiesLoading = true)
         viewModelScope.launch {
@@ -141,6 +162,28 @@ class GroupViewModel @Inject constructor(
                 }
         }
     }
+
+    fun settleDebt(debt: SimplifiedDebt) {
+        viewModelScope.launch {
+            settlementService.addSettlement(
+                groupId = groupId,
+                fromUid = debt.fromUid,
+                toUid = debt.toUid,
+                amount = debt.amount,
+                currency = "INR",
+                method = com.trevio.android.domain.model.SettlementMethod.CASH,
+                upiRefId = null
+            ).onSuccess { loadData() }
+        }
+    }
+}
+
+private fun getUpiVpa(debt: SimplifiedDebt): String {
+    if (debt.toUpiId.isNotEmpty()) return debt.toUpiId
+    if (debt.toPhoneNumber.isNotEmpty() && (debt.toCountryCode.isEmpty() || debt.toCountryCode == "IN")) {
+        return "${debt.toPhoneNumber}@paytm"
+    }
+    return ""
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -150,6 +193,7 @@ fun GroupDetailScreen(
     viewModel: GroupViewModel = hiltViewModel()
 ) {
     val state by viewModel.state.collectAsState()
+    val currencyFormatter = rememberCurrencyFormatter()
     var selectedTab by remember { mutableStateOf(0) }
     var showInviteDialog by remember { mutableStateOf(false) }
     var searchQuery by remember { mutableStateOf("") }
@@ -179,99 +223,179 @@ fun GroupDetailScreen(
     }
 
     Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text(state.groupInfo?.name ?: "Group") },
-                navigationIcon = {
-                    IconButton(onClick = { navController.popBackStack() }) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = "Back")
-                    }
-                },
-                actions = {
-                    if (!state.groupInfo?.inviteCode.isNullOrBlank()) {
-                        IconButton(onClick = { shareInviteLink() }) {
-                            Icon(Icons.Default.Share, contentDescription = "Share Invite")
-                        }
-                    }
-                }
-            )
-        },
         floatingActionButton = {
             FloatingActionButton(
                 onClick = {
                     navController.navigate(TrevioRoute.AddExpense.createRoute(state.groupInfo?.groupId ?: ""))
-                }
+                },
+                shape = RoundedCornerShape(16.dp),
+                containerColor = MaterialTheme.colorScheme.primary
             ) {
-                Icon(Icons.Default.Add, contentDescription = "Add Expense")
+                Icon(Icons.Default.Add, contentDescription = "Add Expense", tint = MaterialTheme.colorScheme.onPrimary)
             }
         }
     ) { padding ->
         if (state.isLoading) {
-            LoadingIndicator(modifier = Modifier.padding(padding))
+            Column(modifier = Modifier.padding(padding).background(MaterialTheme.colorScheme.background)) {
+                TrevioHeader(
+                    title = "Group",
+                    onBack = { navController.popBackStack() }
+                )
+                Box(modifier = Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
+                    CircularProgressIndicator()
+                }
+            }
             return@Scaffold
         }
 
         val groupInfo = state.groupInfo
-        val currency = groupInfo?.currency ?: "INR"
 
-        Column(modifier = Modifier.padding(padding)) {
-            if (groupInfo?.description?.isNotEmpty() == true) {
-                Text(
-                    groupInfo.description,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)
-                )
-            }
-
-            Row(
-                modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                AssistChip(onClick = {}, label = { Text("${groupInfo?.memberCount ?: 0} members") })
-                AssistChip(onClick = {}, label = { Text("${formatCurrency(groupInfo?.totalExpenses ?: 0.0, currency)} total") })
-                if (!groupInfo?.inviteCode.isNullOrBlank()) {
-                    AssistChip(
-                        onClick = {},
-                        leadingIcon = { Icon(Icons.Default.ContentCopy, contentDescription = null, modifier = Modifier.size(16.dp)) },
-                        label = { Text("Code: ${groupInfo?.inviteCode}") }
-                    )
+        LazyColumn(modifier = Modifier.padding(padding).background(MaterialTheme.colorScheme.background)) {
+            item {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(MaterialTheme.colorScheme.primary)
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 8.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        IconButton(onClick = { navController.popBackStack() }) {
+                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = Color.White)
+                        }
+                        Row {
+                            IconButton(onClick = { viewModel.toggleArchive() }) {
+                                Icon(
+                                    if (groupInfo?.archived == true) Icons.Default.Unarchive else Icons.Default.Archive,
+                                    contentDescription = if (groupInfo?.archived == true) "Unarchive" else "Archive",
+                                    tint = Color.White
+                                )
+                            }
+                            if (!state.groupInfo?.inviteCode.isNullOrBlank()) {
+                                IconButton(onClick = {
+                                    val clipboard = context.getSystemService(android.content.Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
+                                    clipboard.setPrimaryClip(android.content.ClipData.newPlainText("Invite Code", state.groupInfo?.inviteCode))
+                                    Toast.makeText(context, "Invite code copied", Toast.LENGTH_SHORT).show()
+                                }) {
+                                    Icon(Icons.Default.ContentCopy, contentDescription = "Copy Code", tint = Color.White)
+                                }
+                                IconButton(onClick = { shareInviteLink() }) {
+                                    Icon(Icons.Default.Share, contentDescription = "Share Invite", tint = Color.White)
+                                }
+                            }
+                        }
+                    }
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        modifier = Modifier.padding(horizontal = 16.dp)
+                    ) {
+                        Text(
+                            groupInfo?.name ?: "Group",
+                            style = MaterialTheme.typography.titleLarge,
+                            fontWeight = FontWeight.Bold,
+                            color = Color.White
+                        )
+                        if (groupInfo?.archived == true) {
+                            Surface(
+                                color = Color.White.copy(alpha = 0.2f),
+                                shape = RoundedCornerShape(6.dp)
+                            ) {
+                                Text(
+                                    "Archived",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = Color.White,
+                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
+                                )
+                            }
+                        }
+                    }
+                    if (groupInfo?.description?.isNotEmpty() == true) {
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            groupInfo.description,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = Color.White.copy(alpha = 0.8f),
+                            modifier = Modifier.padding(horizontal = 16.dp)
+                        )
+                    }
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        modifier = Modifier.padding(horizontal = 16.dp)
+                    ) {
+                        InfoChip("${groupInfo?.memberCount ?: 0} members")
+                        InfoChip(currencyFormatter.formatBase(groupInfo?.totalExpenses ?: 0.0))
+                        if (!groupInfo?.inviteCode.isNullOrBlank()) {
+                            InfoChip("Code: ${groupInfo?.inviteCode}")
+                        }
+                    }
+                    Spacer(modifier = Modifier.height(12.dp))
                 }
             }
 
-            TabRow(selectedTabIndex = selectedTab) {
-                Tab(selected = selectedTab == 0, onClick = { selectedTab = 0 }, text = { Text("Expenses") })
-                Tab(selected = selectedTab == 1, onClick = { selectedTab = 1 }, text = { Text("Balances") })
-                Tab(selected = selectedTab == 2, onClick = { selectedTab = 2 }, text = { Text("Members") })
-                Tab(selected = selectedTab == 3, onClick = {
-                    selectedTab = 3
-                    if (state.activities.isEmpty() && !state.activitiesLoading) {
-                        viewModel.loadActivities()
-                    }
-                }, text = { Text("Activity") })
+            item {
+                TabRow(
+                    selectedTabIndex = selectedTab,
+                    containerColor = MaterialTheme.colorScheme.surface
+                ) {
+                    Tab(selected = selectedTab == 0, onClick = { selectedTab = 0 }, text = { Text("Expenses") })
+                    Tab(selected = selectedTab == 1, onClick = { selectedTab = 1 }, text = { Text("Balances") })
+                    Tab(selected = selectedTab == 2, onClick = { selectedTab = 2 }, text = { Text("Members") })
+                    Tab(selected = selectedTab == 3, onClick = {
+                        selectedTab = 3
+                        if (state.activities.isEmpty() && !state.activitiesLoading) {
+                            viewModel.loadActivities()
+                        }
+                    }, text = { Text("Activity") })
+                }
             }
 
             when (selectedTab) {
-                0 -> ExpensesTab(
-                    expenses = state.expenses,
-                    members = state.members,
-                    onSettleUp = { navController.navigate(TrevioRoute.SettleUp.createRoute(state.groupInfo?.groupId ?: "")) }
-                )
-                1 -> BalancesTab(
-                    members = state.members,
-                    debts = state.debts,
-                    currentUserId = state.currentUserId,
-                    currency = currency,
-                    onSettleUp = { navController.navigate(TrevioRoute.SettleUp.createRoute(state.groupInfo?.groupId ?: "")) }
-                )
-                2 -> MembersTab(
-                    members = state.members,
-                    onInvite = { showInviteDialog = true }
-                )
-                3 -> ActivityTab(
-                    activities = state.activities,
-                    isLoading = state.activitiesLoading
-                )
+                0 -> item {
+                    ExpensesTab(
+                        expenses = state.expenses,
+                        members = state.members,
+                        currentUserId = state.currentUserId,
+                        formatOriginal = currencyFormatter.formatOriginal,
+                        onSettleUp = { navController.navigate(TrevioRoute.SettleUp.createRoute(state.groupInfo?.groupId ?: "")) }
+                    )
+                }
+                1 -> item {
+                    BalancesTab(
+                        members = state.members,
+                        debts = state.debts,
+                        currentUserId = state.currentUserId,
+                        formatBase = currencyFormatter.formatBase,
+                        onSettleUp = { navController.navigate(TrevioRoute.SettleUp.createRoute(state.groupInfo?.groupId ?: "")) },
+                        onMemberClick = { uid -> navController.navigate(TrevioRoute.PublicProfile.createRoute(uid)) },
+                        onSettleDebt = { debt -> viewModel.settleDebt(debt) },
+                        onPayViaUpi = { debt ->
+                            val vpa = getUpiVpa(debt)
+                            if (vpa.isNotEmpty()) {
+                                val upiUri = "upi://pay?pa=${android.net.Uri.encode(vpa)}&pn=${android.net.Uri.encode(debt.toName)}&am=${debt.amount}&cu=INR&tn=${android.net.Uri.encode("Trevio")}"
+                                val intent = android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(upiUri))
+                                context.startActivity(android.content.Intent.createChooser(intent, "Pay with..."))
+                            }
+                        }
+                    )
+                }
+                2 -> item {
+                    MembersTab(
+                        members = state.members,
+                        onInvite = { showInviteDialog = true },
+                        onMemberClick = { uid -> navController.navigate(TrevioRoute.PublicProfile.createRoute(uid)) }
+                    )
+                }
+                3 -> item {
+                    ActivityTab(
+                        activities = state.activities,
+                        isLoading = state.activitiesLoading
+                    )
+                }
             }
         }
 
@@ -334,50 +458,92 @@ fun GroupDetailScreen(
 }
 
 @Composable
-private fun ExpensesTab(expenses: List<Expense>, members: List<Member>, onSettleUp: () -> Unit) {
+private fun ExpensesTab(expenses: List<Expense>, members: List<Member>, currentUserId: String?, formatOriginal: (Double, String) -> String, onSettleUp: () -> Unit) {
     if (expenses.isEmpty()) {
-        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(top = 80.dp),
+            contentAlignment = Alignment.Center
+        ) {
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                Icon(Icons.Default.Receipt, contentDescription = null, modifier = Modifier.size(64.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f))
+                Icon(Icons.Default.Receipt, contentDescription = null, modifier = Modifier.size(64.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f))
                 Spacer(modifier = Modifier.height(16.dp))
                 Text("No expenses yet", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 Spacer(modifier = Modifier.height(4.dp))
-                Text("Tap + to add your first expense", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text("Tap + to add your first expense", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f))
             }
         }
     } else {
-        LazyColumn(
-            contentPadding = PaddingValues(16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
+        Column(
+            modifier = Modifier.fillMaxWidth().padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
-            items(expenses) { expense ->
-                ExpenseCard(expense, members)
+            expenses.forEach { expense ->
+                ExpenseCard(expense, members, currentUserId, formatOriginal)
             }
         }
     }
 }
 
 @Composable
-private fun ExpenseCard(expense: Expense, members: List<Member>) {
+private fun ExpenseCard(expense: Expense, members: List<Member>, currentUserId: String?, formatOriginal: (Double, String) -> String) {
     val payer = members.find { it.uid == expense.paidBy }
     val payerName = payer?.displayName?.split(" ")?.firstOrNull() ?: "Someone"
-    Card(modifier = Modifier.fillMaxWidth(), shape = MaterialTheme.shapes.medium) {
+    val myShare = currentUserId?.let { expense.splits[it]?.amount }
+    val categoryIcon = when (expense.category) {
+        "food" -> Icons.Default.Restaurant
+        "transport" -> Icons.Default.DirectionsCar
+        "shopping" -> Icons.Default.ShoppingBag
+        "turf" -> Icons.Default.Sports
+        "accommodation" -> Icons.Default.Hotel
+        else -> Icons.Default.Receipt
+    }
+    val categoryColor = when (expense.category) {
+        "food" -> Color(0xFFF59E0B)
+        "transport" -> Color(0xFF6366F1)
+        "shopping" -> Color(0xFFEC4899)
+        "turf" -> Color(0xFF22C55E)
+        "accommodation" -> Color(0xFF0D9488)
+        else -> Color(0xFF6B7280)
+    }
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(14.dp),
+        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+    ) {
         Row(
             modifier = Modifier.fillMaxWidth().padding(16.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
+            Box(
+                modifier = Modifier
+                    .size(40.dp)
+                    .clip(CircleShape)
+                    .background(categoryColor.copy(alpha = 0.12f)),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(categoryIcon, contentDescription = null, tint = categoryColor, modifier = Modifier.size(20.dp))
+            }
+            Spacer(modifier = Modifier.width(12.dp))
             Column(modifier = Modifier.weight(1f)) {
-                Text(expense.description, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-                Spacer(modifier = Modifier.height(4.dp))
+                Text(expense.description, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
+                Spacer(modifier = Modifier.height(2.dp))
                 Text(
-                    "$payerName paid · ${expense.category}",
+                    buildString {
+                        append("$payerName paid · ${expense.category}")
+                        if (myShare != null && kotlin.math.abs(myShare) > 0.01) {
+                            append(" · your share: ")
+                            append(formatOriginal(myShare, expense.currency))
+                        }
+                    },
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
             Text(
-                text = formatCurrency(expense.amount, expense.currency),
-                style = MaterialTheme.typography.titleLarge,
+                text = formatOriginal(expense.amount, expense.currency),
+                style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.primary
             )
@@ -390,8 +556,11 @@ private fun BalancesTab(
     members: List<Member>,
     debts: List<SimplifiedDebt>,
     currentUserId: String?,
-    currency: String,
-    onSettleUp: () -> Unit
+    formatBase: (Double) -> String,
+    onSettleUp: () -> Unit,
+    onMemberClick: (String) -> Unit,
+    onSettleDebt: (SimplifiedDebt) -> Unit = {},
+    onPayViaUpi: (SimplifiedDebt) -> Unit = {}
 ) {
     val myBalance = members.find { it.uid == currentUserId }?.balance ?: 0.0
     val myDebts = debts.filter { it.fromUid == currentUserId }
@@ -399,15 +568,14 @@ private fun BalancesTab(
     val totalOwed = myDebts.sumOf { it.amount }
     val totalOwing = myCredits.sumOf { it.amount }
 
-    LazyColumn(
-        modifier = Modifier.fillMaxSize().padding(16.dp),
+    Column(
+        modifier = Modifier.fillMaxWidth().padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         // Your Balance summary card
-        item {
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                shape = MaterialTheme.shapes.medium,
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(16.dp),
                 colors = CardDefaults.cardColors(
                     containerColor = when {
                         myBalance > 0.01 -> MaterialTheme.colorScheme.primary.copy(alpha = 0.08f)
@@ -420,7 +588,7 @@ private fun BalancesTab(
                     Text("Your balance", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     Spacer(modifier = Modifier.height(4.dp))
                     Text(
-                        text = formatCurrency(myBalance, currency),
+                        text = formatBase(myBalance),
                         style = MaterialTheme.typography.headlineMedium,
                         fontWeight = FontWeight.Bold,
                         color = when {
@@ -432,14 +600,14 @@ private fun BalancesTab(
                     Spacer(modifier = Modifier.height(8.dp))
                     if (myDebts.isNotEmpty()) {
                         Text(
-                            "You owe ${myDebts.size} ${if (myDebts.size == 1) "person" else "people"} ${formatCurrency(totalOwed, currency)}",
+                            "You owe ${myDebts.size} ${if (myDebts.size == 1) "person" else "people"} ${formatBase(totalOwed)}",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.error
                         )
                     }
                     if (myCredits.isNotEmpty()) {
                         Text(
-                            "${myCredits.size} ${if (myCredits.size == 1) "person owes" else "people owe"} you ${formatCurrency(totalOwing, currency)}",
+                            "${myCredits.size} ${if (myCredits.size == 1) "person owes" else "people owe"} you ${formatBase(totalOwing)}",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.primary
                         )
@@ -453,37 +621,34 @@ private fun BalancesTab(
                     }
                 }
             }
-        }
 
         // Settle Up button
         if (members.isNotEmpty() && debts.isNotEmpty()) {
-            item {
-                Button(
-                    onClick = onSettleUp,
-                    modifier = Modifier.fillMaxWidth().height(48.dp),
-                    shape = MaterialTheme.shapes.medium
-                ) {
-                    Icon(Icons.Default.AccountBalanceWallet, contentDescription = null, modifier = Modifier.size(20.dp))
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text("Settle Up")
-                }
+            Button(
+                onClick = onSettleUp,
+                modifier = Modifier.fillMaxWidth().height(48.dp),
+                shape = RoundedCornerShape(12.dp)
+            ) {
+                Icon(Icons.Default.AccountBalanceWallet, contentDescription = null, modifier = Modifier.size(20.dp))
+                Spacer(modifier = Modifier.width(8.dp))
+                Text("Settle Up")
             }
         }
 
         // Suggested settlements header
         if (debts.isNotEmpty()) {
-            item {
-                Text("Suggested Settlements", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(top = 4.dp))
-            }
+            Text("Suggested Settlements", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(top = 4.dp))
 
-            items(debts) { debt ->
+            debts.forEach { debt ->
                 val isMyDebt = debt.fromUid == currentUserId
                 val isMyCredit = debt.toUid == currentUserId
                 val fromFirstName = debt.fromName.split(" ").firstOrNull() ?: debt.fromName
                 val toFirstName = debt.toName.split(" ").firstOrNull() ?: debt.toName
+                val paymentVpa = getUpiVpa(debt)
                 Card(
                     modifier = Modifier.fillMaxWidth(),
-                    shape = MaterialTheme.shapes.medium,
+                    shape = RoundedCornerShape(12.dp),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
                     colors = CardDefaults.cardColors(
                         containerColor = when {
                             isMyDebt -> MaterialTheme.colorScheme.error.copy(alpha = 0.05f)
@@ -492,35 +657,74 @@ private fun BalancesTab(
                         }
                     )
                 ) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth().padding(16.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                text = when {
-                                    isMyDebt -> "You owe $toFirstName"
-                                    isMyCredit -> "$fromFirstName owes you"
-                                    else -> "$fromFirstName owes $toFirstName"
-                                },
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = when {
-                                    isMyDebt -> MaterialTheme.colorScheme.error
-                                    isMyCredit -> MaterialTheme.colorScheme.primary
-                                    else -> MaterialTheme.colorScheme.onSurface
+                    Column(modifier = Modifier.fillMaxWidth().padding(16.dp)) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = when {
+                                        isMyDebt -> "You owe $toFirstName"
+                                        isMyCredit -> "$fromFirstName owes you"
+                                        else -> "$fromFirstName owes $toFirstName"
+                                    },
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = when {
+                                        isMyDebt -> MaterialTheme.colorScheme.error
+                                        isMyCredit -> MaterialTheme.colorScheme.primary
+                                        else -> MaterialTheme.colorScheme.onSurface
+                                    }
+                                )
+                                Spacer(modifier = Modifier.height(2.dp))
+                                Text(
+                                    formatBase(debt.amount),
+                                    style = MaterialTheme.typography.titleLarge,
+                                    fontWeight = FontWeight.Bold,
+                                    color = when {
+                                        isMyDebt -> MaterialTheme.colorScheme.error
+                                        isMyCredit -> MaterialTheme.colorScheme.primary
+                                        else -> MaterialTheme.colorScheme.onSurface
+                                    }
+                                )
+                                if (paymentVpa.isNotEmpty() && isMyDebt) {
+                                    Spacer(modifier = Modifier.height(2.dp))
+                                    Text(
+                                        "Pay to: $paymentVpa",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
                                 }
-                            )
-                            Spacer(modifier = Modifier.height(2.dp))
-                            Text(
-                                formatCurrency(debt.amount, currency),
-                                style = MaterialTheme.typography.titleLarge,
-                                fontWeight = FontWeight.Bold,
-                                color = when {
-                                    isMyDebt -> MaterialTheme.colorScheme.error
-                                    isMyCredit -> MaterialTheme.colorScheme.primary
-                                    else -> MaterialTheme.colorScheme.onSurface
+                            }
+                        }
+                        if (isMyDebt) {
+                            Spacer(modifier = Modifier.height(12.dp))
+                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                if (paymentVpa.isNotEmpty()) {
+                                    OutlinedButton(
+                                        onClick = { onPayViaUpi(debt) },
+                                        modifier = Modifier.weight(1f),
+                                        shape = RoundedCornerShape(12.dp)
+                                    ) {
+                                        Text("Pay via UPI", style = MaterialTheme.typography.labelMedium)
+                                    }
+                                    Button(
+                                        onClick = { onSettleDebt(debt) },
+                                        modifier = Modifier.weight(1f),
+                                        shape = RoundedCornerShape(12.dp)
+                                    ) {
+                                        Text("Mark Settled", style = MaterialTheme.typography.labelMedium)
+                                    }
+                                } else {
+                                    Button(
+                                        onClick = { onSettleDebt(debt) },
+                                        modifier = Modifier.fillMaxWidth(),
+                                        shape = RoundedCornerShape(12.dp)
+                                    ) {
+                                        Text("Mark Settled", style = MaterialTheme.typography.labelMedium)
+                                    }
                                 }
-                            )
+                            }
                         }
                     }
                 }
@@ -528,15 +732,15 @@ private fun BalancesTab(
         }
 
         // Member balances header
-        item {
-            Text("Member Balances", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(top = 4.dp))
-        }
+        Text("Member Balances", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(top = 4.dp))
 
-        items(members) { member ->
+        members.forEach { member ->
             val isMe = member.uid == currentUserId
             Card(
+                onClick = { onMemberClick(member.uid) },
                 modifier = Modifier.fillMaxWidth(),
-                shape = MaterialTheme.shapes.medium,
+                shape = RoundedCornerShape(12.dp),
+                elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
                 colors = CardDefaults.cardColors(
                     containerColor = if (isMe) MaterialTheme.colorScheme.primary.copy(alpha = 0.05f) else MaterialTheme.colorScheme.surface
                 )
@@ -550,7 +754,7 @@ private fun BalancesTab(
                     Column(modifier = Modifier.weight(1f)) {
                         Text(
                             member.displayName + if (isMe) " (you)" else "",
-                            style = MaterialTheme.typography.titleMedium,
+                            style = MaterialTheme.typography.titleSmall,
                             fontWeight = FontWeight.Medium
                         )
                         Text("@${member.username}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -568,13 +772,13 @@ private fun BalancesTab(
                             else -> MaterialTheme.colorScheme.onSurfaceVariant
                         }
                         val text = when {
-                            member.balance > 0.01 -> if (isMe) "you'll get ${formatCurrency(member.balance, currency)}" else "gets ${formatCurrency(member.balance, currency)}"
-                            member.balance < -0.01 -> if (isMe) "you'll pay ${formatCurrency(-member.balance, currency)}" else "owes ${formatCurrency(-member.balance, currency)}"
+                            member.balance > 0.01 -> if (isMe) "you'll get ${formatBase(member.balance)}" else "gets ${formatBase(member.balance)}"
+                            member.balance < -0.01 -> if (isMe) "you'll pay ${formatBase(-member.balance)}" else "owes ${formatBase(-member.balance)}"
                             else -> "settled"
                         }
                         Surface(
                             color = color.copy(alpha = 0.12f),
-                            shape = MaterialTheme.shapes.small
+                            shape = RoundedCornerShape(8.dp)
                         ) {
                             Text(
                                 text = text,
@@ -592,15 +796,15 @@ private fun BalancesTab(
 }
 
 @Composable
-private fun MembersTab(members: List<Member>, onInvite: () -> Unit) {
-    Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
+private fun MembersTab(members: List<Member>, onInvite: () -> Unit, onMemberClick: (String) -> Unit) {
+    Column(modifier = Modifier.fillMaxWidth().padding(16.dp)) {
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Text("Members (${members.size})", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-            Button(onClick = onInvite, shape = MaterialTheme.shapes.medium) {
+            Text("Members (${members.size})", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
+            Button(onClick = onInvite, shape = RoundedCornerShape(12.dp)) {
                 Icon(Icons.Default.PersonAdd, contentDescription = null, modifier = Modifier.size(18.dp))
                 Spacer(modifier = Modifier.width(4.dp))
                 Text("Invite")
@@ -608,30 +812,33 @@ private fun MembersTab(members: List<Member>, onInvite: () -> Unit) {
         }
         Spacer(modifier = Modifier.height(16.dp))
 
-        LazyColumn(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            items(members) { member ->
-                Card(modifier = Modifier.fillMaxWidth(), shape = MaterialTheme.shapes.medium) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth().padding(16.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        MemberAvatar(name = member.displayName, photoURL = member.photoURL, size = 40)
-                        Spacer(modifier = Modifier.width(12.dp))
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(member.displayName, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Medium)
-                            Text("@${member.username}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        }
-                        if (member.status == "pending") {
-                            AssistChip(
-                                onClick = {},
-                                leadingIcon = { Icon(Icons.Default.Schedule, contentDescription = null, modifier = Modifier.size(14.dp)) },
-                                label = { Text("pending", style = MaterialTheme.typography.labelSmall) }
-                            )
-                        }
-                        if (member.role == "admin") {
-                            Spacer(modifier = Modifier.width(4.dp))
-                            AssistChip(onClick = {}, label = { Text("admin", style = MaterialTheme.typography.labelSmall) })
-                        }
+        members.forEach { member ->
+            Card(
+                onClick = { onMemberClick(member.uid) },
+                modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                shape = RoundedCornerShape(12.dp),
+                elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(16.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    MemberAvatar(name = member.displayName, photoURL = member.photoURL, size = 40)
+                    Spacer(modifier = Modifier.width(12.dp))
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(member.displayName, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Medium)
+                        Text("@${member.username}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                    if (member.status == "pending") {
+                        AssistChip(
+                            onClick = {},
+                            leadingIcon = { Icon(Icons.Default.Schedule, contentDescription = null, modifier = Modifier.size(14.dp)) },
+                            label = { Text("pending", style = MaterialTheme.typography.labelSmall) }
+                        )
+                    }
+                    if (member.role == "admin") {
+                        Spacer(modifier = Modifier.width(4.dp))
+                        AssistChip(onClick = {}, label = { Text("admin", style = MaterialTheme.typography.labelSmall) })
                     }
                 }
             }
@@ -642,14 +849,19 @@ private fun MembersTab(members: List<Member>, onInvite: () -> Unit) {
 @Composable
 private fun ActivityTab(activities: List<Activity>, isLoading: Boolean) {
     if (isLoading) {
-        LoadingIndicator(modifier = Modifier.fillMaxSize())
+        LoadingIndicator(modifier = Modifier.fillMaxWidth().padding(40.dp))
         return
     }
 
     if (activities.isEmpty()) {
-        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(top = 80.dp),
+            contentAlignment = Alignment.Center
+        ) {
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                Icon(Icons.Default.List, contentDescription = null, modifier = Modifier.size(64.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                Icon(Icons.Default.List, contentDescription = null, modifier = Modifier.size(64.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f))
                 Spacer(modifier = Modifier.height(16.dp))
                 Text("No activity yet", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
@@ -657,34 +869,33 @@ private fun ActivityTab(activities: List<Activity>, isLoading: Boolean) {
         return
     }
 
-    LazyColumn(
-        modifier = Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(16.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp)
+    Column(
+        modifier = Modifier.fillMaxWidth().padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
-        items(activities) { activity ->
-            Card(modifier = Modifier.fillMaxWidth(), shape = MaterialTheme.shapes.medium) {
+        activities.forEach { activity ->
+            val (icon, iconColor) = activityIcon(activity.type)
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(12.dp),
+                elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
+            ) {
                 Row(
                     modifier = Modifier.fillMaxWidth().padding(16.dp),
                     verticalAlignment = Alignment.Top
                 ) {
-                    val icon = when (activity.type) {
-                        "expense_added", "expense_updated", "expense_deleted" -> Icons.Default.Receipt
-                        "settlement_added" -> Icons.Default.AccountBalanceWallet
-                        "member_joined" -> Icons.Default.PersonAdd
-                        "member_left" -> Icons.Default.PersonRemove
-                        "group_created" -> Icons.Default.Group
-                        else -> Icons.Default.Info
-                    }
                     Box(
-                        modifier = Modifier.size(36.dp),
+                        modifier = Modifier
+                            .size(36.dp)
+                            .clip(CircleShape)
+                            .background(iconColor.copy(alpha = 0.12f)),
                         contentAlignment = Alignment.Center
                     ) {
-                        Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(20.dp))
+                        Icon(icon, contentDescription = null, tint = iconColor, modifier = Modifier.size(18.dp))
                     }
                     Spacer(modifier = Modifier.width(12.dp))
                     Column(modifier = Modifier.weight(1f)) {
-                        Text(activity.description, style = MaterialTheme.typography.bodyMedium)
+                        Text(activity.description, style = MaterialTheme.typography.bodySmall)
                         Spacer(modifier = Modifier.height(4.dp))
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             if (activity.userPhotoURL.isNotEmpty()) {
@@ -701,6 +912,32 @@ private fun ActivityTab(activities: List<Activity>, isLoading: Boolean) {
                 }
             }
         }
+    }
+}
+
+private fun activityIcon(type: String): Pair<androidx.compose.ui.graphics.vector.ImageVector, Color> {
+    return when (type) {
+        "expense_added", "expense_updated", "expense_deleted" -> Icons.Default.Receipt to Color(0xFFF59E0B)
+        "settlement_added" -> Icons.Default.AccountBalanceWallet to Color(0xFF22C55E)
+        "member_joined" -> Icons.Default.PersonAdd to Color(0xFF6366F1)
+        "member_left" -> Icons.Default.PersonRemove to Color(0xFFEF4444)
+        "group_created" -> Icons.Default.Group to Color(0xFF0D9488)
+        else -> Icons.Default.Info to Color(0xFF6B7280)
+    }
+}
+
+@Composable
+private fun InfoChip(text: String) {
+    Surface(
+        color = Color.White.copy(alpha = 0.2f),
+        shape = RoundedCornerShape(8.dp)
+    ) {
+        Text(
+            text = text,
+            style = MaterialTheme.typography.labelSmall,
+            color = Color.White,
+            modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
+        )
     }
 }
 

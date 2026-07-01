@@ -157,13 +157,13 @@ class FirebaseUserServiceImpl @Inject constructor(
             val usernameDoc = firestore.collection("usernames").document(normalized).get().await()
             if (usernameDoc.exists()) return Result.failure(Exception("Username is already taken"))
 
-            firestore.runBatch { batch ->
-                if (currentUsername != null) {
-                    batch.delete(firestore.collection("usernames").document(currentUsername))
-                }
-                batch.set(firestore.collection("usernames").document(normalized), mapOf("uid" to uid))
-                batch.update(userDocRef, mapOf("username" to normalized, "updatedAt" to System.currentTimeMillis()))
-            }.await()
+            val batch = firestore.batch()
+            if (currentUsername != null) {
+                batch.delete(firestore.collection("usernames").document(currentUsername))
+            }
+            batch.set(firestore.collection("usernames").document(normalized), mapOf("uid" to uid))
+            batch.update(userDocRef, mapOf("username" to normalized, "updatedAt" to System.currentTimeMillis()))
+            batch.commit().await()
 
             Result.success(normalized)
         } catch (e: Exception) {
@@ -207,6 +207,53 @@ class FirebaseUserServiceImpl @Inject constructor(
             val uid = auth.currentUser?.uid ?: return Result.failure(Exception("User not authenticated"))
             firestore.collection("users").document(uid)
                 .update(mapOf("fcmToken" to token, "updatedAt" to System.currentTimeMillis())).await()
+            Result.success(Unit)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    override suspend fun deleteAccount(): Result<Unit> {
+        return try {
+            val uid = auth.currentUser?.uid ?: return Result.failure(Exception("User not authenticated"))
+            val currentUser = auth.currentUser ?: return Result.failure(Exception("User not authenticated"))
+
+            // 1. Get user doc to find username
+            val userDoc = firestore.collection("users").document(uid).get().await()
+            val username = userDoc.getString("username")
+
+            // 2. Find all group memberships and set status to "left"
+            val membersSnapshot = firestore.collectionGroup("members")
+                .whereEqualTo("uid", uid)
+                .whereEqualTo("status", "active")
+                .get().await()
+
+            for (memberDoc in membersSnapshot.documents) {
+                val pathSegments = memberDoc.reference.path.split("/")
+                val groupId = pathSegments.getOrNull(1) ?: continue
+                memberDoc.reference.update(
+                    mapOf("status" to "left", "leftAt" to System.currentTimeMillis())
+                ).await()
+                // Decrement group memberCount
+                val groupRef = firestore.collection("groups").document(groupId)
+                val groupDoc = groupRef.get().await()
+                if (groupDoc.exists()) {
+                    val count = (groupDoc.getLong("memberCount") ?: 0L).toInt()
+                    groupRef.update("memberCount", maxOf(0, count - 1)).await()
+                }
+            }
+
+            // 3. Delete username doc if exists
+            if (!username.isNullOrBlank()) {
+                firestore.collection("usernames").document(username).delete().await()
+            }
+
+            // 4. Delete user doc
+            firestore.collection("users").document(uid).delete().await()
+
+            // 5. Delete Firebase Auth account
+            currentUser.delete().await()
+
             Result.success(Unit)
         } catch (e: Exception) {
             Result.failure(e)

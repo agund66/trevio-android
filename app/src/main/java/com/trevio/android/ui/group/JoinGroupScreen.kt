@@ -1,5 +1,6 @@
 package com.trevio.android.ui.group
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Group
@@ -13,6 +14,7 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.trevio.android.core.designsystem.components.TrevioHeader
 import com.trevio.android.core.navigation.TrevioRoute
 import com.trevio.android.domain.repository.AuthService
 import com.trevio.android.domain.repository.GroupService
@@ -101,18 +103,13 @@ fun JoinGroupScreen(
         }
     }
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text("Join Group") },
-                navigationIcon = {
-                    TextButton(onClick = { navController.popBackStack() }) { Text("Cancel") }
-                }
-            )
-        }
-    ) { padding ->
+    Column(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
+        TrevioHeader(
+            title = "Join Group",
+            onBack = { navController.popBackStack() }
+        )
         Box(
-            modifier = Modifier.fillMaxSize().padding(padding),
+            modifier = Modifier.weight(1f).fillMaxWidth(),
             contentAlignment = Alignment.Center
         ) {
             when {

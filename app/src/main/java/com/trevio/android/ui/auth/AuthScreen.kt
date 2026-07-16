@@ -52,6 +52,7 @@ class AuthViewModel @Inject constructor(
         data object Loading : AuthState()
         data object NeedsTnC : AuthState()
         data object Authenticated : AuthState()
+        data object Blocked : AuthState()
         data class Error(val message: String) : AuthState()
     }
 
@@ -64,7 +65,10 @@ class AuthViewModel @Inject constructor(
             val result = authService.signInWithGoogle(idToken)
             result.onSuccess {
                 val user = authService.getCurrentUser()
-                if (user != null && !user.acceptedTnC) {
+                if (user != null && user.blocked) {
+                    authService.signOut()
+                    _state.value = AuthState.Blocked
+                } else if (user != null && !user.acceptedTnC) {
                     _state.value = AuthState.NeedsTnC
                 } else {
                     _state.value = AuthState.Authenticated
@@ -85,7 +89,10 @@ class AuthViewModel @Inject constructor(
             val result = authService.signInWithGoogleWeb(activity)
             result.onSuccess {
                 val user = authService.getCurrentUser()
-                if (user != null && !user.acceptedTnC) {
+                if (user != null && user.blocked) {
+                    authService.signOut()
+                    _state.value = AuthState.Blocked
+                } else if (user != null && !user.acceptedTnC) {
                     _state.value = AuthState.NeedsTnC
                 } else {
                     _state.value = AuthState.Authenticated
@@ -118,6 +125,9 @@ fun AuthScreen(
                 navController.navigate(TrevioRoute.Main.route) {
                     popUpTo(0) { inclusive = true }
                 }
+            }
+            is AuthViewModel.AuthState.Blocked -> {
+                viewModel.setError("Your account has been blocked. Please contact support.")
             }
             else -> {}
         }

@@ -58,6 +58,7 @@ class ExpenseViewModel @Inject constructor(
         viewModelScope.launch {
             settlementService.getGroupBalances(groupId)
                 .onSuccess { members -> _state.value = _state.value.copy(members = members) }
+                .onFailure { e -> _state.value = _state.value.copy(error = e.message) }
         }
     }
 

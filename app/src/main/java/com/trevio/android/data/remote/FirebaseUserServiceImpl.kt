@@ -31,6 +31,8 @@ class FirebaseUserServiceImpl @Inject constructor(
                     photoURL = data["photoURL"] as? String ?: "",
                     defaultCurrency = data["defaultCurrency"] as? String ?: "INR",
                     acceptedTnC = data["acceptedTnC"] as? Boolean ?: false,
+                    role = data["role"] as? String ?: "user",
+                    blocked = data["blocked"] as? Boolean ?: false,
                     upiId = data["upiId"] as? String ?: "",
                     phoneNumber = data["phoneNumber"] as? String ?: "",
                     countryCode = data["countryCode"] as? String ?: ""

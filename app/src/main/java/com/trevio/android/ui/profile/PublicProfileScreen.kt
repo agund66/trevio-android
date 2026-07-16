@@ -11,6 +11,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Mail
 import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.Phone
+import androidx.compose.material.icons.filled.Wallet
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -23,7 +25,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 
-import com.trevio.android.core.designsystem.components.TrevioHeader
+import com.trevio.android.core.designsystem.components.TrevioCard
 import com.trevio.android.core.designsystem.theme.TrevioBorder
 import com.trevio.android.domain.model.User
 import com.trevio.android.domain.repository.UserService
@@ -76,10 +78,19 @@ fun PublicProfileScreen(
 
     if (state.isLoading) {
         Column(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
-            TrevioHeader(
-                title = "Profile",
-                onBack = { navController.popBackStack() }
-            )
+            Column(
+                modifier = Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.primary)
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    IconButton(onClick = { navController.popBackStack() }) {
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = Color.White)
+                    }
+                    Text("Profile", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = Color.White)
+                }
+            }
             Box(modifier = Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
                 CircularProgressIndicator()
             }
@@ -184,6 +195,24 @@ fun PublicProfileScreen(
                 label = "Email",
                 value = user.email
             )
+
+            // Payment info
+            if (user.upiId.isNotEmpty()) {
+                ProfileInfoCard(
+                    icon = Icons.Default.Wallet,
+                    iconColor = Color(0xFF0D9488),
+                    label = "Pay via UPI ID",
+                    value = user.upiId
+                )
+            } else if (user.phoneNumber.isNotEmpty()) {
+                val country = COUNTRY_CODES.find { it.code == user.countryCode } ?: COUNTRY_CODES.first()
+                ProfileInfoCard(
+                    icon = Icons.Default.Phone,
+                    iconColor = Color(0xFF0D9488),
+                    label = "Pay via Mobile Number",
+                    value = "${country.dialCode} ${user.phoneNumber}"
+                )
+            }
         }
     }
 }

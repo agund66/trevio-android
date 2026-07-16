@@ -3,15 +3,18 @@ package com.trevio.android.core.navigation
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Group
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.Shield
 import androidx.compose.material.icons.outlined.Group
 import androidx.compose.material.icons.outlined.Home
 import androidx.compose.material.icons.outlined.Person
+import androidx.compose.material.icons.outlined.Shield
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
@@ -21,6 +24,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -35,6 +39,9 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.navArgument
 import androidx.navigation.compose.rememberNavController
 import com.trevio.android.core.designsystem.theme.TrevioBorder
+import com.trevio.android.domain.repository.AuthService
+import com.trevio.android.ui.admin.AdminScreen
+import com.trevio.android.ui.broadcast.BroadcastPopup
 import com.trevio.android.ui.expense.AddExpenseScreen
 import com.trevio.android.ui.group.CreateGroupScreen
 import com.trevio.android.ui.group.GroupDetailScreen
@@ -45,6 +52,28 @@ import com.trevio.android.ui.notifications.NotificationsScreen
 import com.trevio.android.ui.profile.ProfileScreen
 import com.trevio.android.ui.profile.PublicProfileScreen
 import com.trevio.android.ui.settlement.SettleUpScreen
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
+import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.launch
+import javax.inject.Inject
+
+@HiltViewModel
+class MainShellViewModel @Inject constructor(
+    private val authService: AuthService
+) : ViewModel() {
+    private val _isSuperadmin = MutableStateFlow(false)
+    val isSuperadmin: StateFlow<Boolean> = _isSuperadmin
+
+    init {
+        viewModelScope.launch {
+            val user = authService.getCurrentUser()
+            _isSuperadmin.value = user?.role == "superadmin"
+        }
+    }
+}
 
 data class BottomNavItem(
     val route: String,
@@ -53,11 +82,13 @@ data class BottomNavItem(
     val unselectedIcon: ImageVector
 )
 
-val bottomNavItems = listOf(
+val baseBottomNavItems = listOf(
     BottomNavItem(TrevioRoute.Home.route, "Home", Icons.Filled.Home, Icons.Outlined.Home),
     BottomNavItem(TrevioRoute.Groups.route, "Groups", Icons.Filled.Group, Icons.Outlined.Group),
     BottomNavItem(TrevioRoute.Profile.route, "Profile", Icons.Filled.Person, Icons.Outlined.Person)
 )
+
+val adminNavItem = BottomNavItem(TrevioRoute.Admin.route, "Dashboard", Icons.Filled.Shield, Icons.Outlined.Shield)
 
 @Composable
 fun MainShell(
@@ -68,6 +99,11 @@ fun MainShell(
     val navBackStackEntry by innerNavController.currentBackStackEntryAsState()
     val currentRoute = navBackStackEntry?.destination?.route
 
+    val scope = androidx.compose.runtime.rememberCoroutineScope()
+    val authService = androidx.hilt.navigation.compose.hiltViewModel<MainShellViewModel>()
+    val isSuperadmin by authService.isSuperadmin.collectAsState()
+
+    val bottomNavItems = if (isSuperadmin) baseBottomNavItems + adminNavItem else baseBottomNavItems
     val showBottomBar = currentRoute in bottomNavItems.map { it.route }
 
     LaunchedEffect(pendingInviteCode) {
@@ -128,20 +164,23 @@ fun MainShell(
             }
         }
     ) { innerPadding ->
-        NavHost(
-            navController = innerNavController,
-            startDestination = TrevioRoute.Home.route,
-            modifier = Modifier.fillMaxSize().padding(innerPadding)
-        ) {
-            mainTabGraph(
-                innerNavController = innerNavController,
-                onSignOut = {
-                    navController.navigate(TrevioRoute.Login.route) {
-                        popUpTo(navController.graph.id) { inclusive = true }
+        Box(modifier = Modifier.fillMaxSize()) {
+            NavHost(
+                navController = innerNavController,
+                startDestination = TrevioRoute.Home.route,
+                modifier = Modifier.fillMaxSize().padding(innerPadding)
+            ) {
+                mainTabGraph(
+                    innerNavController = innerNavController,
+                    onSignOut = {
+                        navController.navigate(TrevioRoute.Login.route) {
+                            popUpTo(navController.graph.id) { inclusive = true }
+                        }
                     }
-                }
-            )
-            detailGraph(innerNavController)
+                )
+                detailGraph(innerNavController)
+            }
+            BroadcastPopup()
         }
     }
 }
@@ -161,6 +200,9 @@ private fun NavGraphBuilder.mainTabGraph(
     }
     composable(TrevioRoute.Profile.route) {
         ProfileScreen(navController = innerNavController, onSignOut = onSignOut)
+    }
+    composable(TrevioRoute.Admin.route) {
+        AdminScreen(navController = innerNavController)
     }
 }
 

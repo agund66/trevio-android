@@ -97,6 +97,47 @@ class FirebaseExpenseServiceImpl @Inject constructor(
 
             recalculateBalances(groupId)
 
+            // Notify all active group members except the creator (non-blocking — don't fail expense creation if notifications fail)
+            try {
+                val groupName = groupDoc.getString("name") ?: ""
+                val creatorDoc = firestore.collection("users").document(uid).get().await()
+                val creatorName = creatorDoc.getString("displayName") ?: "Someone"
+                val activeMembers = groupRef.collection("members")
+                    .whereEqualTo("status", "active").get().await()
+
+                val notifyBatch = firestore.batch()
+                var count = 0
+                for (memberDoc in activeMembers.documents) {
+                    val memberUid = memberDoc.id
+                    if (memberUid == uid) continue
+                    val notifRef = firestore.collection("users").document(memberUid)
+                        .collection("notifications").document()
+                    notifyBatch.set(notifRef, mapOf(
+                        "type" to "expense_added",
+                        "title" to "New Expense Added",
+                        "body" to "$creatorName added \"$description\" ($currency $amount) in \"$groupName\"",
+                        "data" to mapOf(
+                            "groupId" to groupId,
+                            "groupName" to groupName,
+                            "expenseId" to expenseRef.id,
+                            "type" to "expense_added"
+                        ),
+                        "read" to false,
+                        "createdAt" to now
+                    ))
+                    count++
+                    if (count >= 450) {
+                        notifyBatch.commit().await()
+                        break
+                    }
+                }
+                if (count > 0 && count < 450) {
+                    notifyBatch.commit().await()
+                }
+            } catch (notifError: Exception) {
+                android.util.Log.w("FirebaseExpenseService", "Failed to send expense notifications", notifError)
+            }
+
             Result.success(expenseRef.id)
         } catch (e: Exception) {
             Result.failure(e)

@@ -10,6 +10,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowDropDown
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Logout
@@ -19,6 +20,7 @@ import androidx.compose.material.icons.filled.Mail
 import androidx.compose.material.icons.filled.Payments
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Phone
+import androidx.compose.material.icons.filled.Wallet
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.*
@@ -46,9 +48,9 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
-private data class CountryCode(val code: String, val dialCode: String, val flag: String, val phoneLength: Int)
+internal data class CountryCode(val code: String, val dialCode: String, val flag: String, val phoneLength: Int)
 
-private val COUNTRY_CODES = listOf(
+internal val COUNTRY_CODES = listOf(
     CountryCode("IN", "+91", "🇮🇳", 10),
     CountryCode("US", "+1", "🇺🇸", 10),
     CountryCode("GB", "+44", "🇬🇧", 10),
@@ -76,8 +78,9 @@ private fun isValidPhoneNumber(phone: String, countryCode: String): Boolean {
 private fun getPaymentAddress(user: User): String {
     return if (user.upiId.isNotEmpty()) {
         user.upiId
-    } else if (user.phoneNumber.isNotEmpty() && (user.countryCode.isEmpty() || user.countryCode == "IN")) {
-        "${user.phoneNumber}@paytm"
+    } else if (user.phoneNumber.isNotEmpty()) {
+        val country = COUNTRY_CODES.find { it.code == user.countryCode } ?: COUNTRY_CODES.first()
+        "${country.dialCode} ${user.phoneNumber}"
     } else {
         "Not set"
     }
@@ -296,6 +299,9 @@ fun ProfileScreen(
 private fun ViewProfileContent(user: User, onEdit: () -> Unit, onDelete: () -> Unit) {
     var showDeleteDialog by remember { mutableStateOf(false) }
     var showTermsDialog by remember { mutableStateOf(false) }
+    val hasUpiId = user.upiId.isNotEmpty()
+    val hasPhone = user.phoneNumber.isNotEmpty()
+    val country = COUNTRY_CODES.find { it.code == user.countryCode } ?: COUNTRY_CODES.first()
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -334,21 +340,96 @@ private fun ViewProfileContent(user: User, onEdit: () -> Unit, onDelete: () -> U
             label = "Currency",
             value = "$currencySymbol ${user.defaultCurrency}"
         )
-        if (user.phoneNumber.isNotEmpty()) {
-            val country = COUNTRY_CODES.find { it.code == user.countryCode } ?: COUNTRY_CODES.first()
-            ProfileInfoCard(
-                icon = Icons.Default.Phone,
-                iconColor = Color(0xFFEC4899),
-                label = "Phone",
-                value = "${country.flag} ${country.dialCode} ${user.phoneNumber}"
-            )
-        }
+
+        // Always show phone card
+        ProfileInfoCard(
+            icon = Icons.Default.Phone,
+            iconColor = Color(0xFFEC4899),
+            label = "Mobile",
+            value = if (hasPhone) "${country.flag} ${country.dialCode} ${user.phoneNumber}" else "Not set",
+            actionLabel = if (!hasPhone) "Add" else null,
+            onAction = if (!hasPhone) onEdit else null
+        )
+
+        // Always show UPI ID card
         ProfileInfoCard(
             icon = Icons.Default.Payments,
             iconColor = Color(0xFF0D9488),
-            label = "Payment Address",
-            value = getPaymentAddress(user)
+            label = "UPI ID",
+            value = if (hasUpiId) user.upiId else "Not set",
+            actionLabel = if (!hasUpiId) "Add" else null,
+            onAction = if (!hasUpiId) onEdit else null
         )
+
+        // Payment info card
+        TrevioCard(
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Column(modifier = Modifier.padding(16.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        Icons.Default.Wallet,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(18.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        "Payment Info",
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                }
+                Spacer(modifier = Modifier.height(8.dp))
+                when {
+                    hasUpiId -> {
+                        Text(
+                            user.upiId,
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.Medium,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                        Spacer(modifier = Modifier.height(2.dp))
+                        Text(
+                            "Friends can pay you via UPI ID",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    hasPhone -> {
+                        Text(
+                            "${country.dialCode} ${user.phoneNumber}",
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.Medium,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                        Spacer(modifier = Modifier.height(2.dp))
+                        Text(
+                            "Friends can pay you via mobile number",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    else -> {
+                        Text(
+                            "No payment info set",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Button(
+                            onClick = onEdit,
+                            shape = MaterialTheme.shapes.small
+                        ) {
+                            Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text("Set up payment info", style = MaterialTheme.typography.labelMedium)
+                        }
+                    }
+                }
+            }
+        }
 
         Spacer(modifier = Modifier.height(16.dp))
 
@@ -416,7 +497,9 @@ fun ProfileInfoCard(
     icon: ImageVector,
     iconColor: Color,
     label: String,
-    value: String
+    value: String,
+    actionLabel: String? = null,
+    onAction: (() -> Unit)? = null
 ) {
     TrevioCard(
         modifier = Modifier.fillMaxWidth()
@@ -452,8 +535,18 @@ fun ProfileInfoCard(
                 Text(
                     text = value,
                     style = MaterialTheme.typography.bodyLarge,
-                    fontWeight = FontWeight.Medium
+                    fontWeight = FontWeight.Medium,
+                    color = if (value == "Not set") MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurface
                 )
+            }
+            if (actionLabel != null && onAction != null) {
+                Spacer(modifier = Modifier.width(8.dp))
+                TextButton(
+                    onClick = onAction,
+                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp)
+                ) {
+                    Text(actionLabel, style = MaterialTheme.typography.labelMedium)
+                }
             }
         }
     }

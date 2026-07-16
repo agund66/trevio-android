@@ -72,8 +72,10 @@ class GroupViewModel @Inject constructor(
         val currentUserId: String? = null,
         val activities: List<Activity> = emptyList(),
         val activitiesLoading: Boolean = false,
+        val activitiesError: String? = null,
         val searchResults: List<UserSearchResult> = emptyList(),
         val inviteError: String? = null,
+        val actionError: String? = null,
         val error: String? = null
     )
 
@@ -141,24 +143,29 @@ class GroupViewModel @Inject constructor(
     fun toggleArchive() {
         val isArchived = _state.value.groupInfo?.archived ?: false
         viewModelScope.launch {
-            if (isArchived) {
+            val result = if (isArchived) {
                 groupService.unarchiveGroup(groupId)
             } else {
                 groupService.archiveGroup(groupId)
             }
-            loadData()
+            result.onSuccess {
+                _state.value = _state.value.copy(actionError = null)
+                loadData()
+            }.onFailure { e ->
+                _state.value = _state.value.copy(actionError = e.message)
+            }
         }
     }
 
     fun loadActivities() {
-        _state.value = _state.value.copy(activitiesLoading = true)
+        _state.value = _state.value.copy(activitiesLoading = true, activitiesError = null)
         viewModelScope.launch {
             groupService.getGroupActivities(groupId)
                 .onSuccess { activities ->
                     _state.value = _state.value.copy(activities = activities, activitiesLoading = false)
                 }
-                .onFailure {
-                    _state.value = _state.value.copy(activitiesLoading = false)
+                .onFailure { e ->
+                    _state.value = _state.value.copy(activitiesLoading = false, activitiesError = e.message)
                 }
         }
     }
@@ -173,7 +180,12 @@ class GroupViewModel @Inject constructor(
                 currency = "INR",
                 method = com.trevio.android.domain.model.SettlementMethod.CASH,
                 upiRefId = null
-            ).onSuccess { loadData() }
+            ).onSuccess {
+                _state.value = _state.value.copy(actionError = null)
+                loadData()
+            }.onFailure { e ->
+                _state.value = _state.value.copy(actionError = e.message)
+            }
         }
     }
 }
@@ -393,7 +405,8 @@ fun GroupDetailScreen(
                 3 -> item {
                     ActivityTab(
                         activities = state.activities,
-                        isLoading = state.activitiesLoading
+                        isLoading = state.activitiesLoading,
+                        errorMessage = state.activitiesError
                     )
                 }
             }
@@ -847,9 +860,25 @@ private fun MembersTab(members: List<Member>, onInvite: () -> Unit, onMemberClic
 }
 
 @Composable
-private fun ActivityTab(activities: List<Activity>, isLoading: Boolean) {
+private fun ActivityTab(activities: List<Activity>, isLoading: Boolean, errorMessage: String? = null) {
     if (isLoading) {
         LoadingIndicator(modifier = Modifier.fillMaxWidth().padding(40.dp))
+        return
+    }
+
+    if (errorMessage != null) {
+        Box(
+            modifier = Modifier.fillMaxWidth().padding(top = 80.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Icon(Icons.Default.Warning, contentDescription = null, modifier = Modifier.size(48.dp), tint = MaterialTheme.colorScheme.error)
+                Spacer(modifier = Modifier.height(12.dp))
+                Text("Failed to load activity", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.error)
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(errorMessage, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        }
         return
     }
 

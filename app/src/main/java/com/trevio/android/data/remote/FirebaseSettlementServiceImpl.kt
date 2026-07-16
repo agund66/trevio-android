@@ -88,20 +88,25 @@ class FirebaseSettlementServiceImpl @Inject constructor(
 
             recalculateBalances(groupId)
 
-            firestore.collection("users").document(toUid).collection("notifications").document()
-                .set(mapOf(
-                    "type" to "settlement",
-                    "title" to "Payment Received",
-                    "body" to "$fromUserName recorded a payment of ₹$amountInBase to you",
-                    "data" to mapOf(
-                        "groupId" to groupId,
-                        "groupName" to (groupDoc.data?.get("name") as? String ?: ""),
-                        "settlementId" to settlementRef.id,
-                        "type" to "settlement"
-                    ),
-                    "read" to false,
-                    "createdAt" to now
-                )).await()
+            // Notify the receiver (non-blocking — don't fail settlement creation if notification fails)
+            try {
+                firestore.collection("users").document(toUid).collection("notifications").document()
+                    .set(mapOf(
+                        "type" to "settlement",
+                        "title" to "Payment Received",
+                        "body" to "$fromUserName recorded a payment of ₹$amountInBase to you",
+                        "data" to mapOf(
+                            "groupId" to groupId,
+                            "groupName" to (groupDoc.data?.get("name") as? String ?: ""),
+                            "settlementId" to settlementRef.id,
+                            "type" to "settlement"
+                        ),
+                        "read" to false,
+                        "createdAt" to now
+                    )).await()
+            } catch (notifError: Exception) {
+                android.util.Log.w("FirebaseSettlementService", "Failed to send settlement notification", notifError)
+            }
 
             Result.success(settlementRef.id)
         } catch (e: Exception) {

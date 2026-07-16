@@ -17,6 +17,8 @@ data class User(
     val photoURL: String = "",
     val defaultCurrency: String = "INR",
     val acceptedTnC: Boolean = false,
+    val role: String = "user",
+    val blocked: Boolean = false,
     val upiId: String = "",
     val phoneNumber: String = "",
     val countryCode: String = ""
@@ -127,4 +129,28 @@ data class ExchangeRates(
     val date: String = "",
     val rates: Map<String, Double> = emptyMap(),
     val updatedAt: Long = 0
+)
+
+enum class BroadcastPriority { CRITICAL, MAINTENANCE, INFO }
+enum class BroadcastTargetType { ALL, ALL_EXCEPT_BLOCKED, SPECIFIC }
+
+data class BroadcastMessage(
+    val id: String = "",
+    val title: String = "",
+    val htmlContent: String = "",
+    val priority: BroadcastPriority = BroadcastPriority.INFO,
+    val targetType: BroadcastTargetType = BroadcastTargetType.ALL,
+    val targetUids: List<String> = emptyList(),
+    val startAt: Long = 0,
+    val endAt: Long? = null,
+    val active: Boolean = true,
+    val createdBy: String = "",
+    val createdByName: String = "",
+    val createdAt: Long = 0,
+    val stoppedAt: Long? = null
+)
+
+data class BroadcastRead(
+    val uid: String = "",
+    val readAt: Long = 0
 )

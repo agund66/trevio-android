@@ -37,6 +37,7 @@ class SplashViewModel @Inject constructor(
         data object NotAuthenticated : SplashState()
         data object NeedsTnC : SplashState()
         data object Authenticated : SplashState()
+        data object Blocked : SplashState()
     }
 
     private val _state = MutableStateFlow<SplashState>(SplashState.Loading)
@@ -56,6 +57,9 @@ class SplashViewModel @Inject constructor(
             val user = authService.getCurrentUser()
             if (user == null) {
                 _state.value = SplashState.NotAuthenticated
+            } else if (user.blocked) {
+                authService.signOut()
+                _state.value = SplashState.Blocked
             } else if (!user.acceptedTnC) {
                 _state.value = SplashState.NeedsTnC
             } else {
@@ -106,6 +110,11 @@ fun SplashScreen(
                     navController.navigate(TrevioRoute.Main.route) {
                         popUpTo(0) { inclusive = true }
                     }
+                }
+            }
+            is SplashViewModel.SplashState.Blocked -> {
+                navController.navigate(TrevioRoute.Login.route) {
+                    popUpTo(0) { inclusive = true }
                 }
             }
             else -> {}

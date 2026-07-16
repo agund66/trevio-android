@@ -12,6 +12,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AccountBalanceWallet
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Payments
+import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -83,7 +84,12 @@ class SettlementViewModel @Inject constructor(
                 currency = "INR",
                 method = method,
                 upiRefId = null
-            ).onSuccess { loadDebts() }
+            ).onSuccess {
+                _state.value = _state.value.copy(error = null)
+                loadDebts()
+            }.onFailure { e ->
+                _state.value = _state.value.copy(error = e.message)
+            }
         }
     }
 }
@@ -108,6 +114,29 @@ fun SettleUpScreen(
                 CircularProgressIndicator()
             }
             return
+        }
+
+        if (state.error != null && state.debts.isEmpty()) {
+            Box(modifier = Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Icon(Icons.Default.Warning, contentDescription = null, modifier = Modifier.size(48.dp), tint = MaterialTheme.colorScheme.error)
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Text("Failed to load settlements", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.error)
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(state.error!!, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Spacer(modifier = Modifier.height(16.dp))
+                    OutlinedButton(onClick = { viewModel.loadDebts() }) {
+                        Text("Retry")
+                    }
+                }
+            }
+            return
+        }
+
+        if (state.error != null) {
+            Box(modifier = Modifier.fillMaxWidth().padding(16.dp), contentAlignment = Alignment.Center) {
+                Text(state.error!!, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
+            }
         }
 
         if (state.debts.isEmpty()) {

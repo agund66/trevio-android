@@ -1,5 +1,6 @@
 package com.trevio.android.data.remote
 
+import com.google.firebase.Timestamp
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import com.trevio.android.domain.model.Activity
@@ -11,8 +12,33 @@ import com.trevio.android.util.Calculations
 import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
+import java.util.Date
 import javax.inject.Inject
 import javax.inject.Singleton
+
+private fun toMillis(value: Any?): Long {
+    if (value == null) return 0L
+    if (value is Timestamp) return value.toDate().time
+    if (value is Date) return value.time
+    if (value is Number) return value.toLong()
+    if (value is String) {
+        val parsed = value.toLongOrNull()
+        if (parsed != null) return parsed
+        return try {
+            Date(value).time
+        } catch (e: Exception) {
+            0L
+        }
+    }
+    if (value is Map<*, *>) {
+        val seconds = (value["_seconds"] as? Number ?: value["seconds"] as? Number)?.toLong()
+        if (seconds != null) {
+            val nanos = (value["_nanoseconds"] as? Number ?: value["nanoseconds"] as? Number)?.toLong() ?: 0L
+            return seconds * 1000 + nanos / 1_000_000
+        }
+    }
+    return 0L
+}
 
 @Singleton
 class FirebaseGroupServiceImpl @Inject constructor(
@@ -182,15 +208,19 @@ class FirebaseGroupServiceImpl @Inject constructor(
             groupRef.update(mapOf("memberCount" to (currentCount + 1), "updatedAt" to now)).await()
         }
 
-        firestore.collection("users").document(toUid).collection("notifications").document()
-            .set(mapOf(
-                "type" to "invitation",
-                "title" to "Group Invitation",
-                "body" to "$invitedByName invited you to join \"$groupName\"",
-                "data" to mapOf("groupId" to groupId, "groupName" to groupName, "invitationId" to inviteRef.id, "type" to "invitation"),
-                "read" to false,
-                "createdAt" to now
-            )).await()
+        try {
+            firestore.collection("users").document(toUid).collection("notifications").document()
+                .set(mapOf(
+                    "type" to "invitation",
+                    "title" to "Group Invitation",
+                    "body" to "$invitedByName invited you to join \"$groupName\"",
+                    "data" to mapOf("groupId" to groupId, "groupName" to groupName, "invitationId" to inviteRef.id, "type" to "invitation"),
+                    "read" to false,
+                    "createdAt" to now
+                )).await()
+        } catch (notifError: Exception) {
+            android.util.Log.w("FirebaseGroupService", "Failed to send invitation notification", notifError)
+        }
     }
 
     override suspend fun acceptInvitation(invitationId: String): Result<Pair<String, String>> {
@@ -403,7 +433,7 @@ class FirebaseGroupServiceImpl @Inject constructor(
                         userId = userId,
                         userName = userData?.get("displayName") as? String ?: "Someone",
                         userPhotoURL = userData?.get("photoURL") as? String ?: "",
-                        createdAt = (data["createdAt"] as? Long ?: 0L)
+                        createdAt = toMillis(data["createdAt"])
                     )
                 )
             }

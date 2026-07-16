@@ -7,7 +7,11 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Build
 import androidx.compose.material.icons.filled.Group
+import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Payments
 import androidx.compose.material.icons.filled.Receipt
@@ -20,6 +24,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.viewinterop.AndroidView
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -28,7 +33,13 @@ import com.trevio.android.core.designsystem.components.TrevioCard
 import com.trevio.android.core.designsystem.components.TrevioHeader
 import com.trevio.android.core.designsystem.theme.TrevioBorder
 import com.trevio.android.domain.model.AppNotification
+import com.trevio.android.domain.model.BroadcastMessage
+import com.trevio.android.domain.model.BroadcastPriority
+import com.trevio.android.domain.repository.AuthService
+import com.trevio.android.domain.repository.BroadcastService
+import com.trevio.android.domain.repository.GroupService
 import com.trevio.android.domain.repository.NotificationService
+import com.trevio.android.core.navigation.TrevioRoute
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -37,13 +48,19 @@ import javax.inject.Inject
 
 @HiltViewModel
 class NotificationsViewModel @Inject constructor(
-    private val notificationService: NotificationService
+    private val notificationService: NotificationService,
+    private val broadcastService: BroadcastService,
+    private val authService: AuthService,
+    private val groupService: GroupService
 ) : ViewModel() {
 
     data class NotificationsState(
         val isLoading: Boolean = true,
         val notifications: List<AppNotification> = emptyList(),
-        val error: String? = null
+        val broadcasts: List<BroadcastMessage> = emptyList(),
+        val error: String? = null,
+        val invitationLoading: String? = null,
+        val invitationResult: Map<String, String> = emptyMap()
     )
 
     private val _state = MutableStateFlow(NotificationsState())
@@ -56,11 +73,19 @@ class NotificationsViewModel @Inject constructor(
         viewModelScope.launch {
             notificationService.getNotifications(50, null)
                 .onSuccess { notifications ->
-                    _state.value = NotificationsState(isLoading = false, notifications = notifications)
+                    _state.value = _state.value.copy(isLoading = false, notifications = notifications)
                 }
                 .onFailure { e ->
                     _state.value = NotificationsState(isLoading = false, error = e.message)
                 }
+            val uid = authService.getCurrentUserId()
+            val user = authService.getCurrentUser()
+            if (uid != null && user != null) {
+                broadcastService.getActiveBroadcastsForUser(uid, user.blocked)
+                    .onSuccess { broadcasts ->
+                        _state.value = _state.value.copy(broadcasts = broadcasts)
+                    }
+            }
         }
     }
 
@@ -68,6 +93,45 @@ class NotificationsViewModel @Inject constructor(
         viewModelScope.launch {
             notificationService.markAllNotificationsRead()
                 .onSuccess { loadNotifications() }
+                .onFailure { e ->
+                    _state.value = _state.value.copy(error = e.message)
+                }
+        }
+    }
+
+    fun acceptInvitation(notificationId: String, invitationId: String) {
+        _state.value = _state.value.copy(invitationLoading = invitationId)
+        viewModelScope.launch {
+            groupService.acceptInvitation(invitationId)
+                .onSuccess { result ->
+                    notificationService.updateNotificationData(notificationId, mapOf("status" to "accepted"))
+                    _state.value = _state.value.copy(
+                        invitationLoading = null,
+                        invitationResult = _state.value.invitationResult + (invitationId to "accepted")
+                    )
+                    loadNotifications()
+                }
+                .onFailure { e ->
+                    _state.value = _state.value.copy(invitationLoading = null, error = e.message)
+                }
+        }
+    }
+
+    fun declineInvitation(notificationId: String, invitationId: String) {
+        _state.value = _state.value.copy(invitationLoading = invitationId)
+        viewModelScope.launch {
+            groupService.declineInvitation(invitationId)
+                .onSuccess {
+                    notificationService.updateNotificationData(notificationId, mapOf("status" to "declined"))
+                    _state.value = _state.value.copy(
+                        invitationLoading = null,
+                        invitationResult = _state.value.invitationResult + (invitationId to "declined")
+                    )
+                    loadNotifications()
+                }
+                .onFailure { e ->
+                    _state.value = _state.value.copy(invitationLoading = null, error = e.message)
+                }
         }
     }
 }
@@ -123,7 +187,7 @@ fun NotificationsScreen(
             }
         }
 
-        if (state.notifications.isEmpty()) {
+        if (state.notifications.isEmpty() && state.broadcasts.isEmpty()) {
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -156,8 +220,18 @@ fun NotificationsScreen(
                 modifier = Modifier.weight(1f),
                 contentPadding = PaddingValues(bottom = 100.dp)
             ) {
+                items(state.broadcasts) { broadcast ->
+                    BroadcastNotificationCard(broadcast)
+                }
                 items(state.notifications) { notification ->
-                    NotificationCard(notification)
+                    NotificationCard(
+                        notification = notification,
+                        navController = navController,
+                        invitationLoading = state.invitationLoading,
+                        invitationResult = state.invitationResult,
+                        onAccept = { notificationId, invitationId -> viewModel.acceptInvitation(notificationId, invitationId) },
+                        onDecline = { notificationId, invitationId -> viewModel.declineInvitation(notificationId, invitationId) }
+                    )
                 }
             }
         }
@@ -165,55 +239,144 @@ fun NotificationsScreen(
 }
 
 @Composable
-private fun NotificationCard(notification: AppNotification) {
+private fun NotificationCard(
+    notification: AppNotification,
+    navController: androidx.navigation.NavHostController,
+    invitationLoading: String? = null,
+    invitationResult: Map<String, String> = emptyMap(),
+    onAccept: (String, String) -> Unit = { _, _ -> },
+    onDecline: (String, String) -> Unit = { _, _ -> }
+) {
     val (icon, iconColor) = notificationIcon(notification.type)
+    val isInvitation = notification.type == "invitation" && notification.data.containsKey("invitationId")
+    val isSettlement = notification.type == "settlement" && notification.data.containsKey("groupId")
+    val isExpense = notification.type == "expense_added" && notification.data.containsKey("groupId")
+    val hasGroupLink = isSettlement || isExpense
+    val notificationId = notification.notificationId
+    val invitationId = notification.data["invitationId"] ?: ""
+    val groupId = notification.data["groupId"] ?: ""
+    val result = notification.data["status"]?.takeIf { it.isNotBlank() } ?: invitationResult[invitationId]
 
     TrevioCard(
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = 16.dp, vertical = 4.dp)
     ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp),
-            verticalAlignment = Alignment.Top
-        ) {
-            Box(
-                modifier = Modifier
-                    .size(40.dp)
-                    .clip(CircleShape)
-                    .background(iconColor.copy(alpha = 0.12f)),
-                contentAlignment = Alignment.Center
+        Column(modifier = Modifier.padding(16.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.Top
             ) {
-                Icon(
-                    imageVector = icon,
-                    contentDescription = null,
-                    tint = iconColor,
-                    modifier = Modifier.size(20.dp)
-                )
-            }
-            Spacer(modifier = Modifier.width(12.dp))
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    notification.title,
-                    style = MaterialTheme.typography.titleSmall,
-                    fontWeight = if (!notification.read) FontWeight.SemiBold else FontWeight.Medium
-                )
-                Spacer(modifier = Modifier.height(2.dp))
-                Text(
-                    notification.body,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-            if (!notification.read) {
                 Box(
                     modifier = Modifier
-                        .size(8.dp)
+                        .size(40.dp)
                         .clip(CircleShape)
-                        .background(MaterialTheme.colorScheme.primary)
+                        .background(iconColor.copy(alpha = 0.12f)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = icon,
+                        contentDescription = null,
+                        tint = iconColor,
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
+                Spacer(modifier = Modifier.width(12.dp))
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        notification.title,
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = if (!notification.read) FontWeight.SemiBold else FontWeight.Medium
+                    )
+                    Spacer(modifier = Modifier.height(2.dp))
+                    Text(
+                        notification.body,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    if (notification.createdAt > 0) {
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            formatRelativeTime(notification.createdAt),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+                        )
+                    }
+                }
+                if (!notification.read) {
+                    Box(
+                        modifier = Modifier
+                            .size(8.dp)
+                            .clip(CircleShape)
+                            .background(MaterialTheme.colorScheme.primary)
+                    )
+                }
+            }
+
+            if (isInvitation && result == null) {
+                Spacer(modifier = Modifier.height(12.dp))
+                Row(
+                    modifier = Modifier.padding(start = 52.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Button(
+                        onClick = { onAccept(notificationId, invitationId) },
+                        enabled = invitationLoading != invitationId,
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = MaterialTheme.colorScheme.primary
+                        ),
+                        shape = RoundedCornerShape(8.dp),
+                        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 6.dp)
+                    ) {
+                        if (invitationLoading == invitationId) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(14.dp),
+                                strokeWidth = 2.dp,
+                                color = Color.White
+                            )
+                        } else {
+                            Text("Accept & Join", style = MaterialTheme.typography.labelMedium)
+                        }
+                    }
+                    OutlinedButton(
+                        onClick = { onDecline(notificationId, invitationId) },
+                        enabled = invitationLoading != invitationId,
+                        shape = RoundedCornerShape(8.dp),
+                        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 6.dp)
+                    ) {
+                        Text("Decline", style = MaterialTheme.typography.labelMedium)
+                    }
+                }
+            }
+
+            if (isInvitation && result == "accepted") {
+                Spacer(modifier = Modifier.height(8.dp))
+                TextButton(
+                    onClick = { navController.navigate(TrevioRoute.GroupDetail.createRoute(groupId)) },
+                    modifier = Modifier.padding(start = 52.dp)
+                ) {
+                    Text("Open Group →", color = MaterialTheme.colorScheme.primary)
+                }
+            }
+
+            if (isInvitation && result == "declined") {
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    "Declined",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(start = 52.dp)
                 )
+            }
+
+            if (hasGroupLink) {
+                Spacer(modifier = Modifier.height(8.dp))
+                TextButton(
+                    onClick = { navController.navigate(TrevioRoute.GroupDetail.createRoute(groupId)) },
+                    modifier = Modifier.padding(start = 52.dp)
+                ) {
+                    Text("View Group →", color = MaterialTheme.colorScheme.primary)
+                }
             }
         }
     }
@@ -223,7 +386,125 @@ private fun notificationIcon(type: String): Pair<androidx.compose.ui.graphics.ve
     return when (type) {
         "expense_added", "expense_updated", "expense_deleted" -> Icons.Default.Receipt to Color(0xFFF59E0B)
         "settlement_added" -> Icons.Default.Payments to Color(0xFF22C55E)
-        "member_joined", "member_left", "group_invitation" -> Icons.Default.Group to Color(0xFF6366F1)
+        "member_joined", "member_left", "group_invitation", "invitation" -> Icons.Default.Group to Color(0xFF6366F1)
         else -> Icons.Default.Notifications to Color(0xFF0D9488)
+    }
+}
+
+@Composable
+private fun BroadcastNotificationCard(broadcast: BroadcastMessage) {
+    var isExpanded by remember { mutableStateOf(false) }
+
+    val priorityColor = when (broadcast.priority) {
+        BroadcastPriority.CRITICAL -> Color(0xFFEF4444)
+        BroadcastPriority.MAINTENANCE -> Color(0xFFF59E0B)
+        BroadcastPriority.INFO -> Color(0xFF3B82F6)
+    }
+    val priorityLabel = when (broadcast.priority) {
+        BroadcastPriority.CRITICAL -> "Critical"
+        BroadcastPriority.MAINTENANCE -> "Maintenance"
+        BroadcastPriority.INFO -> "Info"
+    }
+    val priorityIcon = when (broadcast.priority) {
+        BroadcastPriority.CRITICAL -> Icons.Default.Warning
+        BroadcastPriority.MAINTENANCE -> Icons.Default.Build
+        BroadcastPriority.INFO -> Icons.Default.Info
+    }
+
+    val sanitizedHtml = remember(broadcast.htmlContent) {
+        org.jsoup.Jsoup.clean(broadcast.htmlContent, org.jsoup.safety.Safelist.relaxed())
+    }
+
+    TrevioCard(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 4.dp)
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.Top
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(40.dp)
+                        .clip(CircleShape)
+                        .background(priorityColor.copy(alpha = 0.12f)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = priorityIcon,
+                        contentDescription = null,
+                        tint = priorityColor,
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
+                Spacer(modifier = Modifier.width(12.dp))
+                Column(modifier = Modifier.weight(1f)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            broadcast.title,
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Surface(
+                            color = priorityColor.copy(alpha = 0.1f),
+                            shape = RoundedCornerShape(6.dp)
+                        ) {
+                            Text(
+                                priorityLabel,
+                                style = MaterialTheme.typography.labelSmall,
+                                color = priorityColor,
+                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                            )
+                        }
+                    }
+                    if (isExpanded) {
+                        Spacer(modifier = Modifier.height(8.dp))
+                        AndroidView(
+                            factory = { context ->
+                                android.webkit.WebView(context).apply {
+                                    settings.javaScriptEnabled = false
+                                    loadDataWithBaseURL(null, sanitizedHtml, "text/html", "UTF-8", null)
+                                }
+                            },
+                            update = { webView ->
+                                webView.loadDataWithBaseURL(null, sanitizedHtml, "text/html", "UTF-8", null)
+                            },
+                            modifier = Modifier.fillMaxWidth().heightIn(max = 250.dp)
+                        )
+                    }
+                }
+                Icon(
+                    imageVector = if (isExpanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
+                    contentDescription = if (isExpanded) "Show less" else "Read more",
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.size(20.dp)
+                )
+            }
+            TextButton(
+                onClick = { isExpanded = !isExpanded },
+                modifier = Modifier.padding(start = 52.dp)
+            ) {
+                Text(if (isExpanded) "Show less" else "Read more")
+            }
+        }
+    }
+}
+
+private fun formatRelativeTime(timestamp: Long): String {
+    if (timestamp == 0L) return ""
+    val now = System.currentTimeMillis()
+    val diff = now - timestamp
+    val minutes = diff / 60000
+    val hours = diff / 3600000
+    val days = diff / 86400000
+    return when {
+        minutes < 1 -> "just now"
+        minutes < 60 -> "${minutes}m ago"
+        hours < 24 -> "${hours}h ago"
+        days < 7 -> "${days}d ago"
+        else -> java.text.SimpleDateFormat("MMM dd", java.util.Locale.getDefault()).format(java.util.Date(timestamp))
     }
 }

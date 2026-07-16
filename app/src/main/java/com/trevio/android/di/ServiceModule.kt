@@ -1,13 +1,17 @@
 package com.trevio.android.di
 
 import com.trevio.android.data.remote.FirebaseAuthServiceImpl
+import com.trevio.android.data.remote.FirebaseAdminServiceImpl
+import com.trevio.android.data.remote.FirebaseBroadcastServiceImpl
 import com.trevio.android.data.remote.FirebaseExchangeRateServiceImpl
 import com.trevio.android.data.remote.FirebaseExpenseServiceImpl
 import com.trevio.android.data.remote.FirebaseGroupServiceImpl
 import com.trevio.android.data.remote.FirebaseNotificationServiceImpl
 import com.trevio.android.data.remote.FirebaseSettlementServiceImpl
 import com.trevio.android.data.remote.FirebaseUserServiceImpl
+import com.trevio.android.domain.repository.AdminService
 import com.trevio.android.domain.repository.AuthService
+import com.trevio.android.domain.repository.BroadcastService
 import com.trevio.android.domain.repository.ExchangeRateService
 import com.trevio.android.domain.repository.ExpenseService
 import com.trevio.android.domain.repository.GroupService
@@ -51,4 +55,12 @@ abstract class ServiceModule {
     @Binds
     @Singleton
     abstract fun bindExchangeRateService(impl: FirebaseExchangeRateServiceImpl): ExchangeRateService
+
+    @Binds
+    @Singleton
+    abstract fun bindAdminService(impl: FirebaseAdminServiceImpl): AdminService
+
+    @Binds
+    @Singleton
+    abstract fun bindBroadcastService(impl: FirebaseBroadcastServiceImpl): BroadcastService
 }

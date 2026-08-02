@@ -32,6 +32,9 @@ interface GroupService {
     suspend fun leaveGroup(groupId: String): Result<Unit>
     suspend fun archiveGroup(groupId: String): Result<Unit>
     suspend fun unarchiveGroup(groupId: String): Result<Unit>
+    suspend fun deleteGroup(groupId: String): Result<Unit>
+    suspend fun updateGroup(groupId: String, name: String, description: String): Result<Unit>
+    suspend fun transferAdminRole(groupId: String, newAdminUid: String): Result<Unit>
     suspend fun getUserGroups(): Result<List<Group>>
     suspend fun getGroupInfo(groupId: String): Result<GroupInfo>
     suspend fun getGroupActivities(groupId: String, pageSize: Int = 50): Result<List<Activity>>

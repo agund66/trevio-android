@@ -6,6 +6,14 @@ enum class MemberRole { ADMIN, MEMBER }
 enum class MemberStatus { ACTIVE, LEFT }
 enum class InvitationStatus { PENDING, ACCEPTED, DECLINED, EXPIRED }
 enum class SettlementMethod { UPI, CASH, OTHER }
+enum class RecurringFrequency { WEEKLY, MONTHLY }
+
+data class RecurringConfig(
+    val frequency: RecurringFrequency = RecurringFrequency.MONTHLY,
+    val endDate: Long? = null,
+    val nextDueDate: Long? = null,
+    val parentExpenseId: String? = null
+)
 
 data class User(
     val uid: String = "",
@@ -66,7 +74,9 @@ data class Expense(
     val category: String = "other",
     val date: Long = 0,
     val createdBy: String = "",
-    val exchangeRateToBase: Double = 1.0
+    val exchangeRateToBase: Double = 1.0,
+    val note: String = "",
+    val recurring: RecurringConfig? = null
 )
 
 data class Settlement(
@@ -79,7 +89,8 @@ data class Settlement(
     val currency: String = "INR",
     val method: SettlementMethod = SettlementMethod.CASH,
     val upiRefId: String = "",
-    val date: Long = 0
+    val date: Long = 0,
+    val createdBy: String = ""
 )
 
 data class SimplifiedDebt(

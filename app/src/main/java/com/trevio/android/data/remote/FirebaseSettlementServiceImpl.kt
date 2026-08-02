@@ -216,7 +216,9 @@ class FirebaseSettlementServiceImpl @Inject constructor(
                     amount = (data["amount"] as? Number)?.toDouble() ?: 0.0,
                     currency = data["currency"] as? String ?: "INR",
                     method = SettlementMethod.valueOf((data["method"] as? String ?: "cash").uppercase()),
-                    upiRefId = data["upiRefId"] as? String ?: ""
+                    upiRefId = data["upiRefId"] as? String ?: "",
+                    date = (data["date"] as? Number)?.toLong() ?: 0,
+                    createdBy = data["createdBy"] as? String ?: ""
                 )
             }
             Result.success(settlements)

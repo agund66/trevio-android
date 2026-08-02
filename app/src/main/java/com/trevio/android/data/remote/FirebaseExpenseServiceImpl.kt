@@ -158,6 +158,11 @@ class FirebaseExpenseServiceImpl @Inject constructor(
             val memberDoc = groupRef.collection("members").document(uid).get().await()
             if (!memberDoc.exists()) return Result.failure(Exception("You are not a member of this group"))
 
+            // Only creator or group admin can edit
+            val isCreator = oldExpense["createdBy"] == uid
+            val isAdmin = memberDoc.data?.get("role") == "admin"
+            if (!isCreator && !isAdmin) return Result.failure(Exception("Only the expense creator or group admin can edit this expense"))
+
             val now = System.currentTimeMillis()
             val updateData = mutableMapOf<String, Any>("updatedAt" to now)
 
@@ -233,6 +238,11 @@ class FirebaseExpenseServiceImpl @Inject constructor(
             val expenseData = expenseDoc.data ?: return Result.failure(Exception("Invalid expense data"))
             val memberDoc = groupRef.collection("members").document(uid).get().await()
             if (!memberDoc.exists()) return Result.failure(Exception("You are not a member of this group"))
+
+            // Only creator or group admin can delete
+            val isCreator = expenseData["createdBy"] == uid
+            val isAdmin = memberDoc.data?.get("role") == "admin"
+            if (!isCreator && !isAdmin) return Result.failure(Exception("Only the expense creator or group admin can delete this expense"))
 
             val now = System.currentTimeMillis()
             val expenseAmount = (expenseData["amount"] as? Number)?.toDouble() ?: 0.0

@@ -476,4 +476,90 @@ class FirebaseGroupServiceImpl @Inject constructor(
             Result.failure(e)
         }
     }
+
+    override suspend fun deleteGroup(groupId: String): Result<Unit> {
+        return try {
+            val uid = auth.currentUser?.uid ?: return Result.failure(Exception("User not authenticated"))
+            val groupRef = firestore.collection("groups").document(groupId)
+            val groupDoc = groupRef.get().await()
+            if (!groupDoc.exists()) return Result.failure(Exception("Group not found"))
+
+            val memberDoc = groupRef.collection("members").document(uid).get().await()
+            if (!memberDoc.exists()) return Result.failure(Exception("You are not a member of this group"))
+            if (memberDoc.data?.get("role") != "admin") return Result.failure(Exception("Only group admin can delete the group"))
+
+            val membersSnapshot = groupRef.collection("members").get().await()
+            val activeCount = membersSnapshot.documents.count { it.data?.get("status") == "active" }
+            if (activeCount > 1) return Result.failure(Exception("Cannot delete group with other active members. Remove all members first."))
+
+            val batch = firestore.batch()
+            for (memberDoc in membersSnapshot.documents) batch.delete(memberDoc.reference)
+            val expensesSnapshot = groupRef.collection("expenses").get().await()
+            for (expDoc in expensesSnapshot.documents) batch.delete(expDoc.reference)
+            val settlementsSnapshot = groupRef.collection("settlements").get().await()
+            for (setDoc in settlementsSnapshot.documents) batch.delete(setDoc.reference)
+            val activitiesSnapshot = groupRef.collection("activities").get().await()
+            for (actDoc in activitiesSnapshot.documents) batch.delete(actDoc.reference)
+            batch.delete(groupRef)
+            batch.commit().await()
+
+            Result.success(Unit)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    override suspend fun updateGroup(groupId: String, name: String, description: String): Result<Unit> {
+        return try {
+            val uid = auth.currentUser?.uid ?: return Result.failure(Exception("User not authenticated"))
+            if (name.isBlank()) return Result.failure(Exception("Group name is required"))
+
+            val groupRef = firestore.collection("groups").document(groupId)
+            val memberDoc = groupRef.collection("members").document(uid).get().await()
+            if (!memberDoc.exists()) return Result.failure(Exception("You are not a member of this group"))
+            if (memberDoc.data?.get("role") != "admin") return Result.failure(Exception("Only group admin can update group settings"))
+
+            groupRef.update(mapOf(
+                "name" to name.trim(),
+                "description" to description.trim(),
+                "updatedAt" to System.currentTimeMillis()
+            )).await()
+            Result.success(Unit)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    override suspend fun transferAdminRole(groupId: String, newAdminUid: String): Result<Unit> {
+        return try {
+            val uid = auth.currentUser?.uid ?: return Result.failure(Exception("User not authenticated"))
+            if (newAdminUid == uid) return Result.failure(Exception("You are already the admin"))
+
+            val groupRef = firestore.collection("groups").document(groupId)
+            val currentMemberDoc = groupRef.collection("members").document(uid).get().await()
+            if (!currentMemberDoc.exists()) return Result.failure(Exception("You are not a member of this group"))
+            if (currentMemberDoc.data?.get("role") != "admin") return Result.failure(Exception("Only group admin can transfer admin role"))
+
+            val targetMemberDoc = groupRef.collection("members").document(newAdminUid).get().await()
+            if (!targetMemberDoc.exists()) return Result.failure(Exception("Target user is not a member of this group"))
+            if (targetMemberDoc.data?.get("status") != "active") return Result.failure(Exception("Target user is not an active member"))
+
+            val now = System.currentTimeMillis()
+            val batch = firestore.batch()
+            batch.update(groupRef.collection("members").document(uid), mapOf("role" to "member"))
+            batch.update(groupRef.collection("members").document(newAdminUid), mapOf("role" to "admin"))
+            batch.set(groupRef.collection("activities").document(), mapOf(
+                "type" to "admin_transferred",
+                "description" to "Admin role transferred",
+                "userId" to uid,
+                "data" to mapOf("newAdminUid" to newAdminUid),
+                "createdAt" to now
+            ))
+            batch.commit().await()
+
+            Result.success(Unit)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
 }

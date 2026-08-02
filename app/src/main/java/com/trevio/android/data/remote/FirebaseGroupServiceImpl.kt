@@ -134,6 +134,11 @@ class FirebaseGroupServiceImpl @Inject constructor(
             ))
             batch.update(groupDoc.reference, mapOf(
                 "memberCount" to ((groupData["memberCount"] as? Number)?.toLong() ?: 0L) + 1,
+                "updatedAt" to now
+            ))
+            batch.set(groupDoc.reference.collection("activities").document(), mapOf(
+                "type" to "member_joined",
+                "description" to "Member joined via invite code",
                 "userId" to uid,
                 "data" to mapOf("groupId" to groupId),
                 "createdAt" to now
@@ -156,6 +161,7 @@ class FirebaseGroupServiceImpl @Inject constructor(
             if (!usernameDoc.exists()) return Result.failure(Exception("User not found"))
 
             val toUid = usernameDoc.data?.get("uid") as? String ?: return Result.failure(Exception("Invalid user"))
+            if (toUid == uid) return Result.failure(Exception("You cannot invite yourself"))
             val groupDoc = firestore.collection("groups").document(groupId).get().await()
             if (!groupDoc.exists()) return Result.failure(Exception("Group not found"))
 

@@ -8,18 +8,23 @@ import com.trevio.android.domain.model.BroadcastRead
 import com.trevio.android.domain.model.BroadcastTargetType
 import com.trevio.android.domain.model.User
 import com.trevio.android.domain.repository.AdminService
+import com.trevio.android.domain.repository.AuthService
 import com.trevio.android.domain.repository.BroadcastService
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
 import javax.inject.Inject
 
 @HiltViewModel
 class BroadcastViewModel @Inject constructor(
     private val broadcastService: BroadcastService,
-    private val adminService: AdminService
+    private val adminService: AdminService,
+    private val authService: AuthService
 ) : ViewModel() {
+
+    val currentUserId: String? get() = runBlocking { authService.getCurrentUserId() }
 
     data class BroadcastState(
         val isLoading: Boolean = true,

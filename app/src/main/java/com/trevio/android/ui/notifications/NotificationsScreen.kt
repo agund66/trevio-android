@@ -40,6 +40,7 @@ import com.trevio.android.domain.repository.BroadcastService
 import com.trevio.android.domain.repository.GroupService
 import com.trevio.android.domain.repository.NotificationService
 import com.trevio.android.core.navigation.TrevioRoute
+import com.trevio.android.util.rememberCurrencyFormatter
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -143,6 +144,7 @@ fun NotificationsScreen(
     viewModel: NotificationsViewModel = hiltViewModel()
 ) {
     val state by viewModel.state.collectAsState()
+    val currencyFormatter = rememberCurrencyFormatter()
     val unreadCount = state.notifications.count { !it.read }
 
     if (state.isLoading) {
@@ -229,6 +231,7 @@ fun NotificationsScreen(
                         navController = navController,
                         invitationLoading = state.invitationLoading,
                         invitationResult = state.invitationResult,
+                        formatDate = currencyFormatter.formatDate,
                         onAccept = { notificationId, invitationId -> viewModel.acceptInvitation(notificationId, invitationId) },
                         onDecline = { notificationId, invitationId -> viewModel.declineInvitation(notificationId, invitationId) }
                     )
@@ -244,6 +247,7 @@ private fun NotificationCard(
     navController: androidx.navigation.NavHostController,
     invitationLoading: String? = null,
     invitationResult: Map<String, String> = emptyMap(),
+    formatDate: (Long, Boolean) -> String = { _, _ -> "" },
     onAccept: (String, String) -> Unit = { _, _ -> },
     onDecline: (String, String) -> Unit = { _, _ -> }
 ) {
@@ -297,7 +301,7 @@ private fun NotificationCard(
                     if (notification.createdAt > 0) {
                         Spacer(modifier = Modifier.height(4.dp))
                         Text(
-                            formatRelativeTime(notification.createdAt),
+                            formatRelativeTime(notification.createdAt, formatDate),
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
                         )
@@ -493,7 +497,7 @@ private fun BroadcastNotificationCard(broadcast: BroadcastMessage) {
     }
 }
 
-private fun formatRelativeTime(timestamp: Long): String {
+private fun formatRelativeTime(timestamp: Long, formatDate: (Long, Boolean) -> String): String {
     if (timestamp == 0L) return ""
     val now = System.currentTimeMillis()
     val diff = now - timestamp
@@ -505,6 +509,6 @@ private fun formatRelativeTime(timestamp: Long): String {
         minutes < 60 -> "${minutes}m ago"
         hours < 24 -> "${hours}h ago"
         days < 7 -> "${days}d ago"
-        else -> java.text.SimpleDateFormat("MMM dd", java.util.Locale.getDefault()).format(java.util.Date(timestamp))
+        else -> formatDate(timestamp, false)
     }
 }

@@ -72,44 +72,25 @@ class SplashViewModel @Inject constructor(
 @Composable
 fun SplashScreen(
     navController: androidx.navigation.NavHostController,
-    viewModel: SplashViewModel = hiltViewModel(),
-    pendingInviteCode: String? = null
+    viewModel: SplashViewModel = hiltViewModel()
 ) {
     val state by viewModel.state.collectAsState()
 
     LaunchedEffect(state) {
         when (state) {
             is SplashViewModel.SplashState.NotAuthenticated -> {
-                if (pendingInviteCode != null) {
-                    navController.navigate(TrevioRoute.JoinGroup.createRoute(pendingInviteCode)) {
-                        popUpTo(0) { inclusive = true }
-                    }
-                } else {
-                    navController.navigate(TrevioRoute.Login.route) {
-                        popUpTo(0) { inclusive = true }
-                    }
+                navController.navigate(TrevioRoute.Login.route) {
+                    popUpTo(0) { inclusive = true }
                 }
             }
             is SplashViewModel.SplashState.NeedsTnC -> {
-                if (pendingInviteCode != null) {
-                    navController.navigate(TrevioRoute.JoinGroup.createRoute(pendingInviteCode)) {
-                        popUpTo(0) { inclusive = true }
-                    }
-                } else {
-                    navController.navigate(TrevioRoute.Terms.route) {
-                        popUpTo(0) { inclusive = true }
-                    }
+                navController.navigate(TrevioRoute.Terms.route) {
+                    popUpTo(0) { inclusive = true }
                 }
             }
             is SplashViewModel.SplashState.Authenticated -> {
-                if (pendingInviteCode != null) {
-                    navController.navigate(TrevioRoute.JoinGroup.createRoute(pendingInviteCode)) {
-                        popUpTo(0) { inclusive = true }
-                    }
-                } else {
-                    navController.navigate(TrevioRoute.Main.route) {
-                        popUpTo(0) { inclusive = true }
-                    }
+                navController.navigate(TrevioRoute.Main.route) {
+                    popUpTo(0) { inclusive = true }
                 }
             }
             is SplashViewModel.SplashState.Blocked -> {

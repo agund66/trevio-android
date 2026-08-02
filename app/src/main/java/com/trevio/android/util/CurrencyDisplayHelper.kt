@@ -63,6 +63,10 @@ class CurrencyViewModel @Inject constructor(
     fun formatOriginal(amount: Double, currency: String): String {
         return CurrencyConverter.formatCurrency(amount, currency)
     }
+
+    fun formatDate(timestamp: Long, includeTime: Boolean = false): String {
+        return CurrencyConverter.formatDate(timestamp, _state.value.userCurrency, includeTime)
+    }
 }
 
 @Composable
@@ -75,7 +79,8 @@ fun rememberCurrencyFormatter(): CurrencyFormatter {
             rates = state.rates,
             isLoading = state.isLoading,
             formatBase = { amountInBase -> viewModel.formatBase(amountInBase) },
-            formatOriginal = { amount, currency -> viewModel.formatOriginal(amount, currency) }
+            formatOriginal = { amount, currency -> viewModel.formatOriginal(amount, currency) },
+            formatDate = { timestamp, includeTime -> viewModel.formatDate(timestamp, includeTime) }
         )
     }
 }
@@ -85,5 +90,6 @@ data class CurrencyFormatter(
     val rates: Map<String, Double>,
     val isLoading: Boolean,
     val formatBase: (Double) -> String,
-    val formatOriginal: (Double, String) -> String
+    val formatOriginal: (Double, String) -> String,
+    val formatDate: (Long, Boolean) -> String
 )

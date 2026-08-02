@@ -30,12 +30,14 @@ import com.trevio.android.core.designsystem.components.TrevioCard
 import com.trevio.android.core.designsystem.components.TrevioHeader
 import com.trevio.android.core.designsystem.theme.TrevioBorder
 import com.trevio.android.domain.model.SimplifiedDebt
+import com.trevio.android.domain.repository.AuthService
 import com.trevio.android.domain.repository.SettlementService
 import com.trevio.android.util.rememberCurrencyFormatter
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
 import javax.inject.Inject
 
 private fun getUpiVpa(debt: SimplifiedDebt): String {
@@ -49,8 +51,11 @@ private fun getUpiVpa(debt: SimplifiedDebt): String {
 @HiltViewModel
 class SettlementViewModel @Inject constructor(
     private val settlementService: SettlementService,
+    private val authService: AuthService,
     savedStateHandle: SavedStateHandle
 ) : ViewModel() {
+
+    val currentUserId: String? get() = runBlocking { authService.getCurrentUserId() }
 
     private val groupId: String = savedStateHandle.get<String>("groupId") ?: ""
 
@@ -101,6 +106,7 @@ fun SettleUpScreen(
     viewModel: SettlementViewModel = hiltViewModel()
 ) {
     val state by viewModel.state.collectAsState()
+    val currentUserId = remember { viewModel.currentUserId }
     val currencyFormatter = rememberCurrencyFormatter()
     val context = LocalContext.current
 
@@ -168,8 +174,12 @@ fun SettleUpScreen(
             items(state.debts) { debt ->
                 DebtCard(
                     debt = debt,
+                    currentUserId = currentUserId,
                     formatBase = currencyFormatter.formatBase,
-                    onSettle = { viewModel.settleDebt(debt) },
+                    onSettle = {
+                        viewModel.settleDebt(debt)
+                        navController.previousBackStackEntry?.savedStateHandle?.set("needsRefresh", true)
+                    },
                     onPayViaUpi = {
                         val vpa = getUpiVpa(debt)
                         if (vpa.isNotEmpty()) {
@@ -187,6 +197,7 @@ fun SettleUpScreen(
 @Composable
 private fun DebtCard(
     debt: SimplifiedDebt,
+    currentUserId: String?,
     formatBase: (Double) -> String,
     onSettle: () -> Unit,
     onPayViaUpi: () -> Unit
@@ -207,7 +218,7 @@ private fun DebtCard(
                 }
                 Spacer(modifier = Modifier.width(12.dp))
                 Column(modifier = Modifier.weight(1f)) {
-                    Text("${debt.fromName.split(" ").firstOrNull()} owes ${debt.toName.split(" ").firstOrNull()}", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text("${if (debt.fromUid == currentUserId) "You" else debt.fromName.split(" ").firstOrNull() ?: ""} owes ${if (debt.toUid == currentUserId) "you" else debt.toName.split(" ").firstOrNull() ?: ""}", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     Text(formatBase(debt.amount), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
                 }
             }

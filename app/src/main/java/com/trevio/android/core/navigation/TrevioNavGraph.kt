@@ -21,7 +21,7 @@ fun TrevioNavGraph(
         startDestination = startDestination
     ) {
         composable(TrevioRoute.Splash.route) {
-            SplashScreen(navController = navController, pendingInviteCode = pendingInviteCode)
+            SplashScreen(navController = navController)
         }
 
         composable(TrevioRoute.Login.route) {

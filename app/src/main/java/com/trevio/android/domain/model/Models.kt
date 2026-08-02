@@ -65,7 +65,6 @@ data class Expense(
     val splits: Map<String, SplitEntry> = emptyMap(),
     val category: String = "other",
     val date: Long = 0,
-    val isRecurring: Boolean = false,
     val createdBy: String = "",
     val exchangeRateToBase: Double = 1.0
 )

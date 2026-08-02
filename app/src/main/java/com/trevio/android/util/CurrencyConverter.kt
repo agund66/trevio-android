@@ -1,8 +1,42 @@
 package com.trevio.android.util
 
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 import kotlin.math.round
 
 object CurrencyConverter {
+
+    private val currencyLocales = mapOf(
+        "INR" to Locale("en", "IN"),
+        "USD" to Locale("en", "US"),
+        "EUR" to Locale("en", "IE"),
+        "GBP" to Locale("en", "GB"),
+        "JPY" to Locale("ja", "JP"),
+        "AUD" to Locale("en", "AU"),
+        "CAD" to Locale("en", "CA"),
+        "SGD" to Locale("en", "SG"),
+        "AED" to Locale("ar", "AE"),
+        "SAR" to Locale("ar", "SA"),
+        "PKR" to Locale("ur", "PK"),
+        "BDT" to Locale("bn", "BD"),
+        "LKR" to Locale("en", "LK"),
+        "NPR" to Locale("ne", "NP"),
+        "ZAR" to Locale("en", "ZA"),
+        "NGN" to Locale("en", "NG"),
+        "KES" to Locale("sw", "KE")
+    )
+
+    fun getLocaleForCurrency(currency: String): Locale {
+        return currencyLocales[currency] ?: Locale("en", "US")
+    }
+
+    fun formatDate(timestamp: Long, currency: String, includeTime: Boolean = false): String {
+        if (timestamp <= 0L) return ""
+        val locale = getLocaleForCurrency(currency)
+        val pattern = if (includeTime) "dd MMM yyyy, HH:mm" else "dd MMM yyyy"
+        return SimpleDateFormat(pattern, locale).format(Date(timestamp))
+    }
 
     fun convertFromBase(
         amountInBase: Double,

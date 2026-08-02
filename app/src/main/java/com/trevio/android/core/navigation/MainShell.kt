@@ -108,7 +108,7 @@ fun MainShell(
 
     LaunchedEffect(pendingInviteCode) {
         if (pendingInviteCode != null) {
-            navController.navigate(TrevioRoute.JoinGroup.createRoute(pendingInviteCode))
+            innerNavController.navigate(TrevioRoute.JoinGroup.createRoute(pendingInviteCode))
         }
     }
 

@@ -15,9 +15,7 @@ interface ExpenseService {
         splits: Map<String, SplitEntry>,
         memberUids: List<String>,
         category: String,
-        date: Long,
-        isRecurring: Boolean,
-        recurringFrequency: String?
+        date: Long
     ): Result<String>
 
     suspend fun updateExpense(

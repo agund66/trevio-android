@@ -29,22 +29,23 @@ import com.trevio.android.core.designsystem.components.TrevioHeader
 import com.trevio.android.domain.model.BroadcastMessage
 import com.trevio.android.domain.model.BroadcastPriority
 import com.trevio.android.domain.model.BroadcastTargetType
+import com.trevio.android.util.rememberCurrencyFormatter
 import org.jsoup.Jsoup
 import org.jsoup.safety.Safelist
-import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.Locale
 
 @Composable
 fun BroadcastsScreen(
     viewModel: BroadcastViewModel = hiltViewModel()
 ) {
     val state by viewModel.state.collectAsState()
+    val currencyFormatter = rememberCurrencyFormatter()
+    val currentUserId = remember { viewModel.currentUserId }
 
     if (state.showForm) {
         BroadcastCreateScreen(
             state = state,
-            viewModel = viewModel
+            viewModel = viewModel,
+            currentUserId = currentUserId
         )
         return
     }
@@ -241,8 +242,11 @@ private fun BroadcastRow(
 @Composable
 private fun BroadcastCreateScreen(
     state: BroadcastViewModel.BroadcastState,
-    viewModel: BroadcastViewModel
+    viewModel: BroadcastViewModel,
+    currentUserId: String?
 ) {
+    val currencyFormatter = rememberCurrencyFormatter()
+    val formatDate = currencyFormatter.formatDate
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -347,7 +351,7 @@ private fun BroadcastCreateScreen(
                         .padding(8.dp),
                     verticalArrangement = Arrangement.spacedBy(2.dp)
                 ) {
-                    state.allUsers.forEach { u ->
+                    state.allUsers.filter { it.uid != currentUserId }.forEach { u ->
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -378,7 +382,6 @@ private fun BroadcastCreateScreen(
             }
 
             // Start date/time picker
-            val dateFormatter = remember { SimpleDateFormat("dd/MM/yyyy HH:mm", Locale.getDefault()) }
             var showStartPicker by remember { mutableStateOf(false) }
             var showStartTimePicker by remember { mutableStateOf(false) }
             var showEndPicker by remember { mutableStateOf(false) }
@@ -392,7 +395,7 @@ private fun BroadcastCreateScreen(
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 OutlinedTextField(
-                    value = state.formStartAt?.let { dateFormatter.format(Date(it)) } ?: "",
+                    value = state.formStartAt?.let { formatDate(it, true) } ?: "",
                     onValueChange = {},
                     label = { Text("Start Date & Time") },
                     modifier = Modifier
@@ -408,7 +411,7 @@ private fun BroadcastCreateScreen(
                     )
                 )
                 OutlinedTextField(
-                    value = state.formEndAt?.let { dateFormatter.format(Date(it)) } ?: "",
+                    value = state.formEndAt?.let { formatDate(it, true) } ?: "",
                     onValueChange = {},
                     label = { Text("End (optional)") },
                     modifier = Modifier
@@ -625,7 +628,8 @@ private fun BroadcastDetailScreen(
     viewModel: BroadcastViewModel
 ) {
     val broadcast = state.selectedBroadcast ?: return
-    val dateFormatter = remember { SimpleDateFormat("dd/MM/yyyy HH:mm", Locale.getDefault()) }
+    val currencyFormatter = rememberCurrencyFormatter()
+    val formatDate = currencyFormatter.formatDate
 
     val priorityColor = when (broadcast.priority) {
         BroadcastPriority.CRITICAL -> Color(0xFFEF4444)
@@ -647,6 +651,7 @@ private fun BroadcastDetailScreen(
     val readMap = remember(state.detailReads) { state.detailReads.associate { it.uid to it.readAt } }
 
     val targetUsers = state.detailAllUsers.filter { u ->
+        if (u.uid == broadcast.createdBy) return@filter false
         when (broadcast.targetType) {
             BroadcastTargetType.ALL -> true
             BroadcastTargetType.ALL_EXCEPT_BLOCKED -> !u.blocked
@@ -723,13 +728,13 @@ private fun BroadcastDetailScreen(
                     Text(broadcast.title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                     Spacer(modifier = Modifier.height(4.dp))
                     Text(
-                        "Start: ${dateFormatter.format(Date(broadcast.startAt))}",
+                        "Start: ${formatDate(broadcast.startAt, true)}",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                     if (broadcast.endAt != null) {
                         Text(
-                            "End: ${dateFormatter.format(Date(broadcast.endAt))}",
+                            "End: ${formatDate(broadcast.endAt, true)}",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -820,7 +825,7 @@ private fun BroadcastDetailScreen(
                                 )
                                 Spacer(modifier = Modifier.width(4.dp))
                                 Text(
-                                    if (readAt != null && readAt > 0) dateFormatter.format(Date(readAt)) else "Read",
+                                    if (readAt != null && readAt > 0) formatDate(readAt, true) else "Read",
                                     style = MaterialTheme.typography.labelSmall,
                                     color = Color(0xFF22C55E)
                                 )

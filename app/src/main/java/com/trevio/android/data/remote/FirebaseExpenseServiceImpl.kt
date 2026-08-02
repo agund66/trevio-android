@@ -30,9 +30,7 @@ class FirebaseExpenseServiceImpl @Inject constructor(
         splits: Map<String, SplitEntry>,
         memberUids: List<String>,
         category: String,
-        date: Long,
-        isRecurring: Boolean,
-        recurringFrequency: String?
+        date: Long
     ): Result<String> {
         return try {
             val uid = auth.currentUser?.uid ?: return Result.failure(Exception("User not authenticated"))
@@ -63,20 +61,10 @@ class FirebaseExpenseServiceImpl @Inject constructor(
                 },
                 "category" to (category.ifEmpty { "other" }),
                 "date" to now,
-                "isRecurring" to isRecurring,
                 "createdBy" to uid,
                 "createdAt" to now,
                 "exchangeRateToBase" to exchangeRateToBase
             )
-
-            if (isRecurring && recurringFrequency != null) {
-                expenseData["recurringConfig"] = mapOf(
-                    "frequency" to recurringFrequency,
-                    "startDate" to now,
-                    "endDate" to null,
-                    "lastTriggered" to now
-                )
-            }
 
             val amountInBase = amount * exchangeRateToBase
 
@@ -315,7 +303,6 @@ class FirebaseExpenseServiceImpl @Inject constructor(
                         )
                     },
                     category = data["category"] as? String ?: "other",
-                    isRecurring = data["isRecurring"] as? Boolean ?: false,
                     createdBy = data["createdBy"] as? String ?: "",
                     exchangeRateToBase = (data["exchangeRateToBase"] as? Number)?.toDouble() ?: 1.0
                 )

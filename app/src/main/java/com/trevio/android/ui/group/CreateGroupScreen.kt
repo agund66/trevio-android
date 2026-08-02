@@ -32,19 +32,24 @@ import com.trevio.android.core.designsystem.components.TrevioHeader
 import com.trevio.android.core.navigation.TrevioRoute
 import com.trevio.android.domain.model.GroupTemplate
 import com.trevio.android.domain.model.UserSearchResult
+import com.trevio.android.domain.repository.AuthService
 import com.trevio.android.domain.repository.GroupService
 import com.trevio.android.domain.repository.UserService
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
 import javax.inject.Inject
 
 @HiltViewModel
 class CreateGroupViewModel @Inject constructor(
     private val groupService: GroupService,
-    private val userService: UserService
+    private val userService: UserService,
+    private val authService: AuthService
 ) : ViewModel() {
+
+    val currentUserId: String? get() = runBlocking { authService.getCurrentUserId() }
 
     data class CreateState(
         val isLoading: Boolean = false,
@@ -120,9 +125,12 @@ fun CreateGroupScreen(
     var selectedTemplate by remember { mutableStateOf(GroupTemplate.CASUAL) }
     var searchQuery by remember { mutableStateOf("") }
     val state by viewModel.state.collectAsState()
+    val currentUserId = remember { viewModel.currentUserId }
 
     LaunchedEffect(state.createdGroupId) {
         if (state.createdGroupId != null) {
+            navController.getBackStackEntry(TrevioRoute.Home.route)
+                .savedStateHandle["needsRefresh"] = true
             navController.popBackStack(TrevioRoute.Home.route, inclusive = false)
         }
     }
@@ -220,7 +228,7 @@ fun CreateGroupScreen(
                                 MemberAvatar(name = user.displayName, photoURL = user.photoURL, size = 36)
                                 Spacer(modifier = Modifier.width(12.dp))
                                 Column(modifier = Modifier.weight(1f)) {
-                                    Text(user.displayName, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium)
+                                    Text(user.displayName + if (user.uid == currentUserId) " (You)" else "", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium)
                                     Text("@${user.username}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                                 }
                                 Box(
@@ -255,7 +263,7 @@ fun CreateGroupScreen(
                         ) {
                             MemberAvatar(name = user.displayName, photoURL = user.photoURL, size = 32)
                             Spacer(modifier = Modifier.width(12.dp))
-                            Text(user.displayName, modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium)
+                            Text(user.displayName + if (user.uid == currentUserId) " (You)" else "", modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium)
                             TextButton(onClick = { viewModel.removeMember(user) }) { Text("Remove") }
                         }
                     }

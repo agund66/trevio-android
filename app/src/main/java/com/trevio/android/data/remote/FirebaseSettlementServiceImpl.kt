@@ -74,7 +74,7 @@ class FirebaseSettlementServiceImpl @Inject constructor(
             batch.set(settlementRef, settlementData)
             batch.set(groupRef.collection("activities").document(), mapOf(
                 "type" to "settlement_added",
-                "description" to "$fromUserName settled ₹$amountInBase with $toUserName",
+                "description" to "$fromUserName settled $currency $amountInBase with $toUserName",
                 "userId" to uid,
                 "data" to mapOf(
                     "settlementId" to settlementRef.id,
@@ -88,22 +88,34 @@ class FirebaseSettlementServiceImpl @Inject constructor(
 
             recalculateBalances(groupId)
 
-            // Notify the receiver (non-blocking — don't fail settlement creation if notification fails)
+            // Notify the receiver and/or payer (non-blocking — don't fail settlement creation if notification fails)
+            // Skip self-notification: don't notify the user who is recording the settlement
             try {
-                firestore.collection("users").document(toUid).collection("notifications").document()
-                    .set(mapOf(
-                        "type" to "settlement",
-                        "title" to "Payment Received",
-                        "body" to "$fromUserName recorded a payment of ₹$amountInBase to you",
-                        "data" to mapOf(
-                            "groupId" to groupId,
-                            "groupName" to (groupDoc.data?.get("name") as? String ?: ""),
-                            "settlementId" to settlementRef.id,
-                            "type" to "settlement"
-                        ),
-                        "read" to false,
-                        "createdAt" to now
-                    )).await()
+                val groupName = groupDoc.data?.get("name") as? String ?: ""
+                val notifyUids = mutableListOf<String>()
+                if (toUid != uid) notifyUids.add(toUid)
+                if (fromUid != uid && toUid !in notifyUids) notifyUids.add(fromUid)
+
+                for (notifyUid in notifyUids) {
+                    val isReceiver = notifyUid == toUid
+                    firestore.collection("users").document(notifyUid).collection("notifications").document()
+                        .set(mapOf(
+                            "type" to "settlement",
+                            "title" to if (isReceiver) "Payment Received" else "Payment Recorded",
+                            "body" to if (isReceiver)
+                                "$fromUserName recorded a payment of $currency $amountInBase to you"
+                            else
+                                "You paid $toUserName $currency $amountInBase (recorded by $fromUserName)",
+                            "data" to mapOf(
+                                "groupId" to groupId,
+                                "groupName" to groupName,
+                                "settlementId" to settlementRef.id,
+                                "type" to "settlement"
+                            ),
+                            "read" to false,
+                            "createdAt" to now
+                        )).await()
+                }
             } catch (notifError: Exception) {
                 android.util.Log.w("FirebaseSettlementService", "Failed to send settlement notification", notifError)
             }

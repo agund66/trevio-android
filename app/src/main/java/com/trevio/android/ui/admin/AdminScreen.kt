@@ -266,7 +266,7 @@ private fun UserRow(
                 Column(modifier = Modifier.weight(1f)) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Text(
-                            user.displayName,
+                            user.displayName + if (isCurrentUser) " (You)" else "",
                             style = MaterialTheme.typography.bodyLarge,
                             fontWeight = FontWeight.SemiBold,
                             maxLines = 1,

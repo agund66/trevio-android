@@ -18,12 +18,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
-import androidx.lifecycle.Lifecycle
-import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -208,18 +205,20 @@ fun GroupDetailScreen(
     val currencyFormatter = rememberCurrencyFormatter()
     var selectedTab by remember { mutableStateOf(0) }
     var showInviteDialog by remember { mutableStateOf(false) }
+    var showQrDialog by remember { mutableStateOf(false) }
     var searchQuery by remember { mutableStateOf("") }
     val context = LocalContext.current
-    val lifecycleOwner = LocalLifecycleOwner.current
 
-    DisposableEffect(lifecycleOwner) {
-        val observer = LifecycleEventObserver { _, event ->
-            if (event == Lifecycle.Event.ON_RESUME) {
-                viewModel.loadData()
-            }
+    val needsRefresh by navController.currentBackStackEntry
+        ?.savedStateHandle?.getStateFlow<Boolean>("needsRefresh", false)
+        ?.collectAsState() ?: mutableStateOf(false)
+
+    LaunchedEffect(needsRefresh) {
+        if (needsRefresh) {
+            viewModel.loadData()
+            navController.currentBackStackEntry?.savedStateHandle?.set("needsRefresh", false)
+            navController.previousBackStackEntry?.savedStateHandle?.set("needsRefresh", true)
         }
-        lifecycleOwner.lifecycle.addObserver(observer)
-        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
 
     val shareInviteLink = {
@@ -286,6 +285,9 @@ fun GroupDetailScreen(
                                 )
                             }
                             if (!state.groupInfo?.inviteCode.isNullOrBlank()) {
+                                IconButton(onClick = { showQrDialog = true }) {
+                                    Icon(Icons.Default.QrCode2, contentDescription = "QR Code", tint = Color.White)
+                                }
                                 IconButton(onClick = {
                                     val clipboard = context.getSystemService(android.content.Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
                                     clipboard.setPrimaryClip(android.content.ClipData.newPlainText("Invite Code", state.groupInfo?.inviteCode))
@@ -398,6 +400,7 @@ fun GroupDetailScreen(
                 2 -> item {
                     MembersTab(
                         members = state.members,
+                        currentUserId = state.currentUserId,
                         onInvite = { showInviteDialog = true },
                         onMemberClick = { uid -> navController.navigate(TrevioRoute.PublicProfile.createRoute(uid)) }
                     )
@@ -405,8 +408,10 @@ fun GroupDetailScreen(
                 3 -> item {
                     ActivityTab(
                         activities = state.activities,
+                        currentUserId = state.currentUserId,
                         isLoading = state.activitiesLoading,
-                        errorMessage = state.activitiesError
+                        errorMessage = state.activitiesError,
+                        formatDate = currencyFormatter.formatDate
                     )
                 }
             }
@@ -440,7 +445,7 @@ fun GroupDetailScreen(
                                     MemberAvatar(name = user.displayName, photoURL = user.photoURL, size = 32)
                                     Spacer(modifier = Modifier.width(8.dp))
                                     Column(modifier = Modifier.weight(1f)) {
-                                        Text(user.displayName, style = MaterialTheme.typography.bodyMedium)
+                                        Text(user.displayName + if (user.uid == state.currentUserId) " (You)" else "", style = MaterialTheme.typography.bodyMedium)
                                         Text("@${user.username}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                                     }
                                     IconButton(onClick = {
@@ -465,6 +470,14 @@ fun GroupDetailScreen(
                         viewModel.clearSearch()
                     }) { Text("Done") }
                 }
+            )
+        }
+
+        if (showQrDialog && state.groupInfo?.inviteCode != null) {
+            GroupQrCodeDialog(
+                groupName = state.groupInfo?.name ?: "Group",
+                inviteCode = state.groupInfo?.inviteCode ?: "",
+                onDismiss = { showQrDialog = false }
             )
         }
     }
@@ -503,6 +516,8 @@ private fun ExpensesTab(expenses: List<Expense>, members: List<Member>, currentU
 private fun ExpenseCard(expense: Expense, members: List<Member>, currentUserId: String?, formatOriginal: (Double, String) -> String) {
     val payer = members.find { it.uid == expense.paidBy }
     val payerName = payer?.displayName?.split(" ")?.firstOrNull() ?: "Someone"
+    val isPayerMe = payer?.uid == currentUserId
+    val displayPayerName = if (isPayerMe) "You" else payerName
     val myShare = currentUserId?.let { expense.splits[it]?.amount }
     val categoryIcon = when (expense.category) {
         "food" -> Icons.Default.Restaurant
@@ -544,7 +559,7 @@ private fun ExpenseCard(expense: Expense, members: List<Member>, currentUserId: 
                 Spacer(modifier = Modifier.height(2.dp))
                 Text(
                     buildString {
-                        append("$payerName paid · ${expense.category}")
+                        append("$displayPayerName paid · ${expense.category}")
                         if (myShare != null && kotlin.math.abs(myShare) > 0.01) {
                             append(" · your share: ")
                             append(formatOriginal(myShare, expense.currency))
@@ -766,7 +781,7 @@ private fun BalancesTab(
                     Spacer(modifier = Modifier.width(12.dp))
                     Column(modifier = Modifier.weight(1f)) {
                         Text(
-                            member.displayName + if (isMe) " (you)" else "",
+                            member.displayName + if (isMe) " (You)" else "",
                             style = MaterialTheme.typography.titleSmall,
                             fontWeight = FontWeight.Medium
                         )
@@ -809,7 +824,7 @@ private fun BalancesTab(
 }
 
 @Composable
-private fun MembersTab(members: List<Member>, onInvite: () -> Unit, onMemberClick: (String) -> Unit) {
+private fun MembersTab(members: List<Member>, currentUserId: String?, onInvite: () -> Unit, onMemberClick: (String) -> Unit) {
     Column(modifier = Modifier.fillMaxWidth().padding(16.dp)) {
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -839,7 +854,7 @@ private fun MembersTab(members: List<Member>, onInvite: () -> Unit, onMemberClic
                     MemberAvatar(name = member.displayName, photoURL = member.photoURL, size = 40)
                     Spacer(modifier = Modifier.width(12.dp))
                     Column(modifier = Modifier.weight(1f)) {
-                        Text(member.displayName, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Medium)
+                        Text(member.displayName + if (member.uid == currentUserId) " (You)" else "", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Medium)
                         Text("@${member.username}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                     if (member.status == "pending") {
@@ -860,7 +875,7 @@ private fun MembersTab(members: List<Member>, onInvite: () -> Unit, onMemberClic
 }
 
 @Composable
-private fun ActivityTab(activities: List<Activity>, isLoading: Boolean, errorMessage: String? = null) {
+private fun ActivityTab(activities: List<Activity>, currentUserId: String?, isLoading: Boolean, errorMessage: String? = null, formatDate: (Long, Boolean) -> String) {
     if (isLoading) {
         LoadingIndicator(modifier = Modifier.fillMaxWidth().padding(40.dp))
         return
@@ -931,11 +946,11 @@ private fun ActivityTab(activities: List<Activity>, isLoading: Boolean, errorMes
                                 MemberAvatar(name = activity.userName, photoURL = activity.userPhotoURL, size = 16)
                                 Spacer(modifier = Modifier.width(4.dp))
                             }
-                            Text(activity.userName, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text(activity.userName + if (activity.userId == currentUserId) " (You)" else "", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                             Spacer(modifier = Modifier.width(4.dp))
                             Text("·", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                             Spacer(modifier = Modifier.width(4.dp))
-                            Text(formatRelativeTime(activity.createdAt), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text(formatRelativeTime(activity.createdAt, formatDate), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                     }
                 }
@@ -970,7 +985,7 @@ private fun InfoChip(text: String) {
     }
 }
 
-private fun formatRelativeTime(timestamp: Long): String {
+private fun formatRelativeTime(timestamp: Long, formatDate: (Long, Boolean) -> String): String {
     if (timestamp == 0L) return ""
     val now = System.currentTimeMillis()
     val diff = now - timestamp
@@ -982,6 +997,6 @@ private fun formatRelativeTime(timestamp: Long): String {
         minutes < 60 -> "${minutes}m ago"
         hours < 24 -> "${hours}h ago"
         days < 7 -> "${days}d ago"
-        else -> java.text.SimpleDateFormat("MMM dd", java.util.Locale.getDefault()).format(java.util.Date(timestamp))
+        else -> formatDate(timestamp, false)
     }
 }

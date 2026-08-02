@@ -177,6 +177,7 @@ class FirebaseBroadcastServiceImpl @Inject constructor(
             }
 
             val filtered = broadcasts.filter { b ->
+                if (b.createdBy == uid) return@filter false
                 when (b.targetType) {
                     BroadcastTargetType.ALL -> true
                     BroadcastTargetType.ALL_EXCEPT_BLOCKED -> !isBlocked

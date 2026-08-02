@@ -98,4 +98,10 @@ dependencies {
 
     // HTML sanitization
     implementation("org.jsoup:jsoup:1.18.1")
+
+    // QR Code generation (ZXing)
+    implementation("com.google.zxing:core:3.5.3")
+
+    // QR Code scanning (Google Play Services code scanner — no camera permission needed)
+    implementation("com.google.android.gms:play-services-code-scanner:16.1.0")
 }

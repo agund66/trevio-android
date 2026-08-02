@@ -9,6 +9,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Group
+import androidx.compose.material.icons.filled.GroupAdd
 import androidx.compose.material.icons.filled.LocalCafe
 import androidx.compose.material.icons.filled.Flight
 import androidx.compose.material.icons.filled.SportsSoccer
@@ -20,13 +21,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
-import androidx.lifecycle.Lifecycle
-import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.trevio.android.core.designsystem.components.EmptyState
@@ -82,16 +80,17 @@ fun GroupsListScreen(
 ) {
     val state by viewModel.state.collectAsState()
     val currencyFormatter = rememberCurrencyFormatter()
-    val lifecycleOwner = LocalLifecycleOwner.current
+    var showJoinSheet by remember { mutableStateOf(false) }
 
-    DisposableEffect(lifecycleOwner) {
-        val observer = LifecycleEventObserver { _, event ->
-            if (event == Lifecycle.Event.ON_RESUME) {
-                viewModel.loadGroups()
-            }
+    val needsRefresh by navController.currentBackStackEntry
+        ?.savedStateHandle?.getStateFlow<Boolean>("needsRefresh", false)
+        ?.collectAsState() ?: mutableStateOf(false)
+
+    LaunchedEffect(needsRefresh) {
+        if (needsRefresh) {
+            viewModel.loadGroups()
+            navController.currentBackStackEntry?.savedStateHandle?.set("needsRefresh", false)
         }
-        lifecycleOwner.lifecycle.addObserver(observer)
-        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
 
     if (state.isLoading) {
@@ -168,15 +167,44 @@ fun GroupsListScreen(
             }
         }
 
-        ExtendedFloatingActionButton(
-            onClick = { navController.navigate(TrevioRoute.CreateGroup.route) },
-            icon = { Icon(Icons.Default.Add, contentDescription = null) },
-            text = { Text("New Group") },
-            containerColor = MaterialTheme.colorScheme.primary,
-            contentColor = MaterialTheme.colorScheme.onPrimary,
+        Column(
             modifier = Modifier
                 .align(Alignment.BottomEnd)
-                .padding(16.dp)
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+            horizontalAlignment = Alignment.End
+        ) {
+            ExtendedFloatingActionButton(
+                onClick = { showJoinSheet = true },
+                icon = { Icon(Icons.Default.GroupAdd, contentDescription = null) },
+                text = { Text("Join Group") },
+                containerColor = MaterialTheme.colorScheme.secondaryContainer,
+                contentColor = MaterialTheme.colorScheme.onSecondaryContainer
+            )
+            ExtendedFloatingActionButton(
+                onClick = { navController.navigate(TrevioRoute.CreateGroup.route) },
+                icon = { Icon(Icons.Default.Add, contentDescription = null) },
+                text = { Text("New Group") },
+                containerColor = MaterialTheme.colorScheme.primary,
+                contentColor = MaterialTheme.colorScheme.onPrimary
+            )
+        }
+    }
+
+    if (showJoinSheet) {
+        JoinGroupSheet(
+            onDismiss = { showJoinSheet = false },
+            onNavigateToLogin = {
+                navController.navigate(TrevioRoute.Login.route) {
+                    popUpTo(TrevioRoute.Home.route) { inclusive = true }
+                }
+            },
+            onNavigateToTerms = {
+                navController.navigate(TrevioRoute.Terms.route) {
+                    popUpTo(TrevioRoute.Home.route) { inclusive = true }
+                }
+            },
+            onJoined = { viewModel.loadGroups() }
         )
     }
 }

@@ -43,8 +43,10 @@ import com.trevio.android.domain.repository.AuthService
 import com.trevio.android.ui.admin.AdminScreen
 import com.trevio.android.ui.broadcast.BroadcastPopup
 import com.trevio.android.ui.expense.AddExpenseScreen
+import com.trevio.android.ui.expense.EditExpenseScreen
 import com.trevio.android.ui.group.CreateGroupScreen
 import com.trevio.android.ui.group.GroupDetailScreen
+import com.trevio.android.ui.group.GroupSettingsScreen
 import com.trevio.android.ui.group.GroupsListScreen
 import com.trevio.android.ui.group.JoinGroupScreen
 import com.trevio.android.ui.home.HomeScreen
@@ -237,6 +239,23 @@ private fun NavGraphBuilder.detailGraph(navController: NavHostController) {
         arguments = listOf(navArgument("groupId") { type = NavType.StringType })
     ) {
         SettleUpScreen(navController = navController)
+    }
+
+    composable(
+        route = TrevioRoute.GroupSettings.route,
+        arguments = listOf(navArgument("groupId") { type = NavType.StringType })
+    ) {
+        GroupSettingsScreen(navController = navController)
+    }
+
+    composable(
+        route = TrevioRoute.EditExpense.route,
+        arguments = listOf(
+            navArgument("groupId") { type = NavType.StringType },
+            navArgument("expenseId") { type = NavType.StringType }
+        )
+    ) {
+        EditExpenseScreen(navController = navController)
     }
 
     composable(

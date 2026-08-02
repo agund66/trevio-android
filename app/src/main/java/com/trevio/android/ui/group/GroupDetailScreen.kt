@@ -5,6 +5,7 @@ import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -33,6 +34,7 @@ import com.trevio.android.core.navigation.TrevioRoute
 import com.trevio.android.domain.model.Activity
 import com.trevio.android.domain.model.Expense
 import com.trevio.android.domain.model.Member
+import com.trevio.android.domain.model.Settlement
 import com.trevio.android.domain.model.UserSearchResult
 import com.trevio.android.domain.model.SimplifiedDebt
 import com.trevio.android.domain.repository.AuthService
@@ -73,7 +75,12 @@ class GroupViewModel @Inject constructor(
         val searchResults: List<UserSearchResult> = emptyList(),
         val inviteError: String? = null,
         val actionError: String? = null,
-        val error: String? = null
+        val error: String? = null,
+        val settlements: List<Settlement> = emptyList(),
+        val settlementsLoading: Boolean = false,
+        val settlementsError: String? = null,
+        val deleteExpenseId: String? = null,
+        val deleteError: String? = null
     )
 
     private val _state = MutableStateFlow(GroupState())
@@ -185,6 +192,36 @@ class GroupViewModel @Inject constructor(
             }
         }
     }
+
+    fun loadSettlements() {
+        _state.value = _state.value.copy(settlementsLoading = true, settlementsError = null)
+        viewModelScope.launch {
+            settlementService.getSettlementHistory(groupId)
+                .onSuccess { settlements ->
+                    _state.value = _state.value.copy(settlements = settlements, settlementsLoading = false)
+                }
+                .onFailure { e ->
+                    _state.value = _state.value.copy(settlementsLoading = false, settlementsError = e.message)
+                }
+        }
+    }
+
+    fun deleteExpense(expenseId: String) {
+        viewModelScope.launch {
+            expenseService.deleteExpense(groupId, expenseId)
+                .onSuccess {
+                    _state.value = _state.value.copy(deleteExpenseId = null, deleteError = null)
+                    loadData()
+                }
+                .onFailure { e ->
+                    _state.value = _state.value.copy(deleteError = e.message)
+                }
+        }
+    }
+
+    fun setDeleteExpenseId(expenseId: String?) {
+        _state.value = _state.value.copy(deleteExpenseId = expenseId, deleteError = null)
+    }
 }
 
 private fun getUpiVpa(debt: SimplifiedDebt): String {
@@ -207,6 +244,8 @@ fun GroupDetailScreen(
     var showInviteDialog by remember { mutableStateOf(false) }
     var showQrDialog by remember { mutableStateOf(false) }
     var searchQuery by remember { mutableStateOf("") }
+    var expenseSearch by remember { mutableStateOf("") }
+    var categoryFilter by remember { mutableStateOf("all") }
     val context = LocalContext.current
 
     val needsRefresh by navController.currentBackStackEntry
@@ -277,6 +316,9 @@ fun GroupDetailScreen(
                             Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = Color.White)
                         }
                         Row {
+                            IconButton(onClick = { navController.navigate(TrevioRoute.GroupSettings.createRoute(state.groupInfo?.groupId ?: "")) }) {
+                                Icon(Icons.Default.Settings, contentDescription = "Settings", tint = Color.White)
+                            }
                             IconButton(onClick = { viewModel.toggleArchive() }) {
                                 Icon(
                                     if (groupInfo?.archived == true) Icons.Default.Unarchive else Icons.Default.Archive,
@@ -358,9 +400,15 @@ fun GroupDetailScreen(
                 ) {
                     Tab(selected = selectedTab == 0, onClick = { selectedTab = 0 }, text = { Text("Expenses") })
                     Tab(selected = selectedTab == 1, onClick = { selectedTab = 1 }, text = { Text("Balances") })
-                    Tab(selected = selectedTab == 2, onClick = { selectedTab = 2 }, text = { Text("Members") })
-                    Tab(selected = selectedTab == 3, onClick = {
-                        selectedTab = 3
+                    Tab(selected = selectedTab == 2, onClick = {
+                        selectedTab = 2
+                        if (state.settlements.isEmpty() && !state.settlementsLoading) {
+                            viewModel.loadSettlements()
+                        }
+                    }, text = { Text("History") })
+                    Tab(selected = selectedTab == 3, onClick = { selectedTab = 3 }, text = { Text("Members") })
+                    Tab(selected = selectedTab == 4, onClick = {
+                        selectedTab = 4
                         if (state.activities.isEmpty() && !state.activitiesLoading) {
                             viewModel.loadActivities()
                         }
@@ -370,12 +418,25 @@ fun GroupDetailScreen(
 
             when (selectedTab) {
                 0 -> item {
+                    val filtered = state.expenses.filter { e ->
+                        (expenseSearch.isBlank() || e.description.contains(expenseSearch, ignoreCase = true)) &&
+                        (categoryFilter == "all" || e.category == categoryFilter)
+                    }
                     ExpensesTab(
-                        expenses = state.expenses,
+                        expenses = filtered,
                         members = state.members,
                         currentUserId = state.currentUserId,
                         formatOriginal = currencyFormatter.formatOriginal,
-                        onSettleUp = { navController.navigate(TrevioRoute.SettleUp.createRoute(state.groupInfo?.groupId ?: "")) }
+                        expenseSearch = expenseSearch,
+                        onExpenseSearchChange = { expenseSearch = it },
+                        categoryFilter = categoryFilter,
+                        onCategoryFilterChange = { categoryFilter = it },
+                        onEditExpense = { expenseId ->
+                            navController.navigate(TrevioRoute.EditExpense.createRoute(state.groupInfo?.groupId ?: "", expenseId))
+                        },
+                        onDeleteExpense = { expenseId ->
+                            viewModel.setDeleteExpenseId(expenseId)
+                        }
                     )
                 }
                 1 -> item {
@@ -398,6 +459,16 @@ fun GroupDetailScreen(
                     )
                 }
                 2 -> item {
+                    SettlementHistoryTab(
+                        settlements = state.settlements,
+                        isLoading = state.settlementsLoading,
+                        error = state.settlementsError,
+                        currentUserId = state.currentUserId,
+                        formatBase = currencyFormatter.formatBase,
+                        formatDate = currencyFormatter.formatDate
+                    )
+                }
+                3 -> item {
                     MembersTab(
                         members = state.members,
                         currentUserId = state.currentUserId,
@@ -405,7 +476,7 @@ fun GroupDetailScreen(
                         onMemberClick = { uid -> navController.navigate(TrevioRoute.PublicProfile.createRoute(uid)) }
                     )
                 }
-                3 -> item {
+                4 -> item {
                     ActivityTab(
                         activities = state.activities,
                         currentUserId = state.currentUserId,
@@ -480,12 +551,51 @@ fun GroupDetailScreen(
                 onDismiss = { showQrDialog = false }
             )
         }
+
+        if (state.deleteExpenseId != null) {
+            AlertDialog(
+                onDismissRequest = { viewModel.setDeleteExpenseId(null) },
+                title = { Text("Delete Expense?") },
+                text = {
+                    Column {
+                        Text("This action cannot be undone. Balances will be recalculated.")
+                        if (state.deleteError != null) {
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Text(state.deleteError!!, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
+                        }
+                    }
+                },
+                confirmButton = {
+                    TextButton(
+                        onClick = { viewModel.deleteExpense(state.deleteExpenseId!!) },
+                        colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)
+                    ) { Text("Delete") }
+                },
+                dismissButton = {
+                    TextButton(onClick = { viewModel.setDeleteExpenseId(null) }) { Text("Cancel") }
+                }
+            )
+        }
     }
 }
 
 @Composable
-private fun ExpensesTab(expenses: List<Expense>, members: List<Member>, currentUserId: String?, formatOriginal: (Double, String) -> String, onSettleUp: () -> Unit) {
-    if (expenses.isEmpty()) {
+private fun ExpensesTab(
+    expenses: List<Expense>,
+    members: List<Member>,
+    currentUserId: String?,
+    formatOriginal: (Double, String) -> String,
+    expenseSearch: String = "",
+    onExpenseSearchChange: (String) -> Unit = {},
+    categoryFilter: String = "all",
+    onCategoryFilterChange: (String) -> Unit = {},
+    onEditExpense: (String) -> Unit = {},
+    onDeleteExpense: (String) -> Unit = {}
+) {
+    val categories = listOf("all", "food", "transport", "shopping", "turf", "accommodation", "other")
+    val hasExpenses = expenses.isNotEmpty() || expenseSearch.isNotBlank() || categoryFilter != "all"
+
+    if (expenses.isEmpty() && expenseSearch.isBlank() && categoryFilter == "all") {
         Box(
             modifier = Modifier
                 .fillMaxWidth()
@@ -505,20 +615,60 @@ private fun ExpensesTab(expenses: List<Expense>, members: List<Member>, currentU
             modifier = Modifier.fillMaxWidth().padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
-            expenses.forEach { expense ->
-                ExpenseCard(expense, members, currentUserId, formatOriginal)
+            if (hasExpenses) {
+                OutlinedTextField(
+                    value = expenseSearch,
+                    onValueChange = onExpenseSearchChange,
+                    placeholder = { Text("Search expenses...") },
+                    leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true,
+                    shape = RoundedCornerShape(12.dp)
+                )
+                LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    items(categories) { cat ->
+                        FilterChip(
+                            selected = categoryFilter == cat,
+                            onClick = { onCategoryFilterChange(cat) },
+                            label = { Text(cat.replaceFirstChar { it.uppercase() }) }
+                        )
+                    }
+                }
+            }
+            if (expenses.isEmpty() && (expenseSearch.isNotBlank() || categoryFilter != "all")) {
+                Box(modifier = Modifier.fillMaxWidth().padding(top = 40.dp), contentAlignment = Alignment.Center) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Icon(Icons.Default.Search, contentDescription = null, modifier = Modifier.size(48.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f))
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text("No expenses match your filters", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Spacer(modifier = Modifier.height(4.dp))
+                        TextButton(onClick = { onExpenseSearchChange(""); onCategoryFilterChange("all") }) { Text("Clear filters") }
+                    }
+                }
+            } else {
+                expenses.forEach { expense ->
+                    ExpenseCard(expense, members, currentUserId, formatOriginal, onEditExpense, onDeleteExpense)
+                }
             }
         }
     }
 }
 
 @Composable
-private fun ExpenseCard(expense: Expense, members: List<Member>, currentUserId: String?, formatOriginal: (Double, String) -> String) {
+private fun ExpenseCard(
+    expense: Expense,
+    members: List<Member>,
+    currentUserId: String?,
+    formatOriginal: (Double, String) -> String,
+    onEditExpense: (String) -> Unit = {},
+    onDeleteExpense: (String) -> Unit = {}
+) {
     val payer = members.find { it.uid == expense.paidBy }
     val payerName = payer?.displayName?.split(" ")?.firstOrNull() ?: "Someone"
     val isPayerMe = payer?.uid == currentUserId
     val displayPayerName = if (isPayerMe) "You" else payerName
     val myShare = currentUserId?.let { expense.splits[it]?.amount }
+    val canEdit = expense.createdBy == currentUserId || members.find { it.uid == currentUserId }?.role == "admin"
     val categoryIcon = when (expense.category) {
         "food" -> Icons.Default.Restaurant
         "transport" -> Icons.Default.DirectionsCar
@@ -555,7 +705,13 @@ private fun ExpenseCard(expense: Expense, members: List<Member>, currentUserId: 
             }
             Spacer(modifier = Modifier.width(12.dp))
             Column(modifier = Modifier.weight(1f)) {
-                Text(expense.description, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(expense.description, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
+                    if (expense.recurring != null) {
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Icon(Icons.Default.Repeat, contentDescription = "Recurring", modifier = Modifier.size(12.dp), tint = MaterialTheme.colorScheme.primary)
+                    }
+                }
                 Spacer(modifier = Modifier.height(2.dp))
                 Text(
                     buildString {
@@ -568,6 +724,10 @@ private fun ExpenseCard(expense: Expense, members: List<Member>, currentUserId: 
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
+                if (expense.note.isNotBlank()) {
+                    Spacer(modifier = Modifier.height(2.dp))
+                    Text(expense.note, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f))
+                }
             }
             Text(
                 text = formatOriginal(expense.amount, expense.currency),
@@ -575,6 +735,17 @@ private fun ExpenseCard(expense: Expense, members: List<Member>, currentUserId: 
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.primary
             )
+            if (canEdit) {
+                Spacer(modifier = Modifier.width(4.dp))
+                Column {
+                    IconButton(onClick = { onEditExpense(expense.expenseId) }, modifier = Modifier.size(28.dp)) {
+                        Icon(Icons.Default.Edit, contentDescription = "Edit", modifier = Modifier.size(16.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                    IconButton(onClick = { onDeleteExpense(expense.expenseId) }, modifier = Modifier.size(28.dp)) {
+                        Icon(Icons.Default.Delete, contentDescription = "Delete", modifier = Modifier.size(16.dp), tint = MaterialTheme.colorScheme.error.copy(alpha = 0.6f))
+                    }
+                }
+            }
         }
     }
 }
@@ -998,5 +1169,77 @@ private fun formatRelativeTime(timestamp: Long, formatDate: (Long, Boolean) -> S
         hours < 24 -> "${hours}h ago"
         days < 7 -> "${days}d ago"
         else -> formatDate(timestamp, false)
+    }
+}
+
+@Composable
+private fun SettlementHistoryTab(
+    settlements: List<Settlement>,
+    isLoading: Boolean,
+    error: String?,
+    currentUserId: String?,
+    formatBase: (Double) -> String,
+    formatDate: (Long, Boolean) -> String
+) {
+    if (isLoading) {
+        Box(modifier = Modifier.fillMaxWidth().padding(top = 60.dp), contentAlignment = Alignment.Center) {
+            CircularProgressIndicator()
+        }
+    } else if (error != null) {
+        Box(modifier = Modifier.fillMaxWidth().padding(top = 60.dp), contentAlignment = Alignment.Center) {
+            Text(error, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodyMedium)
+        }
+    } else if (settlements.isEmpty()) {
+        Box(modifier = Modifier.fillMaxWidth().padding(top = 80.dp), contentAlignment = Alignment.Center) {
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Icon(Icons.Default.AccountBalanceWallet, contentDescription = null, modifier = Modifier.size(64.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f))
+                Spacer(modifier = Modifier.height(16.dp))
+                Text("No settlements yet", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        }
+    } else {
+        Column(
+            modifier = Modifier.fillMaxWidth().padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            settlements.forEach { s ->
+                val isFromMe = currentUserId == s.fromUid
+                val isToMe = currentUserId == s.toUid
+                val fromName = if (isFromMe) "You" else s.fromName.split(" ").firstOrNull() ?: s.fromName
+                val toName = if (isToMe) "you" else s.toName.split(" ").firstOrNull() ?: s.toName
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(14.dp),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(16.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Box(
+                            modifier = Modifier.size(40.dp).clip(CircleShape).background(Color(0xFF22C55E).copy(alpha = 0.12f)),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(Icons.Default.AccountBalanceWallet, contentDescription = null, tint = Color(0xFF22C55E), modifier = Modifier.size(20.dp))
+                        }
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text("$fromName paid $toName", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
+                            Spacer(modifier = Modifier.height(2.dp))
+                            Text(
+                                buildString {
+                                    if (s.date > 0) append(formatDate(s.date, false))
+                                    append(" · ${s.method.name.lowercase()}")
+                                    if (s.upiRefId.isNotBlank()) append(" · Ref: ${s.upiRefId}")
+                                },
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                        Text(formatBase(s.amount), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = Color(0xFF22C55E))
+                    }
+                }
+            }
+        }
     }
 }

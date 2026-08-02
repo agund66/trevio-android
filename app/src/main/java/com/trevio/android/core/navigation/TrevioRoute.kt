@@ -22,6 +22,12 @@ sealed class TrevioRoute(val route: String) {
     data object SettleUp : TrevioRoute("settle_up/{groupId}") {
         fun createRoute(groupId: String) = "settle_up/$groupId"
     }
+    data object GroupSettings : TrevioRoute("group_settings/{groupId}") {
+        fun createRoute(groupId: String) = "group_settings/$groupId"
+    }
+    data object EditExpense : TrevioRoute("edit_expense/{groupId}/{expenseId}") {
+        fun createRoute(groupId: String, expenseId: String) = "edit_expense/$groupId/$expenseId"
+    }
     data object PublicProfile : TrevioRoute("user/{uid}") {
         fun createRoute(uid: String) = "user/$uid"
     }

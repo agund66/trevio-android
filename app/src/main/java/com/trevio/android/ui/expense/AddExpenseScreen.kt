@@ -127,6 +127,8 @@ fun AddExpenseScreen(
     val splitValues = remember { mutableStateMapOf<String, String>() }
     val currentUserId = remember { viewModel.currentUserId }
     var saveAndAddAnother by remember { mutableStateOf(false) }
+    var note by remember { mutableStateOf("") }
+    var isRecurring by remember { mutableStateOf(false) }
 
     val dateFormatter = remember { SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()) }
     val todayStr = remember { dateFormatter.format(Date()) }
@@ -161,6 +163,8 @@ fun AddExpenseScreen(
                 splitValues.clear()
                 excludedMembers.clear()
                 expenseDateStr = todayStr
+                note = ""
+                isRecurring = false
                 saveAndAddAnother = false
             } else {
                 navController.popBackStack()
@@ -509,7 +513,36 @@ fun AddExpenseScreen(
                 }
             }
 
-            Spacer(modifier = Modifier.height(24.dp))
+            Spacer(modifier = Modifier.height(16.dp))
+
+            // Note field
+            OutlinedTextField(
+                value = note,
+                onValueChange = { note = it },
+                label = { Text("Note (optional)") },
+                modifier = Modifier.fillMaxWidth(),
+                minLines = 2,
+                shape = RoundedCornerShape(12.dp)
+            )
+
+            // Recurring expense toggle
+            Surface(
+                shape = RoundedCornerShape(12.dp),
+                tonalElevation = 1.dp,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Row(
+                    modifier = Modifier.padding(12.dp).fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Checkbox(checked = isRecurring, onCheckedChange = { isRecurring = it })
+                    Icon(Icons.Default.Repeat, contentDescription = null, modifier = Modifier.size(18.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("Make this a recurring expense", style = MaterialTheme.typography.bodyMedium)
+                }
+            }
+
+            Spacer(modifier = Modifier.height(8.dp))
             if (state.error != null) {
                 Text(state.error!!, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
                 Spacer(modifier = Modifier.height(8.dp))

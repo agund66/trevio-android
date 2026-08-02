@@ -145,7 +145,8 @@ class EditExpenseViewModel @Inject constructor(
                 splits = splits,
                 memberUids = activeMembers.map { it.uid },
                 category = s.category,
-                date = 0
+                date = 0,
+                note = s.note
             ).onSuccess {
                 _state.value = s.copy(isSaving = false)
                 onDone()

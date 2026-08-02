@@ -80,7 +80,9 @@ class ExpenseViewModel @Inject constructor(
         splitType: SplitType,
         splits: Map<String, SplitEntry>,
         category: String,
-        date: Long = System.currentTimeMillis()
+        date: Long = System.currentTimeMillis(),
+        note: String = "",
+        recurring: com.trevio.android.domain.model.RecurringConfig? = null
     ) {
         _state.value = _state.value.copy(isLoading = true, error = null)
         viewModelScope.launch {
@@ -95,7 +97,9 @@ class ExpenseViewModel @Inject constructor(
                 splits = splits,
                 memberUids = memberUids,
                 category = category,
-                date = date
+                date = date,
+                note = note,
+                recurring = recurring
             ).onSuccess {
                 _state.value = _state.value.copy(isLoading = false, saved = true)
             }.onFailure { e ->
@@ -560,7 +564,9 @@ fun AddExpenseScreen(
                                 splitType = splitType,
                                 splits = buildSplits(),
                                 category = category,
-                                date = expenseDateMillis
+                                date = expenseDateMillis,
+                                note = note,
+                                recurring = if (isRecurring) com.trevio.android.domain.model.RecurringConfig(frequency = com.trevio.android.domain.model.RecurringFrequency.MONTHLY) else null
                             )
                         }
                     },
@@ -586,7 +592,9 @@ fun AddExpenseScreen(
                                 splitType = splitType,
                                 splits = buildSplits(),
                                 category = category,
-                                date = expenseDateMillis
+                                date = expenseDateMillis,
+                                note = note,
+                                recurring = if (isRecurring) com.trevio.android.domain.model.RecurringConfig(frequency = com.trevio.android.domain.model.RecurringFrequency.MONTHLY) else null
                             )
                         }
                     },

@@ -4,6 +4,8 @@ import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.Query
 import com.trevio.android.domain.model.Expense
+import com.trevio.android.domain.model.RecurringConfig
+import com.trevio.android.domain.model.RecurringFrequency
 import com.trevio.android.domain.model.SplitEntry
 import com.trevio.android.domain.model.SplitType
 import com.trevio.android.domain.repository.ExpenseService
@@ -30,7 +32,9 @@ class FirebaseExpenseServiceImpl @Inject constructor(
         splits: Map<String, SplitEntry>,
         memberUids: List<String>,
         category: String,
-        date: Long
+        date: Long,
+        note: String,
+        recurring: RecurringConfig?
     ): Result<String> {
         return try {
             val uid = auth.currentUser?.uid ?: return Result.failure(Exception("User not authenticated"))
@@ -65,6 +69,15 @@ class FirebaseExpenseServiceImpl @Inject constructor(
                 "createdAt" to now,
                 "exchangeRateToBase" to exchangeRateToBase
             )
+            if (note.isNotBlank()) expenseData["note"] = note
+            if (recurring != null) {
+                expenseData["recurring"] = mapOf(
+                    "frequency" to recurring.frequency.name.lowercase(),
+                    "endDate" to (recurring.endDate ?: 0L),
+                    "nextDueDate" to (recurring.nextDueDate ?: 0L),
+                    "parentExpenseId" to (recurring.parentExpenseId ?: "")
+                )
+            }
 
             val amountInBase = amount * exchangeRateToBase
 
@@ -143,7 +156,8 @@ class FirebaseExpenseServiceImpl @Inject constructor(
         splits: Map<String, SplitEntry>,
         memberUids: List<String>,
         category: String,
-        date: Long
+        date: Long,
+        note: String
     ): Result<Unit> {
         return try {
             val uid = auth.currentUser?.uid ?: return Result.failure(Exception("User not authenticated"))
@@ -171,6 +185,7 @@ class FirebaseExpenseServiceImpl @Inject constructor(
             if (currency.isNotBlank()) updateData["currency"] = currency
             if (paidBy.isNotBlank()) updateData["paidBy"] = paidBy
             if (category.isNotBlank()) updateData["category"] = category
+            updateData["note"] = note
 
             val oldCurrency = oldExpense["currency"] as? String ?: "INR"
             val newCurrency = if (currency.isNotBlank()) currency else oldCurrency
@@ -314,7 +329,17 @@ class FirebaseExpenseServiceImpl @Inject constructor(
                     },
                     category = data["category"] as? String ?: "other",
                     createdBy = data["createdBy"] as? String ?: "",
-                    exchangeRateToBase = (data["exchangeRateToBase"] as? Number)?.toDouble() ?: 1.0
+                    exchangeRateToBase = (data["exchangeRateToBase"] as? Number)?.toDouble() ?: 1.0,
+                    date = (data["date"] as? Number)?.toLong() ?: 0,
+                    note = data["note"] as? String ?: "",
+                    recurring = (data["recurring"] as? Map<*, *>)?.let { r ->
+                        RecurringConfig(
+                            frequency = RecurringFrequency.valueOf((r["frequency"] as? String ?: "monthly").uppercase()),
+                            endDate = (r["endDate"] as? Number)?.toLong(),
+                            nextDueDate = (r["nextDueDate"] as? Number)?.toLong(),
+                            parentExpenseId = r["parentExpenseId"] as? String
+                        )
+                    }
                 )
             }
             Result.success(expenses)

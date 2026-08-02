@@ -1,6 +1,7 @@
 package com.trevio.android.domain.repository
 
 import com.trevio.android.domain.model.Expense
+import com.trevio.android.domain.model.RecurringConfig
 import com.trevio.android.domain.model.SplitEntry
 import com.trevio.android.domain.model.SplitType
 
@@ -15,7 +16,9 @@ interface ExpenseService {
         splits: Map<String, SplitEntry>,
         memberUids: List<String>,
         category: String,
-        date: Long
+        date: Long,
+        note: String = "",
+        recurring: RecurringConfig? = null
     ): Result<String>
 
     suspend fun updateExpense(
@@ -29,7 +32,8 @@ interface ExpenseService {
         splits: Map<String, SplitEntry>,
         memberUids: List<String>,
         category: String,
-        date: Long
+        date: Long,
+        note: String = ""
     ): Result<Unit>
 
     suspend fun deleteExpense(groupId: String, expenseId: String): Result<Unit>

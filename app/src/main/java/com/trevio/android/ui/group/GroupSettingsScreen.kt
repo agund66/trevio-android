@@ -19,6 +19,7 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.trevio.android.core.designsystem.components.MemberAvatar
+import com.trevio.android.core.navigation.TrevioRoute
 import com.trevio.android.domain.repository.AuthService
 import com.trevio.android.domain.repository.GroupInfo
 import com.trevio.android.domain.repository.GroupService
@@ -120,7 +121,7 @@ class GroupSettingsViewModel @Inject constructor(
         viewModelScope.launch {
             groupService.deleteGroup(groupId)
                 .onSuccess {
-                    _state.value = s.copy(isSaving = false, showDeleteConfirm = false)
+                    _state.value = s.copy(isSaving = false, showDeleteConfirm = false, groupInfo = null)
                 }
                 .onFailure { e ->
                     _state.value = s.copy(isSaving = false, error = e.message, showDeleteConfirm = false)
@@ -300,7 +301,7 @@ fun GroupSettingsScreen(
 
     LaunchedEffect(state.groupInfo) {
         if (state.groupInfo == null && !state.isLoading) {
-            navController.popBackStack()
+            navController.popBackStack(TrevioRoute.Groups.route, inclusive = false)
         }
     }
 }

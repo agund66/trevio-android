@@ -14,6 +14,8 @@ object Calculations {
     ): Map<String, SplitEntry> {
         val result = mutableMapOf<String, SplitEntry>()
 
+        if (memberUids.isEmpty()) return result
+
         when (splitType) {
             SplitType.EQUAL -> {
                 val perPerson = round((totalAmount / memberUids.size) * 100) / 100

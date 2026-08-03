@@ -2,6 +2,7 @@ package com.trevio.android.ui.profile
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.rememberScrollState
@@ -13,9 +14,9 @@ import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
-import androidx.compose.material.icons.filled.Logout
 import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.Logout
 import androidx.compose.material.icons.filled.Mail
 import androidx.compose.material.icons.filled.Payments
 import androidx.compose.material.icons.filled.Person
@@ -25,6 +26,7 @@ import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.collectAsState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -37,6 +39,8 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.trevio.android.core.designsystem.components.MemberAvatar
 import com.trevio.android.core.designsystem.components.TrevioCard
+import com.trevio.android.core.designsystem.theme.ThemeMode
+import com.trevio.android.core.designsystem.theme.ThemeViewModel
 import com.trevio.android.core.designsystem.theme.TrevioBorder
 import com.trevio.android.core.navigation.TrevioRoute
 import com.trevio.android.domain.model.User
@@ -169,9 +173,11 @@ class ProfileViewModel @Inject constructor(
 fun ProfileScreen(
     navController: androidx.navigation.NavHostController,
     onSignOut: () -> Unit,
-    viewModel: ProfileViewModel = hiltViewModel()
+    viewModel: ProfileViewModel = hiltViewModel(),
+    themeViewModel: ThemeViewModel = hiltViewModel()
 ) {
     val state by viewModel.state.collectAsState()
+    val themeMode by themeViewModel.themeMode.collectAsState()
 
     LaunchedEffect(state.signedOut) {
         if (state.signedOut) {
@@ -248,7 +254,7 @@ fun ProfileScreen(
                         }
                     }
                     IconButton(onClick = { viewModel.signOut() }) {
-                        Icon(Icons.Default.Logout, contentDescription = "Sign Out", tint = Color.White)
+                        Icon(Icons.AutoMirrored.Filled.Logout, contentDescription = "Sign Out", tint = Color.White)
                     }
                 }
             }
@@ -290,13 +296,25 @@ fun ProfileScreen(
                 onSave = { name, currency, upi, phone, cc -> viewModel.saveProfile(name, currency, upi, phone, cc) }
             )
         } else {
-            ViewProfileContent(user = user, onEdit = { viewModel.startEditing() }, onDelete = { viewModel.deleteAccount() })
+            ViewProfileContent(
+                user = user,
+                onEdit = { viewModel.startEditing() },
+                onDelete = { viewModel.deleteAccount() },
+                themeMode = themeMode,
+                onThemeModeChange = { themeViewModel.setThemeMode(it) }
+            )
         }
     }
 }
 
 @Composable
-private fun ViewProfileContent(user: User, onEdit: () -> Unit, onDelete: () -> Unit) {
+private fun ViewProfileContent(
+    user: User,
+    onEdit: () -> Unit,
+    onDelete: () -> Unit,
+    themeMode: ThemeMode,
+    onThemeModeChange: (ThemeMode) -> Unit
+) {
     var showDeleteDialog by remember { mutableStateOf(false) }
     var showTermsDialog by remember { mutableStateOf(false) }
     val hasUpiId = user.upiId.isNotEmpty()
@@ -310,15 +328,16 @@ private fun ViewProfileContent(user: User, onEdit: () -> Unit, onDelete: () -> U
     ) {
         Spacer(modifier = Modifier.height(8.dp))
 
+        val isDark = isSystemInDarkTheme()
         ProfileInfoCard(
             icon = Icons.Default.Person,
-            iconColor = Color(0xFF6366F1),
+            iconColor = if (isDark) Color(0xFF818CF8) else Color(0xFF6366F1),
             label = "Username",
             value = "@${user.username}"
         )
         ProfileInfoCard(
             icon = Icons.Default.Mail,
-            iconColor = Color(0xFF22C55E),
+            iconColor = if (isDark) Color(0xFF4ADE80) else Color(0xFF22C55E),
             label = "Email",
             value = user.email
         )
@@ -336,7 +355,7 @@ private fun ViewProfileContent(user: User, onEdit: () -> Unit, onDelete: () -> U
         }
         ProfileInfoCard(
             icon = Icons.Default.Payments,
-            iconColor = Color(0xFFF59E0B),
+            iconColor = if (isDark) Color(0xFFFBBF24) else Color(0xFFF59E0B),
             label = "Currency",
             value = "$currencySymbol ${user.defaultCurrency}"
         )
@@ -344,7 +363,7 @@ private fun ViewProfileContent(user: User, onEdit: () -> Unit, onDelete: () -> U
         // Always show phone card
         ProfileInfoCard(
             icon = Icons.Default.Phone,
-            iconColor = Color(0xFFEC4899),
+            iconColor = if (isDark) Color(0xFFF472B6) else Color(0xFFEC4899),
             label = "Mobile",
             value = if (hasPhone) "${country.flag} ${country.dialCode} ${user.phoneNumber}" else "Not set",
             actionLabel = if (!hasPhone) "Add" else null,
@@ -354,7 +373,7 @@ private fun ViewProfileContent(user: User, onEdit: () -> Unit, onDelete: () -> U
         // Always show UPI ID card
         ProfileInfoCard(
             icon = Icons.Default.Payments,
-            iconColor = Color(0xFF0D9488),
+            iconColor = if (isDark) Color(0xFF2DD4BF) else Color(0xFF0D9488),
             label = "UPI ID",
             value = if (hasUpiId) user.upiId else "Not set",
             actionLabel = if (!hasUpiId) "Add" else null,
@@ -427,6 +446,55 @@ private fun ViewProfileContent(user: User, onEdit: () -> Unit, onDelete: () -> U
                             Text("Set up payment info", style = MaterialTheme.typography.labelMedium)
                         }
                     }
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        // Appearance section
+        TrevioCard(
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Column(modifier = Modifier.padding(16.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        Icons.Default.Person,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(18.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        "Appearance",
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                }
+                Spacer(modifier = Modifier.height(12.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    ThemeOptionButton(
+                        label = "Light",
+                        isSelected = themeMode == ThemeMode.LIGHT,
+                        onClick = { onThemeModeChange(ThemeMode.LIGHT) },
+                        modifier = Modifier.weight(1f)
+                    )
+                    ThemeOptionButton(
+                        label = "Dark",
+                        isSelected = themeMode == ThemeMode.DARK,
+                        onClick = { onThemeModeChange(ThemeMode.DARK) },
+                        modifier = Modifier.weight(1f)
+                    )
+                    ThemeOptionButton(
+                        label = "System",
+                        isSelected = themeMode == ThemeMode.SYSTEM,
+                        onClick = { onThemeModeChange(ThemeMode.SYSTEM) },
+                        modifier = Modifier.weight(1f)
+                    )
                 }
             }
         }
@@ -741,6 +809,35 @@ private fun TermsConditionsDialog(onDismiss: () -> Unit) {
             Spacer(modifier = Modifier.height(10.dp))
             TermsSection("5. Account Termination", "You can delete your account at any time. Upon deletion, your data will be removed from our servers.")
         }
+    }
+}
+
+@Composable
+private fun ThemeOptionButton(
+    label: String,
+    isSelected: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val borderColor = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant
+    val backgroundColor = if (isSelected) MaterialTheme.colorScheme.primary.copy(alpha = 0.08f) else Color.Transparent
+    val textColor = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+
+    Box(
+        modifier = modifier
+            .clip(RoundedCornerShape(12.dp))
+            .border(1.dp, borderColor, RoundedCornerShape(12.dp))
+            .background(backgroundColor)
+            .clickable(onClick = onClick)
+            .padding(vertical = 12.dp, horizontal = 8.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelMedium,
+            fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal,
+            color = textColor
+        )
     }
 }
 

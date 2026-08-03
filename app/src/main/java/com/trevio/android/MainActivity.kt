@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -22,9 +23,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.navigation.compose.rememberNavController
+import com.trevio.android.core.designsystem.theme.ThemeViewModel
 import com.trevio.android.core.designsystem.theme.TrevioTheme
 import com.trevio.android.core.navigation.TrevioNavGraph
 import com.trevio.android.core.navigation.TrevioRoute
+import androidx.hilt.navigation.compose.hiltViewModel
 import dagger.hilt.android.AndroidEntryPoint
 
 @AndroidEntryPoint
@@ -46,7 +49,10 @@ class MainActivity : ComponentActivity() {
         pendingInviteCode.value = extractInviteCode(intent)
 
         setContent {
-            TrevioTheme {
+            val themeViewModel: ThemeViewModel = hiltViewModel()
+            val themeMode by themeViewModel.themeMode.collectAsState()
+
+            TrevioTheme(themeMode = themeMode) {
                 Box(
                     modifier = Modifier
                         .fillMaxSize()

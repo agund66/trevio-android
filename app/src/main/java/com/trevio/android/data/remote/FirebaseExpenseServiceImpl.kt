@@ -52,6 +52,7 @@ class FirebaseExpenseServiceImpl @Inject constructor(
             val calculatedSplits = Calculations.calculateSplits(amount, splitType, memberUids, splits)
             val exchangeRateToBase = exchangeRateService.getRateToBase(currency).getOrDefault(1.0)
             val now = System.currentTimeMillis()
+            val expenseDate = if (date > 0) date else now
             val expenseRef = groupRef.collection("expenses").document()
 
             val expenseData = mutableMapOf<String, Any>(
@@ -64,7 +65,7 @@ class FirebaseExpenseServiceImpl @Inject constructor(
                     mapOf("amount" to v.amount, "shareValue" to v.shareValue)
                 },
                 "category" to (category.ifEmpty { "other" }),
-                "date" to now,
+                "date" to expenseDate,
                 "createdBy" to uid,
                 "createdAt" to now,
                 "exchangeRateToBase" to exchangeRateToBase

@@ -74,7 +74,7 @@ class FirebaseSettlementServiceImpl @Inject constructor(
             batch.set(settlementRef, settlementData)
             batch.set(groupRef.collection("activities").document(), mapOf(
                 "type" to "settlement_added",
-                "description" to "$fromUserName settled $currency $amountInBase with $toUserName",
+                "description" to "$fromUserName settled $currency $amount with $toUserName",
                 "userId" to uid,
                 "data" to mapOf(
                     "settlementId" to settlementRef.id,
@@ -103,9 +103,9 @@ class FirebaseSettlementServiceImpl @Inject constructor(
                             "type" to "settlement",
                             "title" to if (isReceiver) "Payment Received" else "Payment Recorded",
                             "body" to if (isReceiver)
-                                "$fromUserName recorded a payment of $currency $amountInBase to you"
+                                "$fromUserName recorded a payment of $currency $amount to you"
                             else
-                                "You paid $toUserName $currency $amountInBase (recorded by $fromUserName)",
+                                "You paid $toUserName $currency $amount (recorded by $fromUserName)",
                             "data" to mapOf(
                                 "groupId" to groupId,
                                 "groupName" to groupName,
@@ -173,17 +173,32 @@ class FirebaseSettlementServiceImpl @Inject constructor(
 
             val members = membersSnapshot.documents.mapNotNull { doc ->
                 val data = doc.data ?: return@mapNotNull null
-                val userDoc = firestore.collection("users").document(doc.id).get().await()
-                val userData = userDoc.data
-                Member(
-                    uid = doc.id,
-                    displayName = userData?.get("displayName") as? String ?: "Unknown",
-                    username = userData?.get("username") as? String ?: "",
-                    photoURL = userData?.get("photoURL") as? String ?: "",
-                    balance = (data["balance"] as? Number)?.toDouble() ?: 0.0,
-                    role = data["role"] as? String ?: "member",
-                    status = data["status"] as? String ?: "active"
-                )
+                val isOffline = data["isOffline"] as? Boolean ?: false
+                if (isOffline) {
+                    Member(
+                        uid = doc.id,
+                        displayName = data["displayName"] as? String ?: "Unknown",
+                        username = "",
+                        photoURL = "",
+                        balance = (data["balance"] as? Number)?.toDouble() ?: 0.0,
+                        role = data["role"] as? String ?: "member",
+                        status = data["status"] as? String ?: "active",
+                        isOffline = true
+                    )
+                } else {
+                    val userDoc = firestore.collection("users").document(doc.id).get().await()
+                    val userData = userDoc.data
+                    Member(
+                        uid = doc.id,
+                        displayName = userData?.get("displayName") as? String ?: "Unknown",
+                        username = userData?.get("username") as? String ?: "",
+                        photoURL = userData?.get("photoURL") as? String ?: "",
+                        balance = (data["balance"] as? Number)?.toDouble() ?: 0.0,
+                        role = data["role"] as? String ?: "member",
+                        status = data["status"] as? String ?: "active",
+                        isOffline = false
+                    )
+                }
             }
             Result.success(members)
         } catch (e: Exception) {

@@ -1,29 +1,41 @@
 package com.trevio.android.ui.group
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.ContentCopy
-import androidx.compose.material.icons.filled.PersonAdd
-import androidx.compose.material.icons.filled.Search
-import androidx.compose.material.icons.filled.Sports
-import androidx.compose.material.icons.filled.TravelExplore
-import androidx.compose.material.icons.filled.Group
+import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.outlined.Close
+import androidx.compose.material.icons.outlined.Description
+import androidx.compose.material.icons.outlined.Group
+import androidx.compose.material.icons.outlined.Label
+import androidx.compose.material.icons.outlined.Person
+import androidx.compose.material.icons.outlined.PersonAdd
+import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -51,11 +63,16 @@ class CreateGroupViewModel @Inject constructor(
 
     val currentUserId: String? get() = runBlocking { authService.getCurrentUserId() }
 
+    data class OfflineMember(
+        val name: String
+    )
+
     data class CreateState(
         val isLoading: Boolean = false,
         val error: String? = null,
         val searchResults: List<UserSearchResult> = emptyList(),
         val selectedMembers: List<UserSearchResult> = emptyList(),
+        val offlineMembers: List<OfflineMember> = emptyList(),
         val inviteCode: String? = null,
         val createdGroupId: String? = null
     )
@@ -93,6 +110,19 @@ class CreateGroupViewModel @Inject constructor(
         )
     }
 
+    fun addOfflineMember(name: String) {
+        if (name.isBlank()) return
+        _state.value = _state.value.copy(
+            offlineMembers = _state.value.offlineMembers + OfflineMember(name.trim())
+        )
+    }
+
+    fun removeOfflineMember(member: OfflineMember) {
+        _state.value = _state.value.copy(
+            offlineMembers = _state.value.offlineMembers.filter { it != member }
+        )
+    }
+
     fun createGroup(name: String, description: String, template: GroupTemplate) {
         _state.value = _state.value.copy(isLoading = true, error = null)
         viewModelScope.launch {
@@ -102,6 +132,9 @@ class CreateGroupViewModel @Inject constructor(
                 template = template,
                 memberUids = _state.value.selectedMembers.map { it.uid }
             ).onSuccess { (groupId, inviteCode) ->
+                for (offline in _state.value.offlineMembers) {
+                    groupService.addOfflineMember(groupId, offline.name)
+                }
                 _state.value = _state.value.copy(
                     isLoading = false,
                     createdGroupId = groupId,
@@ -114,7 +147,7 @@ class CreateGroupViewModel @Inject constructor(
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun CreateGroupScreen(
     navController: androidx.navigation.NavHostController,
@@ -124,8 +157,10 @@ fun CreateGroupScreen(
     var description by remember { mutableStateOf("") }
     var selectedTemplate by remember { mutableStateOf(GroupTemplate.CASUAL) }
     var searchQuery by remember { mutableStateOf("") }
+    var offlineName by remember { mutableStateOf("") }
     val state by viewModel.state.collectAsState()
     val currentUserId = remember { viewModel.currentUserId }
+    val isDark = isSystemInDarkTheme()
 
     LaunchedEffect(state.createdGroupId) {
         if (state.createdGroupId != null) {
@@ -140,14 +175,19 @@ fun CreateGroupScreen(
             title = "Create Group",
             onBack = { navController.popBackStack() }
         )
+
         Column(
             modifier = Modifier
                 .weight(1f)
                 .verticalScroll(rememberScrollState())
-                .padding(20.dp)
+                .padding(horizontal = 20.dp, vertical = 20.dp)
         ) {
+            // ── Template Selection ──
             SectionLabel("Choose a template")
+            Spacer(modifier = Modifier.height(4.dp))
+            SectionHint("Pick a category that best fits your group")
             Spacer(modifier = Modifier.height(12.dp))
+
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(10.dp)
@@ -155,7 +195,8 @@ fun CreateGroupScreen(
                 TemplateCard(
                     icon = Icons.Default.TravelExplore,
                     title = "Trip",
-                    iconColor = Color(0xFF6366F1),
+                    subtitle = "Travel & trips",
+                    iconColor = if (isDark) Color(0xFF818CF8) else Color(0xFF6366F1),
                     selected = selectedTemplate == GroupTemplate.TRIP,
                     onClick = { selectedTemplate = GroupTemplate.TRIP },
                     modifier = Modifier.weight(1f)
@@ -163,7 +204,8 @@ fun CreateGroupScreen(
                 TemplateCard(
                     icon = Icons.Default.Sports,
                     title = "Turf",
-                    iconColor = Color(0xFF22C55E),
+                    subtitle = "Sports & turf",
+                    iconColor = if (isDark) Color(0xFF4ADE80) else Color(0xFF22C55E),
                     selected = selectedTemplate == GroupTemplate.TURF,
                     onClick = { selectedTemplate = GroupTemplate.TURF },
                     modifier = Modifier.weight(1f)
@@ -171,74 +213,120 @@ fun CreateGroupScreen(
                 TemplateCard(
                     icon = Icons.Default.Group,
                     title = "Casual",
-                    iconColor = Color(0xFFF59E0B),
+                    subtitle = "Friends & casual",
+                    iconColor = if (isDark) Color(0xFFFBBF24) else Color(0xFFF59E0B),
                     selected = selectedTemplate == GroupTemplate.CASUAL,
                     onClick = { selectedTemplate = GroupTemplate.CASUAL },
                     modifier = Modifier.weight(1f)
                 )
             }
 
-            Spacer(modifier = Modifier.height(20.dp))
-            OutlinedTextField(
+            Spacer(modifier = Modifier.height(28.dp))
+
+            // ── Group Details ──
+            SectionLabel("Group details")
+            Spacer(modifier = Modifier.height(4.dp))
+            SectionHint("Give your group a name so members can identify it")
+            Spacer(modifier = Modifier.height(12.dp))
+
+            StyledTextField(
                 value = name,
                 onValueChange = { name = it },
-                label = { Text("Group name") },
-                modifier = Modifier.fillMaxWidth(),
-                singleLine = true,
-                shape = RoundedCornerShape(12.dp)
+                label = "Group name",
+                icon = Icons.Outlined.Label,
+                singleLine = true
             )
             Spacer(modifier = Modifier.height(12.dp))
-            OutlinedTextField(
+            StyledTextField(
                 value = description,
                 onValueChange = { description = it },
-                label = { Text("Description (optional)") },
-                modifier = Modifier.fillMaxWidth(),
-                maxLines = 2,
-                shape = RoundedCornerShape(12.dp)
+                label = "Description (optional)",
+                icon = Icons.Outlined.Description,
+                minLines = 2
             )
-            Spacer(modifier = Modifier.height(16.dp))
+
+            Spacer(modifier = Modifier.height(28.dp))
+
+            // ── Add Members ──
             SectionLabel("Add members")
-            Spacer(modifier = Modifier.height(8.dp))
+            Spacer(modifier = Modifier.height(4.dp))
+            SectionHint("Search by username or add someone not on the app")
+            Spacer(modifier = Modifier.height(12.dp))
+
             OutlinedTextField(
                 value = searchQuery,
                 onValueChange = { searchQuery = it; viewModel.searchUsers(it) },
-                label = { Text("Search by username") },
-                leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
+                placeholder = { Text("Search by username", color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)) },
+                leadingIcon = { Icon(Icons.Outlined.Search, contentDescription = null, modifier = Modifier.size(20.dp)) },
+                trailingIcon = {
+                    if (searchQuery.isNotEmpty()) {
+                        IconButton(onClick = { searchQuery = ""; viewModel.searchUsers("") }, modifier = Modifier.size(20.dp)) {
+                            Icon(Icons.Outlined.Close, contentDescription = "Clear", modifier = Modifier.size(16.dp))
+                        }
+                    }
+                },
                 modifier = Modifier.fillMaxWidth(),
                 singleLine = true,
-                shape = RoundedCornerShape(12.dp)
+                shape = RoundedCornerShape(14.dp),
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedBorderColor = MaterialTheme.colorScheme.primary,
+                    unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant
+                )
             )
 
-            if (state.searchResults.isNotEmpty()) {
-                Spacer(modifier = Modifier.height(8.dp))
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(12.dp),
-                    elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
-                ) {
-                    Column {
-                        state.searchResults.forEach { user ->
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(12.dp)
-                                    .selectable(selected = false, onClick = { viewModel.addMember(user) }),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                MemberAvatar(name = user.displayName, photoURL = user.photoURL, size = 36)
-                                Spacer(modifier = Modifier.width(12.dp))
-                                Column(modifier = Modifier.weight(1f)) {
-                                    Text(user.displayName + if (user.uid == currentUserId) " (You)" else "", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium)
-                                    Text("@${user.username}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                                }
-                                Box(
+            // Search Results
+            AnimatedVisibility(
+                visible = state.searchResults.isNotEmpty(),
+                enter = fadeIn() + slideInVertically(),
+                exit = fadeOut() + slideOutVertically()
+            ) {
+                Column(modifier = Modifier.padding(top = 8.dp)) {
+                    Surface(
+                        shape = RoundedCornerShape(14.dp),
+                        tonalElevation = 2.dp,
+                        shadowElevation = 2.dp,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Column {
+                            state.searchResults.forEachIndexed { index, user ->
+                                if (index > 0) HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
+                                Row(
                                     modifier = Modifier
-                                        .size(32.dp)
-                                        .clip(CircleShape)
-                                        .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.1f)),
-                                    contentAlignment = Alignment.Center
+                                        .fillMaxWidth()
+                                        .clickable { viewModel.addMember(user) }
+                                        .padding(horizontal = 14.dp, vertical = 10.dp),
+                                    verticalAlignment = Alignment.CenterVertically
                                 ) {
-                                    Icon(Icons.Default.PersonAdd, contentDescription = "Add", tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(18.dp))
+                                    MemberAvatar(name = user.displayName, photoURL = user.photoURL, size = 40)
+                                    Spacer(modifier = Modifier.width(12.dp))
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text(
+                                            user.displayName + if (user.uid == currentUserId) " (You)" else "",
+                                            style = MaterialTheme.typography.bodyMedium,
+                                            fontWeight = FontWeight.SemiBold,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis
+                                        )
+                                        Text(
+                                            "@${user.username}",
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    }
+                                    Box(
+                                        modifier = Modifier
+                                            .size(36.dp)
+                                            .clip(CircleShape)
+                                            .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.1f)),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Icon(
+                                            Icons.Outlined.PersonAdd,
+                                            contentDescription = "Add",
+                                            tint = MaterialTheme.colorScheme.primary,
+                                            modifier = Modifier.size(18.dp)
+                                        )
+                                    }
                                 }
                             }
                         }
@@ -246,47 +334,167 @@ fun CreateGroupScreen(
                 }
             }
 
-            if (state.selectedMembers.isNotEmpty()) {
+            // No results hint with add-offline option
+            if (searchQuery.isNotEmpty() && state.searchResults.isEmpty()) {
                 Spacer(modifier = Modifier.height(12.dp))
-                Text("Selected (${state.selectedMembers.size})", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, fontWeight = FontWeight.SemiBold)
-                Spacer(modifier = Modifier.height(8.dp))
-                state.selectedMembers.forEach { user ->
-                    Card(
-                        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
-                        shape = RoundedCornerShape(10.dp),
-                        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
-                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
+                Surface(
+                    shape = RoundedCornerShape(14.dp),
+                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable {
+                                viewModel.addOfflineMember(searchQuery)
+                                searchQuery = ""
+                                viewModel.searchUsers("")
+                            }
+                            .padding(14.dp),
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth().padding(12.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            MemberAvatar(name = user.displayName, photoURL = user.photoURL, size = 32)
-                            Spacer(modifier = Modifier.width(12.dp))
-                            Text(user.displayName + if (user.uid == currentUserId) " (You)" else "", modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium)
-                            TextButton(onClick = { viewModel.removeMember(user) }) { Text("Remove") }
+                        Icon(
+                            Icons.Default.PersonAdd,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(20.dp)
+                        )
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Text(
+                            "Add \"$searchQuery\" as offline member",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.primary,
+                            fontWeight = FontWeight.Medium
+                        )
+                    }
+                }
+            }
+
+            // Divider between search and offline add
+            Spacer(modifier = Modifier.height(16.dp))
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                Box(modifier = Modifier.weight(1f).height(1.dp).background(MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f)))
+                Text("or add by name", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f))
+                Box(modifier = Modifier.weight(1f).height(1.dp).background(MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f)))
+            }
+            Spacer(modifier = Modifier.height(12.dp))
+
+            // Add offline member by name
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                OutlinedTextField(
+                    value = offlineName,
+                    onValueChange = { offlineName = it },
+                    placeholder = { Text("Name", color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)) },
+                    leadingIcon = { Icon(Icons.Outlined.Person, contentDescription = null, modifier = Modifier.size(20.dp)) },
+                    modifier = Modifier.weight(1f),
+                    singleLine = true,
+                    shape = RoundedCornerShape(14.dp),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = MaterialTheme.colorScheme.primary,
+                        unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant
+                    )
+                )
+                Button(
+                    onClick = {
+                        viewModel.addOfflineMember(offlineName)
+                        offlineName = ""
+                    },
+                    enabled = offlineName.isNotBlank(),
+                    shape = RoundedCornerShape(14.dp),
+                    contentPadding = PaddingValues(horizontal = 16.dp, vertical = 14.dp)
+                ) {
+                    Icon(Icons.Default.Add, contentDescription = "Add", modifier = Modifier.size(20.dp))
+                }
+            }
+
+            // Selected Members (app users)
+            AnimatedVisibility(
+                visible = state.selectedMembers.isNotEmpty() || state.offlineMembers.isNotEmpty(),
+                enter = fadeIn() + slideInVertically(),
+                exit = fadeOut() + slideOutVertically()
+            ) {
+                Column(modifier = Modifier.padding(top = 16.dp)) {
+                    val totalCount = state.selectedMembers.size + state.offlineMembers.size
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        Icon(Icons.Default.Group, contentDescription = null, modifier = Modifier.size(16.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text(
+                            "$totalCount added",
+                            style = MaterialTheme.typography.labelLarge,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                    }
+                    Spacer(modifier = Modifier.height(10.dp))
+                    FlowRow(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        state.selectedMembers.forEach { user ->
+                            SelectedMemberChip(
+                                user = user,
+                                isCurrentUser = user.uid == currentUserId,
+                                onRemove = { viewModel.removeMember(user) }
+                            )
+                        }
+                        state.offlineMembers.forEach { offline ->
+                            OfflineMemberChip(
+                                name = offline.name,
+                                onRemove = { viewModel.removeOfflineMember(offline) }
+                            )
                         }
                     }
                 }
             }
 
-            Spacer(modifier = Modifier.height(24.dp))
+            Spacer(modifier = Modifier.height(32.dp))
 
+            // Error
             if (state.error != null) {
-                Text(state.error!!, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
-                Spacer(modifier = Modifier.height(8.dp))
+                Surface(
+                    color = MaterialTheme.colorScheme.errorContainer,
+                    shape = RoundedCornerShape(12.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text(
+                        state.error!!,
+                        modifier = Modifier.padding(12.dp),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onErrorContainer
+                    )
+                }
+                Spacer(modifier = Modifier.height(12.dp))
             }
 
+            // Create Button
             Button(
                 onClick = { viewModel.createGroup(name, description, selectedTemplate) },
                 enabled = name.isNotBlank() && !state.isLoading,
-                modifier = Modifier.fillMaxWidth().height(56.dp),
-                shape = RoundedCornerShape(16.dp)
+                modifier = Modifier.fillMaxWidth().height(54.dp),
+                shape = RoundedCornerShape(16.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = MaterialTheme.colorScheme.primary
+                )
             ) {
                 if (state.isLoading) {
-                    CircularProgressIndicator(color = MaterialTheme.colorScheme.onPrimary, strokeWidth = 2.dp, modifier = Modifier.size(24.dp))
+                    CircularProgressIndicator(
+                        color = MaterialTheme.colorScheme.onPrimary,
+                        strokeWidth = 2.dp,
+                        modifier = Modifier.size(22.dp)
+                    )
                 } else {
-                    Text("Create Group", style = MaterialTheme.typography.titleMedium)
+                    Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(20.dp))
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("Create Group", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
                 }
             }
 
@@ -299,52 +507,189 @@ fun CreateGroupScreen(
 private fun SectionLabel(text: String) {
     Text(
         text = text,
-        style = MaterialTheme.typography.titleSmall,
-        fontWeight = FontWeight.SemiBold,
-        color = MaterialTheme.colorScheme.onSurfaceVariant
+        style = MaterialTheme.typography.titleMedium,
+        fontWeight = FontWeight.Bold,
+        color = MaterialTheme.colorScheme.onSurface
     )
 }
 
 @Composable
+private fun SectionHint(text: String) {
+    Text(
+        text = text,
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+    )
+}
+
+@Composable
+private fun StyledTextField(
+    value: String,
+    onValueChange: (String) -> Unit,
+    label: String,
+    icon: ImageVector,
+    singleLine: Boolean = false,
+    minLines: Int = 1
+) {
+    OutlinedTextField(
+        value = value,
+        onValueChange = onValueChange,
+        label = { Text(label) },
+        leadingIcon = { Icon(icon, contentDescription = null, modifier = Modifier.size(20.dp)) },
+        modifier = Modifier.fillMaxWidth(),
+        singleLine = singleLine,
+        minLines = minLines,
+        shape = RoundedCornerShape(14.dp),
+        colors = OutlinedTextFieldDefaults.colors(
+            focusedBorderColor = MaterialTheme.colorScheme.primary,
+            unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant
+        )
+    )
+}
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun SelectedMemberChip(
+    user: UserSearchResult,
+    isCurrentUser: Boolean,
+    onRemove: () -> Unit
+) {
+    Surface(
+        shape = RoundedCornerShape(24.dp),
+        color = MaterialTheme.colorScheme.primary.copy(alpha = 0.08f),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.15f))
+    ) {
+        Row(
+            modifier = Modifier.padding(start = 6.dp, end = 4.dp, top = 4.dp, bottom = 4.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            MemberAvatar(name = user.displayName, photoURL = user.photoURL, size = 28)
+            Spacer(modifier = Modifier.width(8.dp))
+            Text(
+                text = user.displayName + if (isCurrentUser) " (You)" else "",
+                style = MaterialTheme.typography.bodySmall,
+                fontWeight = FontWeight.Medium,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+            Spacer(modifier = Modifier.width(4.dp))
+            IconButton(onClick = onRemove, modifier = Modifier.size(24.dp)) {
+                Icon(Icons.Outlined.Close, contentDescription = "Remove", modifier = Modifier.size(14.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        }
+    }
+}
+
+@Composable
+private fun OfflineMemberChip(
+    name: String,
+    onRemove: () -> Unit
+) {
+    Surface(
+        shape = RoundedCornerShape(24.dp),
+        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
+    ) {
+        Row(
+            modifier = Modifier.padding(start = 6.dp, end = 4.dp, top = 4.dp, bottom = 4.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(28.dp)
+                    .clip(CircleShape)
+                    .background(MaterialTheme.colorScheme.surfaceVariant),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    Icons.Outlined.Person,
+                    contentDescription = null,
+                    modifier = Modifier.size(16.dp),
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            Spacer(modifier = Modifier.width(8.dp))
+            Text(
+                text = name,
+                style = MaterialTheme.typography.bodySmall,
+                fontWeight = FontWeight.Medium,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+            Spacer(modifier = Modifier.width(4.dp))
+            IconButton(onClick = onRemove, modifier = Modifier.size(24.dp)) {
+                Icon(Icons.Outlined.Close, contentDescription = "Remove", modifier = Modifier.size(14.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        }
+    }
+}
+
+@Composable
 private fun TemplateCard(
-    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    icon: ImageVector,
     title: String,
+    subtitle: String,
     iconColor: Color,
     selected: Boolean,
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val borderColor = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant
+    val isDark = isSystemInDarkTheme()
+    val bgGradient = if (selected) {
+        Brush.verticalGradient(
+            listOf(iconColor.copy(alpha = 0.12f), iconColor.copy(alpha = 0.04f))
+        )
+    } else {
+        Brush.verticalGradient(
+            listOf(MaterialTheme.colorScheme.surface, MaterialTheme.colorScheme.surface)
+        )
+    }
+
     Card(
         onClick = onClick,
         modifier = modifier,
-        border = CardDefaults.outlinedCardBorder(true),
-        colors = CardDefaults.cardColors(
-            containerColor = if (selected) MaterialTheme.colorScheme.primary.copy(alpha = 0.08f) else MaterialTheme.colorScheme.surface
-        ),
-        shape = RoundedCornerShape(14.dp),
-        elevation = CardDefaults.cardElevation(defaultElevation = if (selected) 2.dp else 1.dp)
+        border = if (selected) BorderStroke(2.dp, iconColor) else BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        shape = RoundedCornerShape(16.dp),
+        elevation = CardDefaults.cardElevation(defaultElevation = if (selected) 4.dp else 1.dp)
     ) {
-        Column(
-            modifier = Modifier.padding(16.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
+        Box(
+            modifier = Modifier
+                .background(bgGradient)
+                .padding(vertical = 20.dp, horizontal = 8.dp),
+            contentAlignment = Alignment.Center
         ) {
-            Box(
-                modifier = Modifier
-                    .size(44.dp)
-                    .clip(CircleShape)
-                    .background(iconColor.copy(alpha = if (selected) 0.15f else 0.1f)),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(
-                    imageVector = icon,
-                    contentDescription = null,
-                    tint = iconColor,
-                    modifier = Modifier.size(22.dp)
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Box(
+                    modifier = Modifier
+                        .size(48.dp)
+                        .clip(CircleShape)
+                        .background(iconColor.copy(alpha = if (selected) 0.18f else 0.1f)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = icon,
+                        contentDescription = null,
+                        tint = iconColor,
+                        modifier = Modifier.size(24.dp)
+                    )
+                }
+                Spacer(modifier = Modifier.height(10.dp))
+                Text(
+                    title,
+                    style = MaterialTheme.typography.labelLarge,
+                    fontWeight = FontWeight.Bold,
+                    color = if (selected) iconColor else MaterialTheme.colorScheme.onSurface
+                )
+                Spacer(modifier = Modifier.height(2.dp))
+                Text(
+                    subtitle,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
+                    fontSize = 10.sp,
+                    maxLines = 1
                 )
             }
-            Spacer(modifier = Modifier.height(8.dp))
-            Text(title, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Medium)
         }
     }
 }

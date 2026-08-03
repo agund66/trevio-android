@@ -1,6 +1,7 @@
 package com.trevio.android.ui.notifications
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -175,19 +176,20 @@ fun NotificationsScreen(
 
     Column(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
         TrevioHeader(
-            title = if (unreadCount > 0) "Activity ($unreadCount)" else "Activity"
-        ) {
-            if (unreadCount > 0) {
-                TextButton(
-                    onClick = { viewModel.markAllRead() },
-                    colors = ButtonDefaults.textButtonColors(
-                        contentColor = MaterialTheme.colorScheme.primary
-                    )
-                ) {
-                    Text("Mark all read", fontWeight = FontWeight.Medium)
+            title = if (unreadCount > 0) "Activity ($unreadCount)" else "Activity",
+            actions = {
+                if (unreadCount > 0) {
+                    TextButton(
+                        onClick = { viewModel.markAllRead() },
+                        colors = ButtonDefaults.textButtonColors(
+                            contentColor = MaterialTheme.colorScheme.primary
+                        )
+                    ) {
+                        Text("Mark all read", fontWeight = FontWeight.Medium)
+                    }
                 }
             }
-        }
+        )
 
         if (state.notifications.isEmpty() && state.broadcasts.isEmpty()) {
             Box(
@@ -386,12 +388,14 @@ private fun NotificationCard(
     }
 }
 
+@Composable
 private fun notificationIcon(type: String): Pair<androidx.compose.ui.graphics.vector.ImageVector, Color> {
+    val isDark = isSystemInDarkTheme()
     return when (type) {
-        "expense_added", "expense_updated", "expense_deleted" -> Icons.Default.Receipt to Color(0xFFF59E0B)
-        "settlement_added" -> Icons.Default.Payments to Color(0xFF22C55E)
-        "member_joined", "member_left", "group_invitation", "invitation" -> Icons.Default.Group to Color(0xFF6366F1)
-        else -> Icons.Default.Notifications to Color(0xFF0D9488)
+        "expense_added", "expense_updated", "expense_deleted" -> Icons.Default.Receipt to if (isDark) Color(0xFFFBBF24) else Color(0xFFF59E0B)
+        "settlement_added" -> Icons.Default.Payments to if (isDark) Color(0xFF4ADE80) else Color(0xFF22C55E)
+        "member_joined", "member_left", "group_invitation", "invitation" -> Icons.Default.Group to if (isDark) Color(0xFF818CF8) else Color(0xFF6366F1)
+        else -> Icons.Default.Notifications to if (isDark) Color(0xFF2DD4BF) else Color(0xFF0D9488)
     }
 }
 
@@ -399,10 +403,11 @@ private fun notificationIcon(type: String): Pair<androidx.compose.ui.graphics.ve
 private fun BroadcastNotificationCard(broadcast: BroadcastMessage) {
     var isExpanded by remember { mutableStateOf(false) }
 
+    val isDark = isSystemInDarkTheme()
     val priorityColor = when (broadcast.priority) {
-        BroadcastPriority.CRITICAL -> Color(0xFFEF4444)
-        BroadcastPriority.MAINTENANCE -> Color(0xFFF59E0B)
-        BroadcastPriority.INFO -> Color(0xFF3B82F6)
+        BroadcastPriority.CRITICAL -> if (isDark) Color(0xFFF87171) else Color(0xFFEF4444)
+        BroadcastPriority.MAINTENANCE -> if (isDark) Color(0xFFFBBF24) else Color(0xFFF59E0B)
+        BroadcastPriority.INFO -> if (isDark) Color(0xFF60A5FA) else Color(0xFF3B82F6)
     }
     val priorityLabel = when (broadcast.priority) {
         BroadcastPriority.CRITICAL -> "Critical"

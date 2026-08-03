@@ -121,21 +121,28 @@ class FirebaseGroupServiceImpl @Inject constructor(
             val groupData = groupDoc.data ?: return Result.failure(Exception("Invalid group data"))
 
             val memberDoc = groupDoc.reference.collection("members").document(uid).get().await()
-            if (memberDoc.exists()) return Result.failure(Exception("You are already a member of this group"))
+            if (memberDoc.exists() && memberDoc.data?.get("status") == "active" && memberDoc.data?.get("isOffline") != true) {
+                return Result.failure(Exception("You are already a member of this group"))
+            }
 
             val now = System.currentTimeMillis()
             val batch = firestore.batch()
-            batch.set(groupDoc.reference.collection("members").document(uid), mapOf(
-                "uid" to uid,
-                "role" to "member",
-                "joinedAt" to now,
-                "balance" to 0.0,
-                "status" to "active"
-            ))
-            batch.update(groupDoc.reference, mapOf(
-                "memberCount" to ((groupData["memberCount"] as? Number)?.toLong() ?: 0L) + 1,
-                "updatedAt" to now
-            ))
+
+            if (memberDoc.exists() && memberDoc.data?.get("status") == "pending") {
+                batch.update(memberDoc.reference, mapOf("status" to "active", "joinedAt" to now))
+            } else {
+                batch.set(groupDoc.reference.collection("members").document(uid), mapOf(
+                    "uid" to uid,
+                    "role" to "member",
+                    "joinedAt" to now,
+                    "balance" to 0.0,
+                    "status" to "active"
+                ))
+                batch.update(groupDoc.reference, mapOf(
+                    "memberCount" to ((groupData["memberCount"] as? Number)?.toLong() ?: 0L) + 1,
+                    "updatedAt" to now
+                ))
+            }
             batch.set(groupDoc.reference.collection("activities").document(), mapOf(
                 "type" to "member_joined",
                 "description" to "Member joined via invite code",
@@ -286,8 +293,23 @@ class FirebaseGroupServiceImpl @Inject constructor(
 
             val inviteData = inviteDoc.data ?: return Result.failure(Exception("Invalid invitation"))
             if (inviteData["toUid"] != uid) return Result.failure(Exception("This invitation is not for you"))
+            if (inviteData["status"] != "pending") return Result.failure(Exception("Invitation is no longer pending"))
 
-            inviteDoc.reference.update(mapOf("status" to "declined")).await()
+            val groupId = inviteData["groupId"] as? String ?: ""
+            val groupRef = firestore.collection("groups").document(groupId)
+            val memberDoc = groupRef.collection("members").document(uid).get().await()
+
+            val batch = firestore.batch()
+            batch.update(inviteDoc.reference, mapOf("status" to "declined"))
+
+            if (memberDoc.exists() && memberDoc.data?.get("status") == "pending") {
+                batch.delete(memberDoc.reference)
+                val groupDoc = groupRef.get().await()
+                val currentCount = (groupDoc.data?.get("memberCount") as? Number)?.toLong() ?: 1L
+                batch.update(groupRef, mapOf("memberCount" to maxOf(0L, currentCount - 1), "updatedAt" to System.currentTimeMillis()))
+            }
+
+            batch.commit().await()
             Result.success(Unit)
         } catch (e: Exception) {
             Result.failure(e)
@@ -455,6 +477,7 @@ class FirebaseGroupServiceImpl @Inject constructor(
             val groupRef = firestore.collection("groups").document(groupId)
             val memberDoc = groupRef.collection("members").document(uid).get().await()
             if (!memberDoc.exists()) return Result.failure(Exception("You are not a member of this group"))
+            if (memberDoc.data?.get("role") != "admin") return Result.failure(Exception("Only group admin can archive the group"))
 
             groupRef.update(mapOf("archived" to true, "updatedAt" to System.currentTimeMillis())).await()
             Result.success(Unit)
@@ -469,6 +492,7 @@ class FirebaseGroupServiceImpl @Inject constructor(
             val groupRef = firestore.collection("groups").document(groupId)
             val memberDoc = groupRef.collection("members").document(uid).get().await()
             if (!memberDoc.exists()) return Result.failure(Exception("You are not a member of this group"))
+            if (memberDoc.data?.get("role") != "admin") return Result.failure(Exception("Only group admin can unarchive the group"))
 
             groupRef.update(mapOf("archived" to false, "updatedAt" to System.currentTimeMillis())).await()
             Result.success(Unit)
@@ -560,6 +584,187 @@ class FirebaseGroupServiceImpl @Inject constructor(
             Result.success(Unit)
         } catch (e: Exception) {
             Result.failure(e)
+        }
+    }
+
+    override suspend fun addOfflineMember(groupId: String, displayName: String): Result<String> {
+        return try {
+            val uid = auth.currentUser?.uid ?: return Result.failure(Exception("User not authenticated"))
+            if (displayName.isBlank()) return Result.failure(Exception("Name is required"))
+
+            val groupRef = firestore.collection("groups").document(groupId)
+            val groupDoc = groupRef.get().await()
+            if (!groupDoc.exists()) return Result.failure(Exception("Group not found"))
+
+            val now = System.currentTimeMillis()
+            val memberRef = groupRef.collection("members").document()
+            val batch = firestore.batch()
+            batch.set(memberRef, mapOf(
+                "uid" to "",
+                "displayName" to displayName.trim(),
+                "role" to "member",
+                "joinedAt" to now,
+                "balance" to 0.0,
+                "status" to "active",
+                "isOffline" to true,
+                "addedBy" to uid
+            ))
+            batch.update(groupRef, mapOf(
+                "memberCount" to ((groupDoc.data?.get("memberCount") as? Number)?.toLong() ?: 0L) + 1,
+                "updatedAt" to now
+            ))
+            batch.set(groupRef.collection("activities").document(), mapOf(
+                "type" to "member_added",
+                "description" to "Added offline member \"$displayName\"",
+                "userId" to uid,
+                "data" to mapOf("groupId" to groupId, "memberName" to displayName.trim()),
+                "createdAt" to now
+            ))
+            batch.commit().await()
+
+            Result.success(memberRef.id)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    override suspend fun claimOfflineMember(groupId: String, memberDocId: String): Result<Unit> {
+        return try {
+            val uid = auth.currentUser?.uid ?: return Result.failure(Exception("User not authenticated"))
+
+            val groupRef = firestore.collection("groups").document(groupId)
+            val memberDoc = groupRef.collection("members").document(memberDocId).get().await()
+            if (!memberDoc.exists()) return Result.failure(Exception("Member not found"))
+            if (memberDoc.data?.get("isOffline") != true) return Result.failure(Exception("This member is not an offline profile"))
+
+            val existingMemberDoc = groupRef.collection("members").document(uid).get().await()
+            if (existingMemberDoc.exists() && existingMemberDoc.data?.get("status") == "active") {
+                return Result.failure(Exception("You are already a member of this group"))
+            }
+
+            val now = System.currentTimeMillis()
+            val batch = firestore.batch()
+
+            batch.update(memberDoc.reference, mapOf(
+                "uid" to uid,
+                "isOffline" to false,
+                "claimedAt" to now,
+                "claimedBy" to uid
+            ))
+
+            if (existingMemberDoc.exists()) {
+                batch.delete(existingMemberDoc.reference)
+            }
+
+            batch.set(groupRef.collection("activities").document(), mapOf(
+                "type" to "member_claimed",
+                "description" to "Member claimed offline profile",
+                "userId" to uid,
+                "data" to mapOf("groupId" to groupId, "memberDocId" to memberDocId),
+                "createdAt" to now
+            ))
+
+            batch.commit().await()
+
+            migrateMemberReferences(groupId, memberDocId, uid)
+
+            Result.success(Unit)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    override suspend fun linkOfflineMember(groupId: String, memberDocId: String, realUid: String): Result<Unit> {
+        return try {
+            val uid = auth.currentUser?.uid ?: return Result.failure(Exception("User not authenticated"))
+
+            val groupRef = firestore.collection("groups").document(groupId)
+            val adminDoc = groupRef.collection("members").document(uid).get().await()
+            if (adminDoc.data?.get("role") != "admin") return Result.failure(Exception("Only admins can link members"))
+
+            val memberDoc = groupRef.collection("members").document(memberDocId).get().await()
+            if (!memberDoc.exists()) return Result.failure(Exception("Member not found"))
+            if (memberDoc.data?.get("isOffline") != true) return Result.failure(Exception("This member is not an offline profile"))
+
+            val existingMemberDoc = groupRef.collection("members").document(realUid).get().await()
+            if (existingMemberDoc.exists() && existingMemberDoc.data?.get("status") == "active") {
+                return Result.failure(Exception("That user is already an active member of this group"))
+            }
+
+            val now = System.currentTimeMillis()
+            val batch = firestore.batch()
+
+            batch.update(memberDoc.reference, mapOf(
+                "uid" to realUid,
+                "isOffline" to false,
+                "claimedAt" to now,
+                "claimedBy" to uid
+            ))
+
+            if (existingMemberDoc.exists()) {
+                batch.delete(existingMemberDoc.reference)
+            }
+
+            batch.set(groupRef.collection("activities").document(), mapOf(
+                "type" to "member_linked",
+                "description" to "Admin linked offline profile to user",
+                "userId" to uid,
+                "data" to mapOf("groupId" to groupId, "memberDocId" to memberDocId, "linkedUid" to realUid),
+                "createdAt" to now
+            ))
+
+            batch.commit().await()
+
+            migrateMemberReferences(groupId, memberDocId, realUid)
+
+            Result.success(Unit)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    private suspend fun migrateMemberReferences(groupId: String, oldId: String, newId: String) {
+        val groupRef = firestore.collection("groups").document(groupId)
+
+        val expenses = groupRef.collection("expenses").get().await()
+        for (expenseDoc in expenses.documents) {
+            val data = expenseDoc.data ?: continue
+            val batch = firestore.batch()
+            var changed = false
+
+            if (data["paidBy"] == oldId) {
+                batch.update(expenseDoc.reference, mapOf("paidBy" to newId))
+                changed = true
+            }
+
+            @Suppress("UNCHECKED_CAST")
+            val splits = data["splits"] as? Map<String, Any>
+            if (splits != null && splits.containsKey(oldId)) {
+                val newSplits = splits.toMutableMap()
+                newSplits[newId] = newSplits.remove(oldId)!!
+                batch.update(expenseDoc.reference, mapOf("splits" to newSplits))
+                changed = true
+            }
+
+            if (changed) batch.commit().await()
+        }
+
+        val settlements = groupRef.collection("settlements").get().await()
+        for (settlementDoc in settlements.documents) {
+            val data = settlementDoc.data ?: continue
+            val batch = firestore.batch()
+            var changed = false
+
+            if (data["fromUid"] == oldId) {
+                batch.update(settlementDoc.reference, mapOf("fromUid" to newId))
+                changed = true
+            }
+            if (data["toUid"] == oldId) {
+                batch.update(settlementDoc.reference, mapOf("toUid" to newId))
+                changed = true
+            }
+
+            if (changed) batch.commit().await()
         }
     }
 }

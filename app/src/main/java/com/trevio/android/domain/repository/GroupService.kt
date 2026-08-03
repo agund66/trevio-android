@@ -38,4 +38,7 @@ interface GroupService {
     suspend fun getUserGroups(): Result<List<Group>>
     suspend fun getGroupInfo(groupId: String): Result<GroupInfo>
     suspend fun getGroupActivities(groupId: String, pageSize: Int = 50): Result<List<Activity>>
+    suspend fun addOfflineMember(groupId: String, displayName: String): Result<String>
+    suspend fun claimOfflineMember(groupId: String, memberDocId: String): Result<Unit>
+    suspend fun linkOfflineMember(groupId: String, memberDocId: String, realUid: String): Result<Unit>
 }

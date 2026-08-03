@@ -4,6 +4,7 @@ import android.webkit.WebView
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -154,10 +155,11 @@ private fun BroadcastRow(
     onStop: () -> Unit,
     onClick: () -> Unit
 ) {
+    val isDark = isSystemInDarkTheme()
     val priorityColor = when (broadcast.priority) {
-        BroadcastPriority.CRITICAL -> Color(0xFFEF4444)
-        BroadcastPriority.MAINTENANCE -> Color(0xFFF59E0B)
-        BroadcastPriority.INFO -> Color(0xFF3B82F6)
+        BroadcastPriority.CRITICAL -> if (isDark) Color(0xFFF87171) else Color(0xFFEF4444)
+        BroadcastPriority.MAINTENANCE -> if (isDark) Color(0xFFFBBF24) else Color(0xFFF59E0B)
+        BroadcastPriority.INFO -> if (isDark) Color(0xFF60A5FA) else Color(0xFF3B82F6)
     }
     val priorityLabel = when (broadcast.priority) {
         BroadcastPriority.CRITICAL -> "Critical"
@@ -195,8 +197,8 @@ private fun BroadcastRow(
                 }
                 Spacer(modifier = Modifier.weight(1f))
                 if (broadcast.active) {
-                    Surface(color = Color(0xFF22C55E).copy(alpha = 0.1f), shape = RoundedCornerShape(6.dp)) {
-                        Text("Active", style = MaterialTheme.typography.labelSmall, color = Color(0xFF22C55E), modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp))
+                    Surface(color = if (isSystemInDarkTheme()) Color(0xFF4ADE80) else Color(0xFF22C55E).copy(alpha = 0.1f), shape = RoundedCornerShape(6.dp)) {
+                        Text("Active", style = MaterialTheme.typography.labelSmall, color = if (isSystemInDarkTheme()) Color(0xFF4ADE80) else Color(0xFF22C55E), modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp))
                     }
                 } else {
                     Surface(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.05f), shape = RoundedCornerShape(6.dp)) {
@@ -223,7 +225,7 @@ private fun BroadcastRow(
                 OutlinedButton(
                     onClick = onStop,
                     enabled = !actionLoading,
-                    colors = ButtonDefaults.outlinedButtonColors(contentColor = Color(0xFFEF4444))
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = if (isSystemInDarkTheme()) Color(0xFFF87171) else Color(0xFFEF4444))
                 ) {
                     if (actionLoading) {
                         CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
@@ -301,9 +303,9 @@ private fun BroadcastCreateScreen(
                         BroadcastPriority.INFO -> "Info"
                     }
                     val color = when (p) {
-                        BroadcastPriority.CRITICAL -> Color(0xFFEF4444)
-                        BroadcastPriority.MAINTENANCE -> Color(0xFFF59E0B)
-                        BroadcastPriority.INFO -> Color(0xFF3B82F6)
+                        BroadcastPriority.CRITICAL -> if (isSystemInDarkTheme()) Color(0xFFF87171) else Color(0xFFEF4444)
+                        BroadcastPriority.MAINTENANCE -> if (isSystemInDarkTheme()) Color(0xFFFBBF24) else Color(0xFFF59E0B)
+                        BroadcastPriority.INFO -> if (isSystemInDarkTheme()) Color(0xFF60A5FA) else Color(0xFF3B82F6)
                     }
                     FilterChip(
                         selected = state.formPriority == p,
@@ -631,10 +633,11 @@ private fun BroadcastDetailScreen(
     val currencyFormatter = rememberCurrencyFormatter()
     val formatDate = currencyFormatter.formatDate
 
+    val isDarkDetail = isSystemInDarkTheme()
     val priorityColor = when (broadcast.priority) {
-        BroadcastPriority.CRITICAL -> Color(0xFFEF4444)
-        BroadcastPriority.MAINTENANCE -> Color(0xFFF59E0B)
-        BroadcastPriority.INFO -> Color(0xFF3B82F6)
+        BroadcastPriority.CRITICAL -> if (isDarkDetail) Color(0xFFF87171) else Color(0xFFEF4444)
+        BroadcastPriority.MAINTENANCE -> if (isDarkDetail) Color(0xFFFBBF24) else Color(0xFFF59E0B)
+        BroadcastPriority.INFO -> if (isDarkDetail) Color(0xFF60A5FA) else Color(0xFF3B82F6)
     }
     val priorityLabel = when (broadcast.priority) {
         BroadcastPriority.CRITICAL -> "Critical"
@@ -715,8 +718,9 @@ private fun BroadcastDetailScreen(
                         }
                         Spacer(modifier = Modifier.weight(1f))
                         if (broadcast.active) {
-                            Surface(color = Color(0xFF22C55E).copy(alpha = 0.1f), shape = RoundedCornerShape(6.dp)) {
-                                Text("Active", style = MaterialTheme.typography.labelSmall, color = Color(0xFF22C55E), modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp))
+                            val activeColor = if (isDarkDetail) Color(0xFF4ADE80) else Color(0xFF22C55E)
+                            Surface(color = activeColor.copy(alpha = 0.1f), shape = RoundedCornerShape(6.dp)) {
+                                Text("Active", style = MaterialTheme.typography.labelSmall, color = activeColor, modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp))
                             }
                         } else {
                             Surface(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.05f), shape = RoundedCornerShape(6.dp)) {
@@ -816,33 +820,35 @@ private fun BroadcastDetailScreen(
                             )
                         }
                         if (hasRead) {
+                            val readColor = if (isDarkDetail) Color(0xFF4ADE80) else Color(0xFF22C55E)
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 Icon(
                                     Icons.Default.CheckCircle,
                                     contentDescription = null,
                                     modifier = Modifier.size(16.dp),
-                                    tint = Color(0xFF22C55E)
+                                    tint = readColor
                                 )
                                 Spacer(modifier = Modifier.width(4.dp))
                                 Text(
                                     if (readAt != null && readAt > 0) formatDate(readAt, true) else "Read",
                                     style = MaterialTheme.typography.labelSmall,
-                                    color = Color(0xFF22C55E)
+                                    color = readColor
                                 )
                             }
                         } else {
+                            val pendingColor = if (isDarkDetail) Color(0xFFFBBF24) else Color(0xFFF59E0B)
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 Icon(
                                     Icons.Default.Schedule,
                                     contentDescription = null,
                                     modifier = Modifier.size(16.dp),
-                                    tint = Color(0xFFF59E0B)
+                                    tint = pendingColor
                                 )
                                 Spacer(modifier = Modifier.width(4.dp))
                                 Text(
                                     "Pending",
                                     style = MaterialTheme.typography.labelSmall,
-                                    color = Color(0xFFF59E0B)
+                                    color = pendingColor
                                 )
                             }
                         }

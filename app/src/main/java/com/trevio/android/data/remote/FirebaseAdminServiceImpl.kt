@@ -51,10 +51,23 @@ class FirebaseAdminServiceImpl @Inject constructor(
         }
     }
 
+    private suspend fun requireSuperadmin(): Result<Unit> {
+        return try {
+            val uid = auth.currentUser?.uid ?: return Result.failure(Exception("User not authenticated"))
+            val currentUserDoc = firestore.collection("users").document(uid).get().await()
+            val currentRole = currentUserDoc.data?.get("role") as? String ?: "user"
+            if (currentRole != "superadmin") return Result.failure(Exception("Access denied: superadmin only"))
+            Result.success(Unit)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
     override suspend fun blockUser(uid: String): Result<Unit> {
         return try {
             val currentUid = auth.currentUser?.uid ?: return Result.failure(Exception("User not authenticated"))
             if (uid == currentUid) return Result.failure(Exception("Cannot block yourself"))
+            requireSuperadmin().onFailure { return Result.failure(it) }
             firestore.collection("users").document(uid)
                 .update(mapOf("blocked" to true, "updatedAt" to System.currentTimeMillis())).await()
             Result.success(Unit)
@@ -65,6 +78,7 @@ class FirebaseAdminServiceImpl @Inject constructor(
 
     override suspend fun unblockUser(uid: String): Result<Unit> {
         return try {
+            requireSuperadmin().onFailure { return Result.failure(it) }
             firestore.collection("users").document(uid)
                 .update(mapOf("blocked" to false, "updatedAt" to System.currentTimeMillis())).await()
             Result.success(Unit)
@@ -75,6 +89,7 @@ class FirebaseAdminServiceImpl @Inject constructor(
 
     override suspend fun promoteToSuperAdmin(uid: String): Result<Unit> {
         return try {
+            requireSuperadmin().onFailure { return Result.failure(it) }
             firestore.collection("users").document(uid)
                 .update(mapOf("role" to "superadmin", "updatedAt" to System.currentTimeMillis())).await()
             Result.success(Unit)
@@ -87,6 +102,7 @@ class FirebaseAdminServiceImpl @Inject constructor(
         return try {
             val currentUid = auth.currentUser?.uid ?: return Result.failure(Exception("User not authenticated"))
             if (uid == currentUid) return Result.failure(Exception("Cannot demote yourself"))
+            requireSuperadmin().onFailure { return Result.failure(it) }
             firestore.collection("users").document(uid)
                 .update(mapOf("role" to "user", "updatedAt" to System.currentTimeMillis())).await()
             Result.success(Unit)

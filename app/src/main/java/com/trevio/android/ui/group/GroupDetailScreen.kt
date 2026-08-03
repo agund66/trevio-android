@@ -3,6 +3,7 @@ package com.trevio.android.ui.group
 import android.content.Intent
 import android.widget.Toast
 import androidx.compose.foundation.background
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
@@ -11,6 +12,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.List
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -140,6 +142,22 @@ class GroupViewModel @Inject constructor(
         }
     }
 
+    fun addOfflineMember(name: String) {
+        viewModelScope.launch {
+            groupService.addOfflineMember(groupId, name)
+                .onSuccess {
+                    _state.value = _state.value.copy(
+                        searchResults = emptyList(),
+                        inviteError = null
+                    )
+                    loadData()
+                }
+                .onFailure { e ->
+                    _state.value = _state.value.copy(inviteError = e.message)
+                }
+        }
+    }
+
     fun clearSearch() {
         _state.value = _state.value.copy(searchResults = emptyList(), inviteError = null)
     }
@@ -242,8 +260,10 @@ fun GroupDetailScreen(
     val currencyFormatter = rememberCurrencyFormatter()
     var selectedTab by remember { mutableStateOf(0) }
     var showInviteDialog by remember { mutableStateOf(false) }
+    var showAddOfflineDialog by remember { mutableStateOf(false) }
     var showQrDialog by remember { mutableStateOf(false) }
     var searchQuery by remember { mutableStateOf("") }
+    var offlineName by remember { mutableStateOf("") }
     var expenseSearch by remember { mutableStateOf("") }
     var categoryFilter by remember { mutableStateOf("all") }
     val context = LocalContext.current
@@ -299,23 +319,16 @@ fun GroupDetailScreen(
         }
 
         val groupInfo = state.groupInfo
+        val isAdmin = state.currentUserId == groupInfo?.createdBy ||
+            state.members.find { it.uid == state.currentUserId }?.role == "admin"
 
         LazyColumn(modifier = Modifier.padding(padding).background(MaterialTheme.colorScheme.background)) {
             item {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .background(MaterialTheme.colorScheme.primary)
-                ) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 8.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        IconButton(onClick = { navController.popBackStack() }) {
-                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = Color.White)
-                        }
-                        Row {
+                TrevioHeader(
+                    title = groupInfo?.name ?: "Group",
+                    onBack = { navController.popBackStack() },
+                    actions = {
+                        if (isAdmin) {
                             IconButton(onClick = { navController.navigate(TrevioRoute.GroupSettings.createRoute(state.groupInfo?.groupId ?: "")) }) {
                                 Icon(Icons.Default.Settings, contentDescription = "Settings", tint = Color.White)
                             }
@@ -326,47 +339,37 @@ fun GroupDetailScreen(
                                     tint = Color.White
                                 )
                             }
-                            if (!state.groupInfo?.inviteCode.isNullOrBlank()) {
-                                IconButton(onClick = { showQrDialog = true }) {
-                                    Icon(Icons.Default.QrCode2, contentDescription = "QR Code", tint = Color.White)
-                                }
-                                IconButton(onClick = {
-                                    val clipboard = context.getSystemService(android.content.Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
-                                    clipboard.setPrimaryClip(android.content.ClipData.newPlainText("Invite Code", state.groupInfo?.inviteCode))
-                                    Toast.makeText(context, "Invite code copied", Toast.LENGTH_SHORT).show()
-                                }) {
-                                    Icon(Icons.Default.ContentCopy, contentDescription = "Copy Code", tint = Color.White)
-                                }
-                                IconButton(onClick = { shareInviteLink() }) {
-                                    Icon(Icons.Default.Share, contentDescription = "Share Invite", tint = Color.White)
-                                }
+                        }
+                        if (!state.groupInfo?.inviteCode.isNullOrBlank()) {
+                            IconButton(onClick = { showQrDialog = true }) {
+                                Icon(Icons.Default.QrCode2, contentDescription = "QR Code", tint = Color.White)
+                            }
+                            IconButton(onClick = {
+                                val clipboard = context.getSystemService(android.content.Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
+                                clipboard.setPrimaryClip(android.content.ClipData.newPlainText("Invite Code", state.groupInfo?.inviteCode))
+                                Toast.makeText(context, "Invite code copied", Toast.LENGTH_SHORT).show()
+                            }) {
+                                Icon(Icons.Default.ContentCopy, contentDescription = "Copy Code", tint = Color.White)
+                            }
+                            IconButton(onClick = { shareInviteLink() }) {
+                                Icon(Icons.Default.Share, contentDescription = "Share Invite", tint = Color.White)
                             }
                         }
                     }
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        modifier = Modifier.padding(horizontal = 16.dp)
-                    ) {
-                        Text(
-                            groupInfo?.name ?: "Group",
-                            style = MaterialTheme.typography.titleLarge,
-                            fontWeight = FontWeight.Bold,
-                            color = Color.White
-                        )
-                        if (groupInfo?.archived == true) {
-                            Surface(
-                                color = Color.White.copy(alpha = 0.2f),
-                                shape = RoundedCornerShape(6.dp)
-                            ) {
-                                Text(
-                                    "Archived",
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = Color.White,
-                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
-                                )
-                            }
+                ) {
+                    if (groupInfo?.archived == true) {
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Surface(
+                            color = Color.White.copy(alpha = 0.2f),
+                            shape = RoundedCornerShape(6.dp),
+                            modifier = Modifier.padding(horizontal = 16.dp)
+                        ) {
+                            Text(
+                                "Archived",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = Color.White,
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
+                            )
                         }
                     }
                     if (groupInfo?.description?.isNotEmpty() == true) {
@@ -400,15 +403,9 @@ fun GroupDetailScreen(
                 ) {
                     Tab(selected = selectedTab == 0, onClick = { selectedTab = 0 }, text = { Text("Expenses") })
                     Tab(selected = selectedTab == 1, onClick = { selectedTab = 1 }, text = { Text("Balances") })
-                    Tab(selected = selectedTab == 2, onClick = {
-                        selectedTab = 2
-                        if (state.settlements.isEmpty() && !state.settlementsLoading) {
-                            viewModel.loadSettlements()
-                        }
-                    }, text = { Text("History") })
-                    Tab(selected = selectedTab == 3, onClick = { selectedTab = 3 }, text = { Text("Members") })
-                    Tab(selected = selectedTab == 4, onClick = {
-                        selectedTab = 4
+                    Tab(selected = selectedTab == 2, onClick = { selectedTab = 2 }, text = { Text("Members") })
+                    Tab(selected = selectedTab == 3, onClick = {
+                        selectedTab = 3
                         if (state.activities.isEmpty() && !state.activitiesLoading) {
                             viewModel.loadActivities()
                         }
@@ -459,30 +456,30 @@ fun GroupDetailScreen(
                     )
                 }
                 2 -> item {
-                    SettlementHistoryTab(
-                        settlements = state.settlements,
-                        isLoading = state.settlementsLoading,
-                        error = state.settlementsError,
-                        currentUserId = state.currentUserId,
-                        formatBase = currencyFormatter.formatBase,
-                        formatDate = currencyFormatter.formatDate
-                    )
-                }
-                3 -> item {
                     MembersTab(
                         members = state.members,
                         currentUserId = state.currentUserId,
                         onInvite = { showInviteDialog = true },
-                        onMemberClick = { uid -> navController.navigate(TrevioRoute.PublicProfile.createRoute(uid)) }
+                        onMemberClick = { uid ->
+                            if (state.members.find { it.uid == uid }?.isOffline != true) {
+                                navController.navigate(TrevioRoute.PublicProfile.createRoute(uid))
+                            }
+                        },
+                        onAddOffline = { showAddOfflineDialog = true }
                     )
                 }
-                4 -> item {
+                3 -> item {
                     ActivityTab(
                         activities = state.activities,
+                        settlements = state.settlements,
+                        settlementsLoading = state.settlementsLoading,
+                        settlementsError = state.settlementsError,
                         currentUserId = state.currentUserId,
                         isLoading = state.activitiesLoading,
                         errorMessage = state.activitiesError,
-                        formatDate = currencyFormatter.formatDate
+                        formatBase = currencyFormatter.formatBase,
+                        formatDate = currencyFormatter.formatDate,
+                        onLoadSettlements = { viewModel.loadSettlements() }
                     )
                 }
             }
@@ -540,6 +537,56 @@ fun GroupDetailScreen(
                         searchQuery = ""
                         viewModel.clearSearch()
                     }) { Text("Done") }
+                }
+            )
+        }
+
+        if (showAddOfflineDialog) {
+            AlertDialog(
+                onDismissRequest = {
+                    showAddOfflineDialog = false
+                    offlineName = ""
+                },
+                title = { Text("Add Offline Member") },
+                text = {
+                    Column {
+                        Text(
+                            "Add someone who isn't on the app yet. They can claim their profile later.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Spacer(modifier = Modifier.height(12.dp))
+                        OutlinedTextField(
+                            value = offlineName,
+                            onValueChange = { offlineName = it },
+                            label = { Text("Name") },
+                            leadingIcon = { Icon(Icons.Default.Person, contentDescription = null) },
+                            modifier = Modifier.fillMaxWidth(),
+                            singleLine = true
+                        )
+                        if (state.inviteError != null) {
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Text(state.inviteError!!, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
+                        }
+                    }
+                },
+                confirmButton = {
+                    TextButton(
+                        onClick = {
+                            if (offlineName.isNotBlank()) {
+                                viewModel.addOfflineMember(offlineName)
+                                offlineName = ""
+                                showAddOfflineDialog = false
+                            }
+                        },
+                        enabled = offlineName.isNotBlank()
+                    ) { Text("Add") }
+                },
+                dismissButton = {
+                    TextButton(onClick = {
+                        showAddOfflineDialog = false
+                        offlineName = ""
+                    }) { Text("Cancel") }
                 }
             )
         }
@@ -677,14 +724,16 @@ private fun ExpenseCard(
         "accommodation" -> Icons.Default.Hotel
         else -> Icons.Default.Receipt
     }
+    val isDark = isSystemInDarkTheme()
     val categoryColor = when (expense.category) {
-        "food" -> Color(0xFFF59E0B)
-        "transport" -> Color(0xFF6366F1)
-        "shopping" -> Color(0xFFEC4899)
-        "turf" -> Color(0xFF22C55E)
-        "accommodation" -> Color(0xFF0D9488)
-        else -> Color(0xFF6B7280)
+        "food" -> if (isDark) Color(0xFFFBBF24) else Color(0xFFF59E0B)
+        "transport" -> if (isDark) Color(0xFF818CF8) else Color(0xFF6366F1)
+        "shopping" -> if (isDark) Color(0xFFF472B6) else Color(0xFFEC4899)
+        "turf" -> if (isDark) Color(0xFF4ADE80) else Color(0xFF22C55E)
+        "accommodation" -> if (isDark) Color(0xFF2DD4BF) else Color(0xFF0D9488)
+        else -> if (isDark) Color(0xFF9CA3AF) else Color(0xFF6B7280)
     }
+    val iconBgAlpha = if (isDark) 0.15f else 0.12f
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(14.dp),
@@ -698,7 +747,7 @@ private fun ExpenseCard(
                 modifier = Modifier
                     .size(40.dp)
                     .clip(CircleShape)
-                    .background(categoryColor.copy(alpha = 0.12f)),
+                    .background(categoryColor.copy(alpha = iconBgAlpha)),
                 contentAlignment = Alignment.Center
             ) {
                 Icon(categoryIcon, contentDescription = null, tint = categoryColor, modifier = Modifier.size(20.dp))
@@ -995,7 +1044,7 @@ private fun BalancesTab(
 }
 
 @Composable
-private fun MembersTab(members: List<Member>, currentUserId: String?, onInvite: () -> Unit, onMemberClick: (String) -> Unit) {
+private fun MembersTab(members: List<Member>, currentUserId: String?, onInvite: () -> Unit, onMemberClick: (String) -> Unit, onAddOffline: () -> Unit) {
     Column(modifier = Modifier.fillMaxWidth().padding(16.dp)) {
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -1003,10 +1052,17 @@ private fun MembersTab(members: List<Member>, currentUserId: String?, onInvite: 
             verticalAlignment = Alignment.CenterVertically
         ) {
             Text("Members (${members.size})", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
-            Button(onClick = onInvite, shape = RoundedCornerShape(12.dp)) {
-                Icon(Icons.Default.PersonAdd, contentDescription = null, modifier = Modifier.size(18.dp))
-                Spacer(modifier = Modifier.width(4.dp))
-                Text("Invite")
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Button(onClick = onAddOffline, shape = RoundedCornerShape(12.dp)) {
+                    Icon(Icons.Default.PersonAdd, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text("Add")
+                }
+                Button(onClick = onInvite, shape = RoundedCornerShape(12.dp)) {
+                    Icon(Icons.Default.PersonAdd, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text("Invite")
+                }
             }
         }
         Spacer(modifier = Modifier.height(16.dp))
@@ -1026,7 +1082,18 @@ private fun MembersTab(members: List<Member>, currentUserId: String?, onInvite: 
                     Spacer(modifier = Modifier.width(12.dp))
                     Column(modifier = Modifier.weight(1f)) {
                         Text(member.displayName + if (member.uid == currentUserId) " (You)" else "", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Medium)
-                        Text("@${member.username}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        if (member.isOffline) {
+                            Text("Offline member", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        } else {
+                            Text("@${member.username}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                    }
+                    if (member.isOffline) {
+                        AssistChip(
+                            onClick = {},
+                            leadingIcon = { Icon(Icons.Default.CloudOff, contentDescription = null, modifier = Modifier.size(14.dp)) },
+                            label = { Text("offline", style = MaterialTheme.typography.labelSmall) }
+                        )
                     }
                     if (member.status == "pending") {
                         AssistChip(
@@ -1046,82 +1113,172 @@ private fun MembersTab(members: List<Member>, currentUserId: String?, onInvite: 
 }
 
 @Composable
-private fun ActivityTab(activities: List<Activity>, currentUserId: String?, isLoading: Boolean, errorMessage: String? = null, formatDate: (Long, Boolean) -> String) {
-    if (isLoading) {
-        LoadingIndicator(modifier = Modifier.fillMaxWidth().padding(40.dp))
-        return
-    }
+private fun ActivityTab(
+    activities: List<Activity>,
+    settlements: List<Settlement>,
+    settlementsLoading: Boolean,
+    settlementsError: String?,
+    currentUserId: String?,
+    isLoading: Boolean,
+    errorMessage: String? = null,
+    formatBase: (Double) -> String,
+    formatDate: (Long, Boolean) -> String,
+    onLoadSettlements: () -> Unit
+) {
+    var activityFilter by remember { mutableStateOf("all") }
 
-    if (errorMessage != null) {
-        Box(
-            modifier = Modifier.fillMaxWidth().padding(top = 80.dp),
-            contentAlignment = Alignment.Center
-        ) {
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                Icon(Icons.Default.Warning, contentDescription = null, modifier = Modifier.size(48.dp), tint = MaterialTheme.colorScheme.error)
-                Spacer(modifier = Modifier.height(12.dp))
-                Text("Failed to load activity", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.error)
-                Spacer(modifier = Modifier.height(4.dp))
-                Text(errorMessage, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            }
+    LaunchedEffect(activityFilter) {
+        if (activityFilter == "settlements" && settlements.isEmpty() && !settlementsLoading) {
+            onLoadSettlements()
         }
-        return
     }
 
-    if (activities.isEmpty()) {
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(top = 80.dp),
-            contentAlignment = Alignment.Center
+    Column(modifier = Modifier.fillMaxWidth().padding(16.dp)) {
+        // Filter toggle
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            modifier = Modifier.padding(bottom = 12.dp)
         ) {
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                Icon(Icons.Default.List, contentDescription = null, modifier = Modifier.size(64.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f))
-                Spacer(modifier = Modifier.height(16.dp))
-                Text("No activity yet", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            }
+            FilterChip(
+                selected = activityFilter == "all",
+                onClick = { activityFilter = "all" },
+                label = { Text("All") }
+            )
+            FilterChip(
+                selected = activityFilter == "settlements",
+                onClick = { activityFilter = "settlements" },
+                label = { Text("Settlements") }
+            )
         }
-        return
-    }
 
-    Column(
-        modifier = Modifier.fillMaxWidth().padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp)
-    ) {
-        activities.forEach { activity ->
-            val (icon, iconColor) = activityIcon(activity.type)
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(12.dp),
-                elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
-            ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth().padding(16.dp),
-                    verticalAlignment = Alignment.Top
+        if (activityFilter == "settlements") {
+            if (settlementsLoading) {
+                LoadingIndicator(modifier = Modifier.fillMaxWidth().padding(40.dp))
+            } else if (settlementsError != null) {
+                Box(modifier = Modifier.fillMaxWidth().padding(top = 60.dp), contentAlignment = Alignment.Center) {
+                    Text(settlementsError, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodyMedium)
+                }
+            } else if (settlements.isEmpty()) {
+                Box(
+                    modifier = Modifier.fillMaxWidth().padding(top = 80.dp),
+                    contentAlignment = Alignment.Center
                 ) {
-                    Box(
-                        modifier = Modifier
-                            .size(36.dp)
-                            .clip(CircleShape)
-                            .background(iconColor.copy(alpha = 0.12f)),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(icon, contentDescription = null, tint = iconColor, modifier = Modifier.size(18.dp))
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Icon(Icons.Default.AccountBalanceWallet, contentDescription = null, modifier = Modifier.size(64.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f))
+                        Spacer(modifier = Modifier.height(16.dp))
+                        Text("No settlements yet", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
-                    Spacer(modifier = Modifier.width(12.dp))
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(activity.description, style = MaterialTheme.typography.bodySmall)
-                        Spacer(modifier = Modifier.height(4.dp))
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            if (activity.userPhotoURL.isNotEmpty()) {
-                                MemberAvatar(name = activity.userName, photoURL = activity.userPhotoURL, size = 16)
-                                Spacer(modifier = Modifier.width(4.dp))
+                }
+            } else {
+                val isDark = isSystemInDarkTheme()
+                val settlementColor = if (isDark) Color(0xFF4ADE80) else Color(0xFF22C55E)
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    settlements.forEach { s ->
+                        val isFromMe = currentUserId == s.fromUid
+                        val isToMe = currentUserId == s.toUid
+                        val fromName = if (isFromMe) "You" else s.fromName.split(" ").firstOrNull() ?: s.fromName
+                        val toName = if (isToMe) "you" else s.toName.split(" ").firstOrNull() ?: s.toName
+                        Card(
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(14.dp),
+                            elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+                        ) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth().padding(16.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Box(
+                                    modifier = Modifier.size(40.dp).clip(CircleShape).background(settlementColor.copy(alpha = 0.12f)),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Icon(Icons.Default.AccountBalanceWallet, contentDescription = null, tint = settlementColor, modifier = Modifier.size(20.dp))
+                                }
+                                Spacer(modifier = Modifier.width(12.dp))
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text("$fromName paid $toName", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
+                                    Spacer(modifier = Modifier.height(2.dp))
+                                    Text(
+                                        buildString {
+                                            if (s.date > 0) append(formatDate(s.date, false))
+                                            append(" · ${s.method.name.lowercase()}")
+                                            if (s.upiRefId.isNotBlank()) append(" · Ref: ${s.upiRefId}")
+                                        },
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                                Text(formatBase(s.amount), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = settlementColor)
                             }
-                            Text(activity.userName + if (activity.userId == currentUserId) " (You)" else "", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                            Spacer(modifier = Modifier.width(4.dp))
-                            Text("·", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                            Spacer(modifier = Modifier.width(4.dp))
-                            Text(formatRelativeTime(activity.createdAt, formatDate), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                    }
+                }
+            }
+        } else {
+            if (isLoading) {
+                LoadingIndicator(modifier = Modifier.fillMaxWidth().padding(40.dp))
+            } else if (errorMessage != null) {
+                Box(
+                    modifier = Modifier.fillMaxWidth().padding(top = 80.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Icon(Icons.Default.Warning, contentDescription = null, modifier = Modifier.size(48.dp), tint = MaterialTheme.colorScheme.error)
+                        Spacer(modifier = Modifier.height(12.dp))
+                        Text("Failed to load activity", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.error)
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(errorMessage, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                }
+            } else if (activities.isEmpty()) {
+                Box(
+                    modifier = Modifier.fillMaxWidth().padding(top = 80.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Icon(Icons.AutoMirrored.Filled.List, contentDescription = null, modifier = Modifier.size(64.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f))
+                        Spacer(modifier = Modifier.height(16.dp))
+                        Text("No activity yet", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                }
+            } else {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    activities.forEach { activity ->
+                        val (icon, iconColor) = activityIcon(activity.type)
+                        Card(
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(12.dp),
+                            elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
+                        ) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth().padding(16.dp),
+                                verticalAlignment = Alignment.Top
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(36.dp)
+                                        .clip(CircleShape)
+                                        .background(iconColor.copy(alpha = 0.12f)),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Icon(icon, contentDescription = null, tint = iconColor, modifier = Modifier.size(18.dp))
+                                }
+                                Spacer(modifier = Modifier.width(12.dp))
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(activity.description, style = MaterialTheme.typography.bodySmall)
+                                    Spacer(modifier = Modifier.height(4.dp))
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        if (activity.userPhotoURL.isNotEmpty()) {
+                                            MemberAvatar(name = activity.userName, photoURL = activity.userPhotoURL, size = 16)
+                                            Spacer(modifier = Modifier.width(4.dp))
+                                        }
+                                        Text(activity.userName + if (activity.userId == currentUserId) " (You)" else "", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                        Spacer(modifier = Modifier.width(4.dp))
+                                        Text("·", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                        Spacer(modifier = Modifier.width(4.dp))
+                                        Text(formatRelativeTime(activity.createdAt, formatDate), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                    }
+                                }
+                            }
                         }
                     }
                 }
@@ -1130,14 +1287,16 @@ private fun ActivityTab(activities: List<Activity>, currentUserId: String?, isLo
     }
 }
 
+@Composable
 private fun activityIcon(type: String): Pair<androidx.compose.ui.graphics.vector.ImageVector, Color> {
+    val isDark = isSystemInDarkTheme()
     return when (type) {
-        "expense_added", "expense_updated", "expense_deleted" -> Icons.Default.Receipt to Color(0xFFF59E0B)
-        "settlement_added" -> Icons.Default.AccountBalanceWallet to Color(0xFF22C55E)
-        "member_joined" -> Icons.Default.PersonAdd to Color(0xFF6366F1)
-        "member_left" -> Icons.Default.PersonRemove to Color(0xFFEF4444)
-        "group_created" -> Icons.Default.Group to Color(0xFF0D9488)
-        else -> Icons.Default.Info to Color(0xFF6B7280)
+        "expense_added", "expense_updated", "expense_deleted" -> Icons.Default.Receipt to if (isDark) Color(0xFFFBBF24) else Color(0xFFF59E0B)
+        "settlement_added" -> Icons.Default.AccountBalanceWallet to if (isDark) Color(0xFF4ADE80) else Color(0xFF22C55E)
+        "member_joined" -> Icons.Default.PersonAdd to if (isDark) Color(0xFF818CF8) else Color(0xFF6366F1)
+        "member_left" -> Icons.Default.PersonRemove to if (isDark) Color(0xFFF87171) else Color(0xFFEF4444)
+        "group_created" -> Icons.Default.Group to if (isDark) Color(0xFF2DD4BF) else Color(0xFF0D9488)
+        else -> Icons.Default.Info to if (isDark) Color(0xFF9CA3AF) else Color(0xFF6B7280)
     }
 }
 
@@ -1169,77 +1328,5 @@ private fun formatRelativeTime(timestamp: Long, formatDate: (Long, Boolean) -> S
         hours < 24 -> "${hours}h ago"
         days < 7 -> "${days}d ago"
         else -> formatDate(timestamp, false)
-    }
-}
-
-@Composable
-private fun SettlementHistoryTab(
-    settlements: List<Settlement>,
-    isLoading: Boolean,
-    error: String?,
-    currentUserId: String?,
-    formatBase: (Double) -> String,
-    formatDate: (Long, Boolean) -> String
-) {
-    if (isLoading) {
-        Box(modifier = Modifier.fillMaxWidth().padding(top = 60.dp), contentAlignment = Alignment.Center) {
-            CircularProgressIndicator()
-        }
-    } else if (error != null) {
-        Box(modifier = Modifier.fillMaxWidth().padding(top = 60.dp), contentAlignment = Alignment.Center) {
-            Text(error, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodyMedium)
-        }
-    } else if (settlements.isEmpty()) {
-        Box(modifier = Modifier.fillMaxWidth().padding(top = 80.dp), contentAlignment = Alignment.Center) {
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                Icon(Icons.Default.AccountBalanceWallet, contentDescription = null, modifier = Modifier.size(64.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f))
-                Spacer(modifier = Modifier.height(16.dp))
-                Text("No settlements yet", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            }
-        }
-    } else {
-        Column(
-            modifier = Modifier.fillMaxWidth().padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp)
-        ) {
-            settlements.forEach { s ->
-                val isFromMe = currentUserId == s.fromUid
-                val isToMe = currentUserId == s.toUid
-                val fromName = if (isFromMe) "You" else s.fromName.split(" ").firstOrNull() ?: s.fromName
-                val toName = if (isToMe) "you" else s.toName.split(" ").firstOrNull() ?: s.toName
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(14.dp),
-                    elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
-                ) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth().padding(16.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Box(
-                            modifier = Modifier.size(40.dp).clip(CircleShape).background(Color(0xFF22C55E).copy(alpha = 0.12f)),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Icon(Icons.Default.AccountBalanceWallet, contentDescription = null, tint = Color(0xFF22C55E), modifier = Modifier.size(20.dp))
-                        }
-                        Spacer(modifier = Modifier.width(12.dp))
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text("$fromName paid $toName", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
-                            Spacer(modifier = Modifier.height(2.dp))
-                            Text(
-                                buildString {
-                                    if (s.date > 0) append(formatDate(s.date, false))
-                                    append(" · ${s.method.name.lowercase()}")
-                                    if (s.upiRefId.isNotBlank()) append(" · Ref: ${s.upiRefId}")
-                                },
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
-                        Text(formatBase(s.amount), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = Color(0xFF22C55E))
-                    }
-                }
-            }
-        }
     }
 }

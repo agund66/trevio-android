@@ -2,6 +2,7 @@ package com.trevio.android.ui.profile
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
@@ -183,15 +184,16 @@ fun PublicProfileScreen(
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
+            val isDark = isSystemInDarkTheme()
             ProfileInfoCard(
                 icon = Icons.Default.Person,
-                iconColor = Color(0xFF6366F1),
+                iconColor = if (isDark) Color(0xFF818CF8) else Color(0xFF6366F1),
                 label = "Username",
                 value = "@${user.username}"
             )
             ProfileInfoCard(
                 icon = Icons.Default.Mail,
-                iconColor = Color(0xFF22C55E),
+                iconColor = if (isDark) Color(0xFF4ADE80) else Color(0xFF22C55E),
                 label = "Email",
                 value = user.email
             )
@@ -200,7 +202,7 @@ fun PublicProfileScreen(
             if (user.upiId.isNotEmpty()) {
                 ProfileInfoCard(
                     icon = Icons.Default.Wallet,
-                    iconColor = Color(0xFF0D9488),
+                    iconColor = if (isDark) Color(0xFF2DD4BF) else Color(0xFF0D9488),
                     label = "Pay via UPI ID",
                     value = user.upiId
                 )
@@ -208,7 +210,7 @@ fun PublicProfileScreen(
                 val country = COUNTRY_CODES.find { it.code == user.countryCode } ?: COUNTRY_CODES.first()
                 ProfileInfoCard(
                     icon = Icons.Default.Phone,
-                    iconColor = Color(0xFF0D9488),
+                    iconColor = if (isDark) Color(0xFF2DD4BF) else Color(0xFF0D9488),
                     label = "Pay via Mobile Number",
                     value = "${country.dialCode} ${user.phoneNumber}"
                 )

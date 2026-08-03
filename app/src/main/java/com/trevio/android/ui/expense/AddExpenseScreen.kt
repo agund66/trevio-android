@@ -86,7 +86,7 @@ class ExpenseViewModel @Inject constructor(
     ) {
         _state.value = _state.value.copy(isLoading = true, error = null)
         viewModelScope.launch {
-            val memberUids = _state.value.members.map { it.uid }
+            val memberUids = _state.value.members.filter { it.status == "active" }.map { it.uid }
             expenseService.addExpense(
                 groupId = groupId,
                 description = description,

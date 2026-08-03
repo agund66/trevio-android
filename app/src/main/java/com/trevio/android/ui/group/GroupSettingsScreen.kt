@@ -1,11 +1,12 @@
 package com.trevio.android.ui.group
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -19,6 +20,7 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.trevio.android.core.designsystem.components.MemberAvatar
+import com.trevio.android.core.designsystem.components.TrevioHeader
 import com.trevio.android.core.navigation.TrevioRoute
 import com.trevio.android.domain.repository.AuthService
 import com.trevio.android.domain.repository.GroupInfo
@@ -82,7 +84,8 @@ class GroupSettingsViewModel @Inject constructor(
     fun setTransferTarget(uid: String?) { _state.value = _state.value.copy(transferTargetUid = uid) }
     fun setShowDeleteConfirm(v: Boolean) { _state.value = _state.value.copy(showDeleteConfirm = v) }
 
-    val isAdmin: Boolean get() = _state.value.members.find { it.uid == _state.value.currentUserId }?.role == "admin"
+    val isAdmin: Boolean get() = _state.value.currentUserId == _state.value.groupInfo?.createdBy ||
+        _state.value.members.find { it.uid == _state.value.currentUserId }?.role == "admin"
 
     fun saveGroupSettings() {
         val s = _state.value
@@ -130,7 +133,6 @@ class GroupSettingsViewModel @Inject constructor(
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun GroupSettingsScreen(
     navController: androidx.navigation.NavHostController,
@@ -139,13 +141,12 @@ fun GroupSettingsScreen(
     val state by viewModel.state.collectAsState()
 
     if (state.isLoading) {
-        Scaffold(topBar = {
-            TopAppBar(
-                title = { Text("Group Settings") },
-                navigationIcon = { IconButton(onClick = { navController.popBackStack() }) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back") } }
+        Column(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
+            TrevioHeader(
+                title = "Group Settings",
+                onBack = { navController.popBackStack() }
             )
-        }) { padding ->
-            Box(modifier = Modifier.padding(padding).fillMaxSize(), contentAlignment = Alignment.Center) {
+            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 CircularProgressIndicator()
             }
         }
@@ -153,13 +154,12 @@ fun GroupSettingsScreen(
     }
 
     if (!viewModel.isAdmin) {
-        Scaffold(topBar = {
-            TopAppBar(
-                title = { Text("Group Settings") },
-                navigationIcon = { IconButton(onClick = { navController.popBackStack() }) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back") } }
+        Column(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
+            TrevioHeader(
+                title = "Group Settings",
+                onBack = { navController.popBackStack() }
             )
-        }) { padding ->
-            Box(modifier = Modifier.padding(padding).fillMaxSize(), contentAlignment = Alignment.Center) {
+            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     Icon(Icons.Default.Settings, contentDescription = null, modifier = Modifier.size(48.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f))
                     Spacer(modifier = Modifier.height(12.dp))
@@ -172,14 +172,13 @@ fun GroupSettingsScreen(
 
     val activeMembers = state.members.filter { it.status == "active" && it.uid != state.currentUserId }
 
-    Scaffold(topBar = {
-        TopAppBar(
-            title = { Text("Group Settings") },
-            navigationIcon = { IconButton(onClick = { navController.popBackStack() }) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back") } }
+    Column(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
+        TrevioHeader(
+            title = "Group Settings",
+            onBack = { navController.popBackStack() }
         )
-    }) { padding ->
         Column(
-            modifier = Modifier.padding(padding).fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp),
+            modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             if (state.error != null) {
@@ -188,8 +187,11 @@ fun GroupSettingsScreen(
                 }
             }
             if (state.success != null) {
-                Surface(color = Color(0xFF22C55E).copy(alpha = 0.12f), shape = RoundedCornerShape(12.dp), modifier = Modifier.fillMaxWidth()) {
-                    Text(state.success!!, modifier = Modifier.padding(12.dp), style = MaterialTheme.typography.bodySmall, color = Color(0xFF16A34A))
+                val isDark = isSystemInDarkTheme()
+                val successColor = if (isDark) Color(0xFF4ADE80) else Color(0xFF22C55E)
+                val successTextColor = if (isDark) Color(0xFF86EFAC) else Color(0xFF16A34A)
+                Surface(color = successColor.copy(alpha = 0.12f), shape = RoundedCornerShape(12.dp), modifier = Modifier.fillMaxWidth()) {
+                    Text(state.success!!, modifier = Modifier.padding(12.dp), style = MaterialTheme.typography.bodySmall, color = successTextColor)
                 }
             }
 

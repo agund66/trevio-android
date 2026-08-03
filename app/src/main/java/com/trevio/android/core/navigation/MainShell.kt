@@ -2,6 +2,7 @@ package com.trevio.android.core.navigation
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.padding
@@ -39,6 +40,7 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.navArgument
 import androidx.navigation.compose.rememberNavController
 import com.trevio.android.core.designsystem.theme.TrevioBorder
+import com.trevio.android.core.designsystem.theme.TrevioBorderDark
 import com.trevio.android.domain.repository.AuthService
 import com.trevio.android.ui.admin.AdminScreen
 import com.trevio.android.ui.broadcast.BroadcastPopup
@@ -122,7 +124,7 @@ fun MainShell(
                     tonalElevation = 0.dp,
                     modifier = Modifier.border(
                         width = 1.dp,
-                        color = TrevioBorder,
+                        color = if (isSystemInDarkTheme()) TrevioBorderDark else TrevioBorder,
                         shape = RoundedCornerShape(0.dp)
                     )
                 ) {

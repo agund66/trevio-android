@@ -35,6 +35,18 @@ class FirebaseBroadcastServiceImpl @Inject constructor(
     private val auth: FirebaseAuth
 ) : BroadcastService {
 
+    private suspend fun requireSuperadmin(): Result<Unit> {
+        return try {
+            val uid = auth.currentUser?.uid ?: return Result.failure(Exception("User not authenticated"))
+            val currentUserDoc = firestore.collection("users").document(uid).get().await()
+            val currentRole = currentUserDoc.data?.get("role") as? String ?: "user"
+            if (currentRole != "superadmin") return Result.failure(Exception("Access denied: superadmin only"))
+            Result.success(Unit)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
     override suspend fun createBroadcast(
         title: String,
         htmlContent: String,
@@ -45,6 +57,7 @@ class FirebaseBroadcastServiceImpl @Inject constructor(
         endAt: Long?
     ): Result<String> {
         return try {
+            requireSuperadmin().onFailure { return Result.failure(it) }
             val currentUid = auth.currentUser?.uid ?: return Result.failure(Exception("Not authenticated"))
             val currentUserDoc = firestore.collection("users").document(currentUid).get().await()
             val createdByName = currentUserDoc.data?.get("displayName") as? String ?: ""
@@ -103,6 +116,7 @@ class FirebaseBroadcastServiceImpl @Inject constructor(
 
     override suspend fun stopBroadcast(id: String): Result<Unit> {
         return try {
+            requireSuperadmin().onFailure { return Result.failure(it) }
             firestore.collection("broadcasts").document(id)
                 .update(mapOf("active" to false, "stoppedAt" to System.currentTimeMillis()))
                 .await()

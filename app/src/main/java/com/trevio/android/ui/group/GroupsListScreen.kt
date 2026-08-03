@@ -2,6 +2,7 @@ package com.trevio.android.ui.group
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -216,7 +217,8 @@ private fun GroupsListItem(
     formatBase: (Double) -> String
 ) {
     val balance = group.yourBalance
-    val balanceColor = if (balance > 0) Color(0xFF22C55E) else if (balance < 0) Color(0xFFEF4444) else MaterialTheme.colorScheme.onSurfaceVariant
+    val isDark = isSystemInDarkTheme()
+    val balanceColor = if (balance > 0) if (isDark) Color(0xFF4ADE80) else Color(0xFF22C55E) else if (balance < 0) if (isDark) Color(0xFFF87171) else Color(0xFFEF4444) else MaterialTheme.colorScheme.onSurfaceVariant
     val balanceText = if (balance > 0) "owes you ${formatBase(balance)}" else if (balance < 0) "you owe ${formatBase(-balance)}" else "settled up"
 
     TrevioCard(

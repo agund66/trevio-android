@@ -1,6 +1,7 @@
 package com.trevio.android.ui.auth
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
@@ -116,33 +117,34 @@ fun TermsScreen(
                 .padding(20.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
+            val isDark = isSystemInDarkTheme()
             TermsSectionCard(
                 icon = Icons.Default.VerifiedUser,
-                iconColor = Color(0xFF6366F1),
+                iconColor = if (isDark) Color(0xFF818CF8) else Color(0xFF6366F1),
                 title = "1. Acceptance of Terms",
                 body = "By using Trevio, you agree to these terms and conditions. If you do not agree, please do not use the app."
             )
             TermsSectionCard(
                 icon = Icons.Default.Lock,
-                iconColor = Color(0xFF22C55E),
+                iconColor = if (isDark) Color(0xFF4ADE80) else Color(0xFF22C55E),
                 title = "2. Privacy & Data",
                 body = "Trevio stores your name, email, and profile photo from your Google account. We use this to identify you and facilitate group expense splitting. Your data is stored securely in Firebase."
             )
             TermsSectionCard(
                 icon = Icons.Default.Payments,
-                iconColor = Color(0xFFF59E0B),
+                iconColor = if (isDark) Color(0xFFFBBF24) else Color(0xFFF59E0B),
                 title = "3. Financial Data",
                 body = "Trevio helps track expenses and settlements between users. We do not process actual payments. All settlements are tracked in-app. UPI deep links redirect you to your preferred payment app."
             )
             TermsSectionCard(
                 icon = Icons.Default.Gavel,
-                iconColor = Color(0xFFEC4899),
+                iconColor = if (isDark) Color(0xFFF472B6) else Color(0xFFEC4899),
                 title = "4. User Conduct",
                 body = "You are responsible for the expenses and settlements you add. Do not create fraudulent or misleading expense entries."
             )
             TermsSectionCard(
                 icon = Icons.Default.PersonOff,
-                iconColor = Color(0xFFEF4444),
+                iconColor = if (isDark) Color(0xFFF87171) else Color(0xFFEF4444),
                 title = "5. Account Termination",
                 body = "You can delete your account at any time. Upon deletion, your data will be removed from our servers."
             )

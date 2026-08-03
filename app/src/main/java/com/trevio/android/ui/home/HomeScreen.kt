@@ -2,6 +2,7 @@ package com.trevio.android.ui.home
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -34,6 +35,7 @@ import androidx.lifecycle.viewModelScope
 import com.trevio.android.core.designsystem.components.EmptyState
 import com.trevio.android.core.designsystem.components.TrevioCard
 import com.trevio.android.core.designsystem.theme.TrevioBorder
+import com.trevio.android.core.designsystem.theme.TrevioBorderDark
 
 import com.trevio.android.core.navigation.TrevioRoute
 import com.trevio.android.domain.model.Group
@@ -340,7 +342,10 @@ private fun BalanceCard(
     activeGroups: Int,
     formatBase: (Double) -> String
 ) {
-    val netColor = if (netBalance >= 0) Color(0xFF22C55E) else Color(0xFFEF4444)
+    val isDark = isSystemInDarkTheme()
+    val greenColor = if (isDark) Color(0xFF4ADE80) else Color(0xFF22C55E)
+    val redColor = if (isDark) Color(0xFFF87171) else Color(0xFFEF4444)
+    val netColor = if (netBalance >= 0) greenColor else redColor
 
     TrevioCard(
         modifier = Modifier
@@ -381,7 +386,7 @@ private fun BalanceCard(
                 color = netColor
             )
             Spacer(modifier = Modifier.height(12.dp))
-            HorizontalDivider(color = TrevioBorder)
+            HorizontalDivider(color = if (isSystemInDarkTheme()) TrevioBorderDark else TrevioBorder)
             Spacer(modifier = Modifier.height(12.dp))
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -390,13 +395,13 @@ private fun BalanceCard(
                 BalanceColumn(
                     label = "You'll get",
                     amount = totalOwed,
-                    color = Color(0xFF22C55E),
+                    color = greenColor,
                     formatBase = formatBase
                 )
                 BalanceColumn(
                     label = "You'll pay",
                     amount = totalOwing,
-                    color = Color(0xFFEF4444),
+                    color = redColor,
                     formatBase = formatBase
                 )
                 BalanceColumn(
@@ -447,10 +452,14 @@ private fun templateIcon(template: GroupTemplate): ImageVector = when (template)
     GroupTemplate.CASUAL -> Icons.Default.LocalCafe
 }
 
-private fun templateColor(template: GroupTemplate): Color = when (template) {
-    GroupTemplate.TRIP -> Color(0xFF6366F1)
-    GroupTemplate.TURF -> Color(0xFF22C55E)
-    GroupTemplate.CASUAL -> Color(0xFFF59E0B)
+@Composable
+private fun templateColorAdaptive(template: GroupTemplate): Color {
+    val isDark = isSystemInDarkTheme()
+    return when (template) {
+        GroupTemplate.TRIP -> if (isDark) Color(0xFF818CF8) else Color(0xFF6366F1)
+        GroupTemplate.TURF -> if (isDark) Color(0xFF4ADE80) else Color(0xFF22C55E)
+        GroupTemplate.CASUAL -> if (isDark) Color(0xFFFBBF24) else Color(0xFFF59E0B)
+    }
 }
 
 @Composable
@@ -460,10 +469,10 @@ private fun GroupCardItem(
     formatBase: (Double) -> String
 ) {
     val icon = templateIcon(group.template)
-    val accentColor = templateColor(group.template)
+    val accentColor = templateColorAdaptive(group.template)
     val balanceColor = when {
-        group.yourBalance > 0.01 -> Color(0xFF22C55E)
-        group.yourBalance < -0.01 -> Color(0xFFEF4444)
+        group.yourBalance > 0.01 -> if (isSystemInDarkTheme()) Color(0xFF4ADE80) else Color(0xFF22C55E)
+        group.yourBalance < -0.01 -> if (isSystemInDarkTheme()) Color(0xFFF87171) else Color(0xFFEF4444)
         else -> MaterialTheme.colorScheme.onSurfaceVariant
     }
     val balanceText = when {

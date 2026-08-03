@@ -2,6 +2,7 @@ package com.trevio.android.core.designsystem.components
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -22,6 +23,7 @@ import com.trevio.android.core.designsystem.theme.BalanceNegative
 import com.trevio.android.core.designsystem.theme.BalanceNeutral
 import com.trevio.android.core.designsystem.theme.BalancePositive
 import com.trevio.android.core.designsystem.theme.TrevioBorder
+import com.trevio.android.core.designsystem.theme.TrevioBorderDark
 
 @Composable
 fun BalanceChip(
@@ -30,8 +32,8 @@ fun BalanceChip(
     modifier: Modifier = Modifier
 ) {
     val color = when {
-        balance > 0.01 -> BalancePositive
-        balance < -0.01 -> BalanceNegative
+        balance > 0.01 -> if (isSystemInDarkTheme()) Color(0xFF4ADE80) else BalancePositive
+        balance < -0.01 -> if (isSystemInDarkTheme()) Color(0xFFF87171) else BalanceNegative
         else -> BalanceNeutral
     }
     val text = when {
@@ -145,20 +147,23 @@ fun LoadingIndicator(modifier: Modifier = Modifier) {
 @Composable
 fun TrevioHeader(
     title: String,
-    gradient: Brush = Brush.verticalGradient(listOf(Color.White, Color.White)),
+    gradient: Brush = Brush.verticalGradient(listOf(Color.Transparent, Color.Transparent)),
     modifier: Modifier = Modifier,
     onBack: (() -> Unit)? = null,
-    actions: @Composable RowScope.() -> Unit = {}
+    actions: @Composable RowScope.() -> Unit = {},
+    content: @Composable (ColumnScope.() -> Unit)? = null
 ) {
     Column(
         modifier = modifier
             .fillMaxWidth()
             .background(MaterialTheme.colorScheme.primary)
+            .windowInsetsPadding(WindowInsets.statusBars)
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 8.dp, vertical = 8.dp),
+                .height(56.dp)
+                .padding(horizontal = 4.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             if (onBack != null) {
@@ -183,6 +188,9 @@ fun TrevioHeader(
             )
             actions()
         }
+        if (content != null) {
+            content()
+        }
     }
 }
 
@@ -192,10 +200,11 @@ fun TrevioCard(
     onClick: (() -> Unit)? = null,
     content: @Composable ColumnScope.() -> Unit
 ) {
+    val borderColor = if (isSystemInDarkTheme()) TrevioBorderDark else TrevioBorder
     val baseModifier = modifier
         .clip(RoundedCornerShape(16.dp))
         .background(MaterialTheme.colorScheme.surface)
-        .border(1.dp, TrevioBorder, RoundedCornerShape(16.dp))
+        .border(1.dp, borderColor, RoundedCornerShape(16.dp))
     if (onClick != null) {
         Card(
             onClick = onClick,

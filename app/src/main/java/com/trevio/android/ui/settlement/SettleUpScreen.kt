@@ -3,6 +3,7 @@ package com.trevio.android.ui.settlement
 import android.content.Intent
 import android.net.Uri
 import androidx.compose.foundation.background
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -202,6 +203,8 @@ private fun DebtCard(
     onSettle: () -> Unit,
     onPayViaUpi: () -> Unit
 ) {
+    val isDark = isSystemInDarkTheme()
+    val iconColor = if (isDark) Color(0xFF818CF8) else Color(0xFF6366F1)
     TrevioCard(
         modifier = Modifier.fillMaxWidth()
     ) {
@@ -211,10 +214,10 @@ private fun DebtCard(
                     modifier = Modifier
                         .size(44.dp)
                         .clip(CircleShape)
-                        .background(Color(0xFF6366F1).copy(alpha = 0.12f)),
+                        .background(iconColor.copy(alpha = 0.12f)),
                     contentAlignment = Alignment.Center
                 ) {
-                    Icon(Icons.Default.Payments, contentDescription = null, tint = Color(0xFF6366F1), modifier = Modifier.size(22.dp))
+                    Icon(Icons.Default.Payments, contentDescription = null, tint = iconColor, modifier = Modifier.size(22.dp))
                 }
                 Spacer(modifier = Modifier.width(12.dp))
                 Column(modifier = Modifier.weight(1f)) {

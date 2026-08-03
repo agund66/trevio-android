@@ -2,6 +2,7 @@ package com.trevio.android.ui.admin
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -192,7 +193,7 @@ fun AdminScreen(
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
                         StatCard("Total Users", totalUsers.toString(), MaterialTheme.colorScheme.onSurface)
-                        StatCard("Blocked", blockedUsers.toString(), Color(0xFFEF4444))
+                        StatCard("Blocked", blockedUsers.toString(), if (isSystemInDarkTheme()) Color(0xFFF87171) else Color(0xFFEF4444))
                         StatCard("Admins", adminUsers.toString(), MaterialTheme.colorScheme.primary)
                     }
                 }
@@ -289,13 +290,13 @@ private fun UserRow(
                         if (user.blocked) {
                             Spacer(modifier = Modifier.width(6.dp))
                             Surface(
-                                color = Color(0xFFEF4444).copy(alpha = 0.1f),
+                                color = if (isSystemInDarkTheme()) Color(0xFFF87171) else Color(0xFFEF4444).copy(alpha = 0.1f),
                                 shape = RoundedCornerShape(6.dp)
                             ) {
                                 Text(
                                     "Blocked",
                                     style = MaterialTheme.typography.labelSmall,
-                                    color = Color(0xFFEF4444),
+                                    color = if (isSystemInDarkTheme()) Color(0xFFF87171) else Color(0xFFEF4444),
                                     modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
                                 )
                             }

@@ -3,6 +3,7 @@ package com.trevio.android.ui.broadcast
 import android.webkit.WebView
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -65,10 +66,11 @@ private fun BroadcastDialog(
     onAcknowledge: () -> Unit,
     onDismiss: () -> Unit
 ) {
+    val isDark = isSystemInDarkTheme()
     val priorityColor = when (broadcast.priority) {
-        BroadcastPriority.CRITICAL -> Color(0xFFEF4444)
-        BroadcastPriority.MAINTENANCE -> Color(0xFFF59E0B)
-        BroadcastPriority.INFO -> Color(0xFF3B82F6)
+        BroadcastPriority.CRITICAL -> if (isDark) Color(0xFFF87171) else Color(0xFFEF4444)
+        BroadcastPriority.MAINTENANCE -> if (isDark) Color(0xFFFBBF24) else Color(0xFFF59E0B)
+        BroadcastPriority.INFO -> if (isDark) Color(0xFF60A5FA) else Color(0xFF3B82F6)
     }
     val priorityLabel = when (broadcast.priority) {
         BroadcastPriority.CRITICAL -> "Critical Alert"

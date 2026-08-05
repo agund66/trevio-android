@@ -79,6 +79,21 @@ class GroupSettingsViewModel @Inject constructor(
         }
     }
 
+    fun refreshData() {
+        viewModelScope.launch {
+            val uid = authService.getCurrentUserId()
+            val info = groupService.getGroupInfo(groupId).getOrNull()
+            val members = settlementService.getGroupBalances(groupId).getOrDefault(emptyList())
+            _state.value = _state.value.copy(
+                groupInfo = info,
+                members = members,
+                currentUserId = uid,
+                name = info?.name ?: "",
+                description = info?.description ?: ""
+            )
+        }
+    }
+
     fun updateName(v: String) { _state.value = _state.value.copy(name = v) }
     fun updateDescription(v: String) { _state.value = _state.value.copy(description = v) }
     fun setTransferTarget(uid: String?) { _state.value = _state.value.copy(transferTargetUid = uid) }
@@ -94,7 +109,7 @@ class GroupSettingsViewModel @Inject constructor(
             groupService.updateGroup(groupId, s.name, s.description)
                 .onSuccess {
                     _state.value = s.copy(isSaving = false, success = "Group settings updated")
-                    loadData()
+                    refreshData()
                 }
                 .onFailure { e ->
                     _state.value = s.copy(isSaving = false, error = e.message)
@@ -110,7 +125,7 @@ class GroupSettingsViewModel @Inject constructor(
             groupService.transferAdminRole(groupId, targetUid)
                 .onSuccess {
                     _state.value = s.copy(isSaving = false, success = "Admin role transferred", transferTargetUid = null)
-                    loadData()
+                    refreshData()
                 }
                 .onFailure { e ->
                     _state.value = s.copy(isSaving = false, error = e.message)

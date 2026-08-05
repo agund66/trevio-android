@@ -109,6 +109,23 @@ class GroupViewModel @Inject constructor(
         }
     }
 
+    fun refreshData() {
+        viewModelScope.launch {
+            val currentUid = authService.getCurrentUserId()
+            val info = groupService.getGroupInfo(groupId).getOrNull()
+            val expenses = expenseService.getGroupExpenses(groupId, 50, null).getOrDefault(emptyList())
+            val members = settlementService.getGroupBalances(groupId).getOrDefault(emptyList())
+            val debts = settlementService.getSimplifiedDebts(groupId).getOrDefault(emptyList())
+            _state.value = _state.value.copy(
+                groupInfo = info,
+                expenses = expenses,
+                members = members,
+                debts = debts,
+                currentUserId = currentUid
+            )
+        }
+    }
+
     fun searchUsers(query: String) {
         if (query.isBlank()) {
             _state.value = _state.value.copy(searchResults = emptyList())
@@ -134,7 +151,7 @@ class GroupViewModel @Inject constructor(
                         searchResults = emptyList(),
                         inviteError = null
                     )
-                    loadData()
+                    refreshData()
                 }
                 .onFailure { e ->
                     _state.value = _state.value.copy(inviteError = e.message)
@@ -150,7 +167,7 @@ class GroupViewModel @Inject constructor(
                         searchResults = emptyList(),
                         inviteError = null
                     )
-                    loadData()
+                    refreshData()
                 }
                 .onFailure { e ->
                     _state.value = _state.value.copy(inviteError = e.message)
@@ -172,7 +189,7 @@ class GroupViewModel @Inject constructor(
             }
             result.onSuccess {
                 _state.value = _state.value.copy(actionError = null)
-                loadData()
+                refreshData()
             }.onFailure { e ->
                 _state.value = _state.value.copy(actionError = e.message)
             }
@@ -204,7 +221,7 @@ class GroupViewModel @Inject constructor(
                 upiRefId = null
             ).onSuccess {
                 _state.value = _state.value.copy(actionError = null)
-                loadData()
+                refreshData()
             }.onFailure { e ->
                 _state.value = _state.value.copy(actionError = e.message)
             }
@@ -229,7 +246,7 @@ class GroupViewModel @Inject constructor(
             expenseService.deleteExpense(groupId, expenseId)
                 .onSuccess {
                     _state.value = _state.value.copy(deleteExpenseId = null, deleteError = null)
-                    loadData()
+                    refreshData()
                 }
                 .onFailure { e ->
                     _state.value = _state.value.copy(deleteError = e.message)
@@ -274,7 +291,7 @@ fun GroupDetailScreen(
 
     LaunchedEffect(needsRefresh) {
         if (needsRefresh) {
-            viewModel.loadData()
+            viewModel.refreshData()
             navController.currentBackStackEntry?.savedStateHandle?.set("needsRefresh", false)
             navController.previousBackStackEntry?.savedStateHandle?.set("needsRefresh", true)
         }

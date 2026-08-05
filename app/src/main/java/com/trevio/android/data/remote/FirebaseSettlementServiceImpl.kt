@@ -66,9 +66,21 @@ class FirebaseSettlementServiceImpl @Inject constructor(
             if (upiRefId != null) settlementData["upiRefId"] = upiRefId
 
             val fromUserDoc = firestore.collection("users").document(fromUid).get().await()
-            val fromUserName = fromUserDoc.data?.get("displayName") as? String ?: "Someone"
+            val fromMemberDoc = groupRef.collection("members").document(fromUid).get().await()
+            val fromIsOffline = fromMemberDoc.data?.get("isOffline") as? Boolean ?: false
+            val fromUserName = if (fromIsOffline) {
+                fromMemberDoc.data?.get("displayName") as? String ?: "Someone"
+            } else {
+                fromUserDoc.data?.get("displayName") as? String ?: "Someone"
+            }
             val toUserDoc = firestore.collection("users").document(toUid).get().await()
-            val toUserName = toUserDoc.data?.get("displayName") as? String ?: "Someone"
+            val toMemberDoc = groupRef.collection("members").document(toUid).get().await()
+            val toIsOffline = toMemberDoc.data?.get("isOffline") as? Boolean ?: false
+            val toUserName = if (toIsOffline) {
+                toMemberDoc.data?.get("displayName") as? String ?: "Someone"
+            } else {
+                toUserDoc.data?.get("displayName") as? String ?: "Someone"
+            }
 
             val batch = firestore.batch()
             batch.set(settlementRef, settlementData)
@@ -136,21 +148,61 @@ class FirebaseSettlementServiceImpl @Inject constructor(
             val debts = calculateSimplifiedDebts(groupId)
 
             val enrichedDebts = debts.map { debt ->
-                val fromDoc = firestore.collection("users").document(debt.fromUid).get().await()
-                val toDoc = firestore.collection("users").document(debt.toUid).get().await()
-                val fromData = fromDoc.data
-                val toData = toDoc.data
+                val fromMemberDoc = groupRef.collection("members").document(debt.fromUid).get().await()
+                val toMemberDoc = groupRef.collection("members").document(debt.toUid).get().await()
+                val fromData = fromMemberDoc.data
+                val toData = toMemberDoc.data
+
+                val fromIsOffline = fromData?.get("isOffline") as? Boolean ?: false
+                val toIsOffline = toData?.get("isOffline") as? Boolean ?: false
+
+                val fromName: String
+                val fromPhotoURL: String
+                val fromUpiId: String
+                if (fromIsOffline) {
+                    fromName = fromData?.get("displayName") as? String ?: "Unknown"
+                    fromPhotoURL = ""
+                    fromUpiId = ""
+                } else {
+                    val fromUserDoc = firestore.collection("users").document(debt.fromUid).get().await()
+                    val userData = fromUserDoc.data
+                    fromName = userData?.get("displayName") as? String ?: "Unknown"
+                    fromPhotoURL = userData?.get("photoURL") as? String ?: ""
+                    fromUpiId = userData?.get("upiId") as? String ?: ""
+                }
+
+                val toName: String
+                val toPhotoURL: String
+                val toUpiId: String
+                val toPhoneNumber: String
+                val toCountryCode: String
+                if (toIsOffline) {
+                    toName = toData?.get("displayName") as? String ?: "Unknown"
+                    toPhotoURL = ""
+                    toUpiId = ""
+                    toPhoneNumber = ""
+                    toCountryCode = ""
+                } else {
+                    val toUserDoc = firestore.collection("users").document(debt.toUid).get().await()
+                    val userData = toUserDoc.data
+                    toName = userData?.get("displayName") as? String ?: "Unknown"
+                    toPhotoURL = userData?.get("photoURL") as? String ?: ""
+                    toUpiId = userData?.get("upiId") as? String ?: ""
+                    toPhoneNumber = userData?.get("phoneNumber") as? String ?: ""
+                    toCountryCode = userData?.get("countryCode") as? String ?: ""
+                }
+
                 SimplifiedDebt(
                     fromUid = debt.fromUid,
                     toUid = debt.toUid,
-                    fromName = fromData?.get("displayName") as? String ?: "Unknown",
-                    toName = toData?.get("displayName") as? String ?: "Unknown",
-                    fromPhotoURL = fromData?.get("photoURL") as? String ?: "",
-                    toPhotoURL = toData?.get("photoURL") as? String ?: "",
-                    toUpiId = toData?.get("upiId") as? String ?: "",
-                    fromUpiId = fromData?.get("upiId") as? String ?: "",
-                    toPhoneNumber = toData?.get("phoneNumber") as? String ?: "",
-                    toCountryCode = toData?.get("countryCode") as? String ?: "",
+                    fromName = fromName,
+                    toName = toName,
+                    fromPhotoURL = fromPhotoURL,
+                    toPhotoURL = toPhotoURL,
+                    toUpiId = toUpiId,
+                    fromUpiId = fromUpiId,
+                    toPhoneNumber = toPhoneNumber,
+                    toCountryCode = toCountryCode,
                     amount = debt.amount
                 )
             }
@@ -220,14 +272,33 @@ class FirebaseSettlementServiceImpl @Inject constructor(
 
             val settlements = snapshot.documents.map { doc ->
                 val data = doc.data ?: emptyMap()
-                val fromDoc = firestore.collection("users").document(data["fromUid"] as? String ?: "").get().await()
-                val toDoc = firestore.collection("users").document(data["toUid"] as? String ?: "").get().await()
+                val fromUid = data["fromUid"] as? String ?: ""
+                val toUid = data["toUid"] as? String ?: ""
+
+                val fromMemberDoc = groupRef.collection("members").document(fromUid).get().await()
+                val toMemberDoc = groupRef.collection("members").document(toUid).get().await()
+                val fromIsOffline = fromMemberDoc.data?.get("isOffline") as? Boolean ?: false
+                val toIsOffline = toMemberDoc.data?.get("isOffline") as? Boolean ?: false
+
+                val fromName = if (fromIsOffline) {
+                    fromMemberDoc.data?.get("displayName") as? String ?: "Unknown"
+                } else {
+                    val fromUserDoc = firestore.collection("users").document(fromUid).get().await()
+                    fromUserDoc.data?.get("displayName") as? String ?: "Unknown"
+                }
+                val toName = if (toIsOffline) {
+                    toMemberDoc.data?.get("displayName") as? String ?: "Unknown"
+                } else {
+                    val toUserDoc = firestore.collection("users").document(toUid).get().await()
+                    toUserDoc.data?.get("displayName") as? String ?: "Unknown"
+                }
+
                 Settlement(
                     settlementId = doc.id,
-                    fromUid = data["fromUid"] as? String ?: "",
-                    toUid = data["toUid"] as? String ?: "",
-                    fromName = fromDoc.data?.get("displayName") as? String ?: "Unknown",
-                    toName = toDoc.data?.get("displayName") as? String ?: "Unknown",
+                    fromUid = fromUid,
+                    toUid = toUid,
+                    fromName = fromName,
+                    toName = toName,
                     amount = (data["amount"] as? Number)?.toDouble() ?: 0.0,
                     currency = data["currency"] as? String ?: "INR",
                     method = SettlementMethod.valueOf((data["method"] as? String ?: "cash").uppercase()),

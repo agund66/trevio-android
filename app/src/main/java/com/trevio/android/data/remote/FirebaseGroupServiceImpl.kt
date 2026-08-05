@@ -8,6 +8,7 @@ import com.trevio.android.domain.model.Group
 import com.trevio.android.domain.model.GroupTemplate
 import com.trevio.android.domain.repository.GroupInfo
 import com.trevio.android.domain.repository.GroupService
+import com.trevio.android.domain.model.SplitEntry
 import com.trevio.android.util.Calculations
 import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.async
@@ -596,6 +597,11 @@ class FirebaseGroupServiceImpl @Inject constructor(
             val groupDoc = groupRef.get().await()
             if (!groupDoc.exists()) return Result.failure(Exception("Group not found"))
 
+            val callerMemberDoc = groupRef.collection("members").document(uid).get().await()
+            if (!callerMemberDoc.exists() || callerMemberDoc.data?.get("status") != "active") {
+                return Result.failure(Exception("You are not a member of this group"))
+            }
+
             val now = System.currentTimeMillis()
             val memberRef = groupRef.collection("members").document()
             val batch = firestore.batch()
@@ -638,22 +644,29 @@ class FirebaseGroupServiceImpl @Inject constructor(
             if (memberDoc.data?.get("isOffline") != true) return Result.failure(Exception("This member is not an offline profile"))
 
             val existingMemberDoc = groupRef.collection("members").document(uid).get().await()
-            if (existingMemberDoc.exists() && existingMemberDoc.data?.get("status") == "active") {
-                return Result.failure(Exception("You are already a member of this group"))
-            }
 
+            val memberData = memberDoc.data!!
             val now = System.currentTimeMillis()
             val batch = firestore.batch()
 
-            batch.update(memberDoc.reference, mapOf(
-                "uid" to uid,
-                "isOffline" to false,
-                "claimedAt" to now,
-                "claimedBy" to uid
-            ))
-
             if (existingMemberDoc.exists()) {
-                batch.delete(existingMemberDoc.reference)
+                // User already has a member doc (e.g. joined via invite code)
+                // Keep existing doc, just delete the offline profile doc
+                batch.delete(memberDoc.reference)
+                val groupDocForCount = groupRef.get().await()
+                val currentCount = (groupDocForCount.data?.get("memberCount") as? Number)?.toLong() ?: 0L
+                if (currentCount > 0) {
+                    batch.update(groupRef, mapOf("memberCount" to currentCount - 1))
+                }
+            } else {
+                // No existing doc — create one with offline member's data
+                val claimedData = memberData.toMutableMap()
+                claimedData["uid"] = uid
+                claimedData["isOffline"] = false
+                claimedData["claimedAt"] = now
+                claimedData["claimedBy"] = uid
+                batch.set(groupRef.collection("members").document(uid), claimedData)
+                batch.delete(memberDoc.reference)
             }
 
             batch.set(groupRef.collection("activities").document(), mapOf(
@@ -667,6 +680,7 @@ class FirebaseGroupServiceImpl @Inject constructor(
             batch.commit().await()
 
             migrateMemberReferences(groupId, memberDocId, uid)
+            recalculateBalances(groupId)
 
             Result.success(Unit)
         } catch (e: Exception) {
@@ -687,22 +701,29 @@ class FirebaseGroupServiceImpl @Inject constructor(
             if (memberDoc.data?.get("isOffline") != true) return Result.failure(Exception("This member is not an offline profile"))
 
             val existingMemberDoc = groupRef.collection("members").document(realUid).get().await()
-            if (existingMemberDoc.exists() && existingMemberDoc.data?.get("status") == "active") {
-                return Result.failure(Exception("That user is already an active member of this group"))
-            }
 
+            val memberData = memberDoc.data!!
             val now = System.currentTimeMillis()
             val batch = firestore.batch()
 
-            batch.update(memberDoc.reference, mapOf(
-                "uid" to realUid,
-                "isOffline" to false,
-                "claimedAt" to now,
-                "claimedBy" to uid
-            ))
-
             if (existingMemberDoc.exists()) {
-                batch.delete(existingMemberDoc.reference)
+                // Target user already has a member doc (e.g. joined via invite code)
+                // Keep existing doc, just delete the offline profile doc
+                batch.delete(memberDoc.reference)
+                val groupDocForCount = groupRef.get().await()
+                val currentCount = (groupDocForCount.data?.get("memberCount") as? Number)?.toLong() ?: 0L
+                if (currentCount > 0) {
+                    batch.update(groupRef, mapOf("memberCount" to currentCount - 1))
+                }
+            } else {
+                // No existing doc — create one with offline member's data
+                val linkedData = memberData.toMutableMap()
+                linkedData["uid"] = realUid
+                linkedData["isOffline"] = false
+                linkedData["claimedAt"] = now
+                linkedData["claimedBy"] = uid
+                batch.set(groupRef.collection("members").document(realUid), linkedData)
+                batch.delete(memberDoc.reference)
             }
 
             batch.set(groupRef.collection("activities").document(), mapOf(
@@ -716,6 +737,7 @@ class FirebaseGroupServiceImpl @Inject constructor(
             batch.commit().await()
 
             migrateMemberReferences(groupId, memberDocId, realUid)
+            recalculateBalances(groupId)
 
             Result.success(Unit)
         } catch (e: Exception) {
@@ -766,5 +788,50 @@ class FirebaseGroupServiceImpl @Inject constructor(
 
             if (changed) batch.commit().await()
         }
+    }
+
+    private suspend fun recalculateBalances(groupId: String) {
+        val groupRef = firestore.collection("groups").document(groupId)
+
+        val expensesSnapshot = groupRef.collection("expenses").get().await()
+        val settlementsSnapshot = groupRef.collection("settlements").get().await()
+        val membersSnapshot = groupRef.collection("members").whereEqualTo("status", "active").get().await()
+
+        val memberUids = membersSnapshot.documents.map { it.id }
+
+        val expenses = expensesSnapshot.documents.map { doc ->
+            val data = doc.data ?: emptyMap()
+            @Suppress("UNCHECKED_CAST")
+            val splitsRaw = data["splits"] as? Map<String, Map<String, Any>> ?: emptyMap()
+            Calculations.ExpenseBalanceData(
+                paidBy = data["paidBy"] as? String ?: "",
+                splits = splitsRaw.mapValues { (_, v) ->
+                    SplitEntry(
+                        amount = (v["amount"] as? Number)?.toDouble() ?: 0.0,
+                        shareValue = (v["shareValue"] as? Number)?.toDouble() ?: 0.0
+                    )
+                },
+                amount = (data["amount"] as? Number)?.toDouble() ?: 0.0,
+                exchangeRateToBase = (data["exchangeRateToBase"] as? Number)?.toDouble() ?: 1.0
+            )
+        }
+
+        val settlements = settlementsSnapshot.documents.map { doc ->
+            val data = doc.data ?: emptyMap()
+            Triple(
+                data["fromUid"] as? String ?: "",
+                data["toUid"] as? String ?: "",
+                (data["amount"] as? Number)?.toDouble() ?: 0.0
+            )
+        }
+
+        val balances = Calculations.calculateBalances(expenses, settlements, memberUids)
+
+        val batch = firestore.batch()
+        balances.forEach { (memberUid, balance) ->
+            val roundedBalance = kotlin.math.round(balance * 100) / 100
+            batch.update(groupRef.collection("members").document(memberUid), mapOf("balance" to roundedBalance))
+        }
+        batch.commit().await()
     }
 }

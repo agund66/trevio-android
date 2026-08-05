@@ -99,8 +99,34 @@ class HomeViewModel @Inject constructor(
                     _state.value = _state.value.copy(
                         isLoading = false,
                         error = e.message,
-                        userDisplayName = user?.displayName ?: ""
+                        userDisplayName = _state.value.userDisplayName
                     )
+                }
+        }
+    }
+
+    fun refreshGroups() {
+        viewModelScope.launch {
+            val user = authService.getCurrentUser()
+            groupService.getUserGroups()
+                .onSuccess { groups ->
+                    val totalOwed = groups.filter { it.yourBalance > 0 }.sumOf { it.yourBalance }
+                    val totalOwing = groups.filter { it.yourBalance < 0 }.sumOf { -it.yourBalance }
+                    val totalExpenses = groups.sumOf { it.totalExpenses }
+                    val activeGroups = groups.count { !it.archived }
+                    _state.value = _state.value.copy(
+                        groups = groups,
+                        totalOwed = totalOwed,
+                        totalOwing = totalOwing,
+                        netBalance = totalOwed - totalOwing,
+                        totalExpenses = totalExpenses,
+                        activeGroups = activeGroups,
+                        userDisplayName = user?.displayName ?: _state.value.userDisplayName,
+                        error = null
+                    )
+                }
+                .onFailure { e ->
+                    _state.value = _state.value.copy(error = e.message)
                 }
         }
     }
@@ -130,7 +156,7 @@ fun HomeScreen(
 
     LaunchedEffect(needsRefresh) {
         if (needsRefresh) {
-            viewModel.loadGroups()
+            viewModel.refreshGroups()
             navController.currentBackStackEntry?.savedStateHandle?.set("needsRefresh", false)
         }
     }

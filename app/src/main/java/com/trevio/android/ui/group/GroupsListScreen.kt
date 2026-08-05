@@ -71,6 +71,18 @@ class GroupsListViewModel @Inject constructor(
                 }
         }
     }
+
+    fun refreshGroups() {
+        viewModelScope.launch {
+            groupService.getUserGroups()
+                .onSuccess { groups ->
+                    _state.value = _state.value.copy(groups = groups, error = null)
+                }
+                .onFailure { e ->
+                    _state.value = _state.value.copy(error = e.message)
+                }
+        }
+    }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -89,7 +101,7 @@ fun GroupsListScreen(
 
     LaunchedEffect(needsRefresh) {
         if (needsRefresh) {
-            viewModel.loadGroups()
+            viewModel.refreshGroups()
             navController.currentBackStackEntry?.savedStateHandle?.set("needsRefresh", false)
         }
     }

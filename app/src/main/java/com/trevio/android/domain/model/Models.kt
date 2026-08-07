@@ -1,6 +1,6 @@
 package com.trevio.android.domain.model
 
-enum class SplitType { EQUAL, EXACT, PERCENT, SHARES }
+enum class SplitType { EQUAL, EXACT, PERCENT, SHARES, ITEMIZED }
 enum class GroupTemplate { TRIP, TURF, CASUAL }
 enum class MemberRole { ADMIN, MEMBER }
 enum class MemberStatus { ACTIVE, LEFT }
@@ -63,6 +63,21 @@ data class SplitEntry(
     val shareValue: Double = 0.0
 )
 
+data class BillItem(
+    val itemId: String = "",
+    val name: String = "",
+    val amount: Double = 0.0,
+    val assignedTo: List<String> = emptyList()
+)
+
+data class ItemizedSplitData(
+    val items: List<BillItem> = emptyList(),
+    val taxAmount: Double = 0.0,
+    val tipAmount: Double = 0.0,
+    val taxSplitMode: String = "proportional",
+    val tipSplitMode: String = "proportional"
+)
+
 data class Expense(
     val expenseId: String = "",
     val description: String = "",
@@ -77,7 +92,8 @@ data class Expense(
     val createdBy: String = "",
     val exchangeRateToBase: Double = 1.0,
     val note: String = "",
-    val recurring: RecurringConfig? = null
+    val recurring: RecurringConfig? = null,
+    val itemizedData: ItemizedSplitData? = null
 )
 
 data class Settlement(

@@ -1,6 +1,7 @@
 package com.trevio.android.domain.repository
 
 import com.trevio.android.domain.model.Expense
+import com.trevio.android.domain.model.ItemizedSplitData
 import com.trevio.android.domain.model.RecurringConfig
 import com.trevio.android.domain.model.SplitEntry
 import com.trevio.android.domain.model.SplitType
@@ -18,7 +19,8 @@ interface ExpenseService {
         category: String,
         date: Long,
         note: String = "",
-        recurring: RecurringConfig? = null
+        recurring: RecurringConfig? = null,
+        itemizedData: ItemizedSplitData? = null
     ): Result<String>
 
     suspend fun updateExpense(
@@ -33,7 +35,8 @@ interface ExpenseService {
         memberUids: List<String>,
         category: String,
         date: Long,
-        note: String = ""
+        note: String = "",
+        itemizedData: ItemizedSplitData? = null
     ): Result<Unit>
 
     suspend fun deleteExpense(groupId: String, expenseId: String): Result<Unit>

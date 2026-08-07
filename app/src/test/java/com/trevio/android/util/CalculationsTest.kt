@@ -1,6 +1,8 @@
 package com.trevio.android.util
 
 import com.google.common.truth.Truth.assertThat
+import com.trevio.android.domain.model.BillItem
+import com.trevio.android.domain.model.ItemizedSplitData
 import com.trevio.android.domain.model.SplitEntry
 import com.trevio.android.domain.model.SplitType
 import org.junit.Test
@@ -1146,5 +1148,163 @@ class CalculationsTest {
         val longFirst = "A".repeat(100)
         val longLast = "B".repeat(100)
         assertThat(Calculations.generateBaseUsername(longFirst, longLast)).isEqualTo("${longFirst.lowercase()}.${longLast.lowercase()}")
+    }
+
+    // ─── ITEMIZED SPLIT TESTS ─────────────────────────────────────
+
+    private fun mkItemized(
+        items: List<Triple<String, Double, List<String>>>,
+        tax: Double = 0.0,
+        tip: Double = 0.0,
+        taxMode: String = "proportional",
+        tipMode: String = "proportional"
+    ): ItemizedSplitData {
+        return ItemizedSplitData(
+            items = items.mapIndexed { i, (name, amount, assigned) ->
+                BillItem(itemId = "item_$i", name = name, amount = amount, assignedTo = assigned)
+            },
+            taxAmount = tax,
+            tipAmount = tip,
+            taxSplitMode = taxMode,
+            tipSplitMode = tipMode
+        )
+    }
+
+    @Test
+    fun itemized_emptyItems_returnsZeros() {
+        val result = Calculations.calculateSplits(0.0, SplitType.ITEMIZED, listOf("u1", "u2"), itemizedData = mkItemized(emptyList()))
+        assertThat(result["u1"]?.amount).isEqualTo(0.0)
+        assertThat(result["u2"]?.amount).isEqualTo(0.0)
+    }
+
+    @Test
+    fun itemized_undefinedData_returnsZeros() {
+        val result = Calculations.calculateSplits(0.0, SplitType.ITEMIZED, listOf("u1", "u2"), itemizedData = null)
+        assertThat(result["u1"]?.amount).isEqualTo(0.0)
+        assertThat(result["u2"]?.amount).isEqualTo(0.0)
+    }
+
+    @Test
+    fun itemized_singleItemTwoPeople() {
+        val data = mkItemized(listOf(Triple("Pizza", 100.0, listOf("u1", "u2"))))
+        val result = Calculations.calculateSplits(100.0, SplitType.ITEMIZED, listOf("u1", "u2"), itemizedData = data)
+        assertThat(result["u1"]?.amount).isEqualTo(50.0)
+        assertThat(result["u2"]?.amount).isEqualTo(50.0)
+    }
+
+    @Test
+    fun itemized_assignedToSinglePerson() {
+        val data = mkItemized(listOf(Triple("Beer", 60.0, listOf("u1"))))
+        val result = Calculations.calculateSplits(60.0, SplitType.ITEMIZED, listOf("u1", "u2"), itemizedData = data)
+        assertThat(result["u1"]?.amount).isEqualTo(60.0)
+        assertThat(result["u2"]?.amount).isEqualTo(0.0)
+    }
+
+    @Test
+    fun itemized_multipleItems() {
+        val data = mkItemized(listOf(
+            Triple("Pizza", 300.0, listOf("u1", "u2", "u3")),
+            Triple("Beer", 100.0, listOf("u1")),
+            Triple("Salad", 150.0, listOf("u2", "u3"))
+        ))
+        val result = Calculations.calculateSplits(550.0, SplitType.ITEMIZED, listOf("u1", "u2", "u3"), itemizedData = data)
+        assertThat(result["u1"]?.amount).isWithin(0.01).of(200.0)
+        assertThat(result["u2"]?.amount).isWithin(0.01).of(175.0)
+        assertThat(result["u3"]?.amount).isWithin(0.01).of(175.0)
+    }
+
+    @Test
+    fun itemized_proportionalTax() {
+        val data = mkItemized(
+            listOf(Triple("Burger", 200.0, listOf("u1")), Triple("Salad", 100.0, listOf("u2"))),
+            tax = 30.0
+        )
+        val result = Calculations.calculateSplits(330.0, SplitType.ITEMIZED, listOf("u1", "u2"), itemizedData = data)
+        assertThat(result["u1"]?.amount).isWithin(0.01).of(220.0)
+        assertThat(result["u2"]?.amount).isWithin(0.01).of(110.0)
+    }
+
+    @Test
+    fun itemized_equalTax() {
+        val data = mkItemized(
+            listOf(Triple("Burger", 200.0, listOf("u1")), Triple("Salad", 100.0, listOf("u2"))),
+            tax = 30.0, taxMode = "equal"
+        )
+        val result = Calculations.calculateSplits(330.0, SplitType.ITEMIZED, listOf("u1", "u2"), itemizedData = data)
+        assertThat(result["u1"]?.amount).isWithin(0.01).of(215.0)
+        assertThat(result["u2"]?.amount).isWithin(0.01).of(115.0)
+    }
+
+    @Test
+    fun itemized_proportionalTip() {
+        val data = mkItemized(
+            listOf(Triple("Burger", 200.0, listOf("u1")), Triple("Salad", 100.0, listOf("u2"))),
+            tip = 15.0
+        )
+        val result = Calculations.calculateSplits(315.0, SplitType.ITEMIZED, listOf("u1", "u2"), itemizedData = data)
+        assertThat(result["u1"]?.amount).isWithin(0.01).of(210.0)
+        assertThat(result["u2"]?.amount).isWithin(0.01).of(105.0)
+    }
+
+    @Test
+    fun itemized_equalTip() {
+        val data = mkItemized(
+            listOf(Triple("Burger", 200.0, listOf("u1")), Triple("Salad", 100.0, listOf("u2"))),
+            tip = 15.0, tipMode = "equal"
+        )
+        val result = Calculations.calculateSplits(315.0, SplitType.ITEMIZED, listOf("u1", "u2"), itemizedData = data)
+        assertThat(result["u1"]?.amount).isWithin(0.01).of(207.5)
+        assertThat(result["u2"]?.amount).isWithin(0.01).of(107.5)
+    }
+
+    @Test
+    fun itemized_taxAndTipTogether() {
+        val data = mkItemized(
+            listOf(Triple("Pizza", 400.0, listOf("u1", "u2")), Triple("Beer", 100.0, listOf("u3"))),
+            tax = 50.0, tip = 30.0
+        )
+        val result = Calculations.calculateSplits(580.0, SplitType.ITEMIZED, listOf("u1", "u2", "u3"), itemizedData = data)
+        assertThat(result["u1"]?.amount).isWithin(0.01).of(232.0)
+        assertThat(result["u2"]?.amount).isWithin(0.01).of(232.0)
+        assertThat(result["u3"]?.amount).isWithin(0.01).of(116.0)
+    }
+
+    @Test
+    fun itemized_skipsUnassignedItems() {
+        val data = mkItemized(listOf(
+            Triple("Pizza", 100.0, listOf("u1")),
+            Triple("Unassigned", 50.0, emptyList())
+        ))
+        val result = Calculations.calculateSplits(100.0, SplitType.ITEMIZED, listOf("u1", "u2"), itemizedData = data)
+        assertThat(result["u1"]?.amount).isEqualTo(100.0)
+        assertThat(result["u2"]?.amount).isEqualTo(0.0)
+    }
+
+    @Test
+    fun itemized_sumEqualsGrandTotal() {
+        val data = mkItemized(
+            listOf(Triple("A", 120.0, listOf("u1", "u2")), Triple("B", 80.0, listOf("u3"))),
+            tax = 20.0, tip = 10.0
+        )
+        val result = Calculations.calculateSplits(230.0, SplitType.ITEMIZED, listOf("u1", "u2", "u3"), itemizedData = data)
+        val total = result.values.sumOf { it.amount }
+        assertThat(total).isWithin(0.01).of(230.0)
+    }
+
+    @Test
+    fun itemized_allItemsAllMembers_equalsEqualSplit() {
+        val data = mkItemized(listOf(Triple("Dinner", 300.0, listOf("u1", "u2", "u3"))))
+        val result = Calculations.calculateSplits(300.0, SplitType.ITEMIZED, listOf("u1", "u2", "u3"), itemizedData = data)
+        assertThat(result["u1"]?.amount).isEqualTo(100.0)
+        assertThat(result["u2"]?.amount).isEqualTo(100.0)
+        assertThat(result["u3"]?.amount).isEqualTo(100.0)
+    }
+
+    @Test
+    fun itemized_zeroItemsTotalWithTax_noCrash() {
+        val data = mkItemized(listOf(Triple("A", 100.0, emptyList())), tax = 30.0)
+        val result = Calculations.calculateSplits(0.0, SplitType.ITEMIZED, listOf("u1", "u2"), itemizedData = data)
+        assertThat(result["u1"]?.amount).isEqualTo(0.0)
+        assertThat(result["u2"]?.amount).isEqualTo(0.0)
     }
 }

@@ -25,6 +25,8 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.trevio.android.core.designsystem.components.TrevioHeader
+import com.trevio.android.domain.model.BillItem
+import com.trevio.android.domain.model.ItemizedSplitData
 import com.trevio.android.domain.model.SplitEntry
 import com.trevio.android.domain.model.SplitType
 import com.trevio.android.domain.repository.AuthService
@@ -82,7 +84,8 @@ class ExpenseViewModel @Inject constructor(
         category: String,
         date: Long = System.currentTimeMillis(),
         note: String = "",
-        recurring: com.trevio.android.domain.model.RecurringConfig? = null
+        recurring: com.trevio.android.domain.model.RecurringConfig? = null,
+        itemizedData: ItemizedSplitData? = null
     ) {
         _state.value = _state.value.copy(isLoading = true, error = null)
         viewModelScope.launch {
@@ -99,7 +102,8 @@ class ExpenseViewModel @Inject constructor(
                 category = category,
                 date = date,
                 note = note,
-                recurring = recurring
+                recurring = recurring,
+                itemizedData = itemizedData
             ).onSuccess {
                 _state.value = _state.value.copy(isLoading = false, saved = true)
             }.onFailure { e ->
@@ -133,6 +137,7 @@ fun AddExpenseScreen(
     var saveAndAddAnother by remember { mutableStateOf(false) }
     var note by remember { mutableStateOf("") }
     var isRecurring by remember { mutableStateOf(false) }
+    var itemizedData by remember { mutableStateOf(ItemizedSplitData()) }
 
     val dateFormatter = remember { SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()) }
     val todayStr = remember { dateFormatter.format(Date()) }
@@ -169,6 +174,7 @@ fun AddExpenseScreen(
                 expenseDateStr = todayStr
                 note = ""
                 isRecurring = false
+                itemizedData = ItemizedSplitData()
                 saveAndAddAnother = false
             } else {
                 navController.popBackStack()
@@ -216,8 +222,12 @@ fun AddExpenseScreen(
         }
     }
 
-    val isSplitValid = remember(splitType, splitValues.toMap(), amount, includedMembers, splitSummary) {
+    val isSplitValid = remember(splitType, splitValues.toMap(), amount, includedMembers, splitSummary, itemizedData) {
         if (splitType == SplitType.EQUAL) includedMembers.isNotEmpty()
+        else if (splitType == SplitType.ITEMIZED) {
+            if (itemizedData.items.isEmpty()) false
+            else itemizedData.items.all { it.name.isNotBlank() && it.amount > 0.0 && it.assignedTo.isNotEmpty() }
+        }
         else if (amount <= 0.0 || includedMembers.isEmpty()) false
         else if (splitType == SplitType.SHARES) {
             splitValues.values.any { (it.toDoubleOrNull() ?: 0.0) > 0.0 }
@@ -226,7 +236,7 @@ fun AddExpenseScreen(
     }
 
     val buildSplits: () -> Map<String, SplitEntry> = {
-        if (splitType == SplitType.EQUAL) emptyMap()
+        if (splitType == SplitType.EQUAL || splitType == SplitType.ITEMIZED) emptyMap()
         else {
             val result = mutableMapOf<String, SplitEntry>()
             for (m in includedMembers) {
@@ -433,7 +443,17 @@ fun AddExpenseScreen(
                 }
             }
 
-            if (splitType != SplitType.EQUAL && amount > 0.0 && includedMembers.isNotEmpty()) {
+            if (splitType == SplitType.ITEMIZED && activeMembers.isNotEmpty()) {
+                Spacer(modifier = Modifier.height(12.dp))
+                ItemizedSplitEditor(
+                    members = activeMembers,
+                    currencySymbol = currencySymbol,
+                    itemizedData = itemizedData,
+                    onItemizedDataChange = { itemizedData = it }
+                )
+            }
+
+            if (splitType != SplitType.EQUAL && splitType != SplitType.ITEMIZED && amount > 0.0 && includedMembers.isNotEmpty()) {
                 Spacer(modifier = Modifier.height(12.dp))
                 Card(
                     modifier = Modifier.fillMaxWidth(),
@@ -566,7 +586,8 @@ fun AddExpenseScreen(
                                 category = category,
                                 date = expenseDateMillis,
                                 note = note,
-                                recurring = if (isRecurring) com.trevio.android.domain.model.RecurringConfig(frequency = com.trevio.android.domain.model.RecurringFrequency.MONTHLY) else null
+                                recurring = if (isRecurring) com.trevio.android.domain.model.RecurringConfig(frequency = com.trevio.android.domain.model.RecurringFrequency.MONTHLY) else null,
+                                itemizedData = if (splitType == SplitType.ITEMIZED) itemizedData else null
                             )
                         }
                     },
@@ -594,7 +615,8 @@ fun AddExpenseScreen(
                                 category = category,
                                 date = expenseDateMillis,
                                 note = note,
-                                recurring = if (isRecurring) com.trevio.android.domain.model.RecurringConfig(frequency = com.trevio.android.domain.model.RecurringFrequency.MONTHLY) else null
+                                recurring = if (isRecurring) com.trevio.android.domain.model.RecurringConfig(frequency = com.trevio.android.domain.model.RecurringFrequency.MONTHLY) else null,
+                                itemizedData = if (splitType == SplitType.ITEMIZED) itemizedData else null
                             )
                         }
                     },

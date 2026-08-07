@@ -3,7 +3,9 @@ package com.trevio.android.data.remote
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.Query
+import com.trevio.android.domain.model.BillItem
 import com.trevio.android.domain.model.Expense
+import com.trevio.android.domain.model.ItemizedSplitData
 import com.trevio.android.domain.model.RecurringConfig
 import com.trevio.android.domain.model.RecurringFrequency
 import com.trevio.android.domain.model.SplitEntry
@@ -34,7 +36,8 @@ class FirebaseExpenseServiceImpl @Inject constructor(
         category: String,
         date: Long,
         note: String,
-        recurring: RecurringConfig?
+        recurring: RecurringConfig?,
+        itemizedData: ItemizedSplitData?
     ): Result<String> {
         return try {
             val uid = auth.currentUser?.uid ?: return Result.failure(Exception("User not authenticated"))
@@ -49,7 +52,7 @@ class FirebaseExpenseServiceImpl @Inject constructor(
             val memberDoc = groupRef.collection("members").document(uid).get().await()
             if (!memberDoc.exists()) return Result.failure(Exception("You are not a member of this group"))
 
-            val calculatedSplits = Calculations.calculateSplits(amount, splitType, memberUids, splits)
+            val calculatedSplits = Calculations.calculateSplits(amount, splitType, memberUids, splits, itemizedData)
             val exchangeRateToBase = exchangeRateService.getRateToBase(currency).getOrDefault(1.0)
             val now = System.currentTimeMillis()
             val expenseDate = if (date > 0) date else now
@@ -77,6 +80,22 @@ class FirebaseExpenseServiceImpl @Inject constructor(
                     "endDate" to (recurring.endDate ?: 0L),
                     "nextDueDate" to (recurring.nextDueDate ?: 0L),
                     "parentExpenseId" to (recurring.parentExpenseId ?: "")
+                )
+            }
+            if (itemizedData != null) {
+                expenseData["itemizedData"] = mapOf(
+                    "items" to itemizedData.items.map { item ->
+                        mapOf(
+                            "itemId" to item.itemId,
+                            "name" to item.name,
+                            "amount" to item.amount,
+                            "assignedTo" to item.assignedTo
+                        )
+                    },
+                    "taxAmount" to itemizedData.taxAmount,
+                    "tipAmount" to itemizedData.tipAmount,
+                    "taxSplitMode" to itemizedData.taxSplitMode,
+                    "tipSplitMode" to itemizedData.tipSplitMode
                 )
             }
 
@@ -158,7 +177,8 @@ class FirebaseExpenseServiceImpl @Inject constructor(
         memberUids: List<String>,
         category: String,
         date: Long,
-        note: String
+        note: String,
+        itemizedData: ItemizedSplitData?
     ): Result<Unit> {
         return try {
             val uid = auth.currentUser?.uid ?: return Result.failure(Exception("User not authenticated"))
@@ -199,9 +219,25 @@ class FirebaseExpenseServiceImpl @Inject constructor(
 
             if (memberUids.isNotEmpty()) {
                 updateData["splitType"] = splitType.name.lowercase()
-                val calculatedSplits = Calculations.calculateSplits(effectiveAmount, splitType, memberUids, splits)
+                val calculatedSplits = Calculations.calculateSplits(effectiveAmount, splitType, memberUids, splits, itemizedData)
                 updateData["splits"] = calculatedSplits.mapValues { (_, v) ->
                     mapOf("amount" to v.amount, "shareValue" to v.shareValue)
+                }
+                if (itemizedData != null) {
+                    updateData["itemizedData"] = mapOf(
+                        "items" to itemizedData.items.map { item ->
+                            mapOf(
+                                "itemId" to item.itemId,
+                                "name" to item.name,
+                                "amount" to item.amount,
+                                "assignedTo" to item.assignedTo
+                            )
+                        },
+                        "taxAmount" to itemizedData.taxAmount,
+                        "tipAmount" to itemizedData.tipAmount,
+                        "taxSplitMode" to itemizedData.taxSplitMode,
+                        "tipSplitMode" to itemizedData.tipSplitMode
+                    )
                 }
             }
 
@@ -339,6 +375,26 @@ class FirebaseExpenseServiceImpl @Inject constructor(
                             endDate = (r["endDate"] as? Number)?.toLong(),
                             nextDueDate = (r["nextDueDate"] as? Number)?.toLong(),
                             parentExpenseId = r["parentExpenseId"] as? String
+                        )
+                    },
+                    itemizedData = (data["itemizedData"] as? Map<*, *>)?.let { id ->
+                        @Suppress("UNCHECKED_CAST")
+                        val itemsRaw = id["items"] as? List<Map<String, Any>> ?: emptyList()
+                        ItemizedSplitData(
+                            items = itemsRaw.map { item ->
+                                @Suppress("UNCHECKED_CAST")
+                                val assignedTo = (item["assignedTo"] as? List<String>) ?: emptyList()
+                                BillItem(
+                                    itemId = item["itemId"] as? String ?: "",
+                                    name = item["name"] as? String ?: "",
+                                    amount = (item["amount"] as? Number)?.toDouble() ?: 0.0,
+                                    assignedTo = assignedTo
+                                )
+                            },
+                            taxAmount = (id["taxAmount"] as? Number)?.toDouble() ?: 0.0,
+                            tipAmount = (id["tipAmount"] as? Number)?.toDouble() ?: 0.0,
+                            taxSplitMode = id["taxSplitMode"] as? String ?: "proportional",
+                            tipSplitMode = id["tipSplitMode"] as? String ?: "proportional"
                         )
                     }
                 )

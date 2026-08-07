@@ -1,5 +1,6 @@
 package com.trevio.android.util
 
+import com.trevio.android.domain.model.ItemizedSplitData
 import com.trevio.android.domain.model.SplitEntry
 import com.trevio.android.domain.model.SplitType
 import kotlin.math.round
@@ -10,7 +11,8 @@ object Calculations {
         totalAmount: Double,
         splitType: SplitType,
         memberUids: List<String>,
-        splits: Map<String, SplitEntry> = emptyMap()
+        splits: Map<String, SplitEntry> = emptyMap(),
+        itemizedData: ItemizedSplitData? = null
     ): Map<String, SplitEntry> {
         val result = mutableMapOf<String, SplitEntry>()
 
@@ -61,6 +63,78 @@ object Calculations {
                         } else {
                             result[uid] = SplitEntry(amount = amount, shareValue = shares)
                             allocated += amount
+                        }
+                    }
+                }
+            }
+
+            SplitType.ITEMIZED -> {
+                if (itemizedData == null || itemizedData.items.isEmpty()) {
+                    memberUids.forEach { uid ->
+                        result[uid] = SplitEntry(amount = 0.0)
+                    }
+                } else {
+                    val memberTotals = mutableMapOf<String, Double>()
+                    memberUids.forEach { memberTotals[it] = 0.0 }
+
+                    for (item in itemizedData.items) {
+                        if (item.assignedTo.isEmpty()) continue
+                        val perPerson = item.amount / item.assignedTo.size
+                        for (uid in item.assignedTo) {
+                            if (memberTotals.containsKey(uid)) {
+                                memberTotals[uid] = memberTotals[uid]!! + perPerson
+                            }
+                        }
+                    }
+
+                    val itemsTotal = itemizedData.items
+                        .filter { it.assignedTo.isNotEmpty() }
+                        .sumOf { it.amount }
+
+                    val taxAmt = itemizedData.taxAmount
+                    if (taxAmt > 0 && itemsTotal > 0) {
+                        val taxMode = itemizedData.taxSplitMode
+                        val membersWithItems = memberUids.filter { (memberTotals[it] ?: 0.0) > 0 }
+                        if (taxMode == "proportional" && itemsTotal > 0) {
+                            for (uid in memberUids) {
+                                val proportion = (memberTotals[uid] ?: 0.0) / itemsTotal
+                                memberTotals[uid] = (memberTotals[uid] ?: 0.0) + taxAmt * proportion
+                            }
+                        } else {
+                            val taxPerPerson = taxAmt / maxOf(membersWithItems.size, 1)
+                            for (uid in membersWithItems) {
+                                memberTotals[uid] = (memberTotals[uid] ?: 0.0) + taxPerPerson
+                            }
+                        }
+                    }
+
+                    val tipAmt = itemizedData.tipAmount
+                    if (tipAmt > 0 && itemsTotal > 0) {
+                        val tipMode = itemizedData.tipSplitMode
+                        val membersWithItems = memberUids.filter { (memberTotals[it] ?: 0.0) > 0 }
+                        if (tipMode == "proportional" && itemsTotal > 0) {
+                            for (uid in memberUids) {
+                                val proportion = (memberTotals[uid] ?: 0.0) / (itemsTotal + taxAmt)
+                                memberTotals[uid] = (memberTotals[uid] ?: 0.0) + tipAmt * proportion
+                            }
+                        } else {
+                            val tipPerPerson = tipAmt / maxOf(membersWithItems.size, 1)
+                            for (uid in membersWithItems) {
+                                memberTotals[uid] = (memberTotals[uid] ?: 0.0) + tipPerPerson
+                            }
+                        }
+                    }
+
+                    val totalToSplit = itemsTotal + (if (itemsTotal > 0) taxAmt else 0.0) + (if (itemsTotal > 0) tipAmt else 0.0)
+                    var allocated = 0.0
+                    memberUids.forEachIndexed { index, uid ->
+                        val rawAmount = memberTotals[uid] ?: 0.0
+                        if (index == memberUids.size - 1) {
+                            result[uid] = SplitEntry(amount = round((totalToSplit - allocated) * 100) / 100)
+                        } else {
+                            val rounded = round(rawAmount * 100) / 100
+                            result[uid] = SplitEntry(amount = rounded)
+                            allocated += rounded
                         }
                     }
                 }

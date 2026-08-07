@@ -9,6 +9,7 @@ import com.trevio.android.data.remote.FirebaseExpenseServiceImpl
 import com.trevio.android.data.remote.FirebaseGroupServiceImpl
 import com.trevio.android.data.remote.FirebaseNotificationServiceImpl
 import com.trevio.android.data.remote.FirebaseSettlementServiceImpl
+import com.trevio.android.data.remote.FirebaseTripServiceImpl
 import com.trevio.android.data.remote.FirebaseUserServiceImpl
 import com.trevio.android.domain.repository.AdminService
 import com.trevio.android.domain.repository.AnalyticsService
@@ -19,6 +20,7 @@ import com.trevio.android.domain.repository.ExpenseService
 import com.trevio.android.domain.repository.GroupService
 import com.trevio.android.domain.repository.NotificationService
 import com.trevio.android.domain.repository.SettlementService
+import com.trevio.android.domain.repository.TripService
 import com.trevio.android.domain.repository.UserService
 import dagger.Binds
 import dagger.Module
@@ -69,4 +71,8 @@ abstract class ServiceModule {
     @Binds
     @Singleton
     abstract fun bindAnalyticsService(impl: FirebaseAnalyticsService): AnalyticsService
+
+    @Binds
+    @Singleton
+    abstract fun bindTripService(impl: FirebaseTripServiceImpl): TripService
 }

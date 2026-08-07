@@ -9,8 +9,9 @@ import com.trevio.android.domain.model.UserAnalytics
 import com.trevio.android.domain.repository.AnalyticsService
 import com.trevio.android.util.computeGroupAnalytics
 import kotlinx.coroutines.tasks.await
+import javax.inject.Inject
 
-class FirebaseAnalyticsService : AnalyticsService {
+class FirebaseAnalyticsService @Inject constructor() : AnalyticsService {
 
     private val db = FirebaseFirestore.getInstance()
 

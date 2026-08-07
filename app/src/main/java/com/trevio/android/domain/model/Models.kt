@@ -244,3 +244,44 @@ data class UserAnalytics(
     val monthlyTrends: List<MonthlyTrend> = emptyList(),
     val topGroups: List<TopGroupSpending> = emptyList()
 )
+
+data class TripItineraryItem(
+    val itemId: String = "",
+    val title: String = "",
+    val description: String = "",
+    val date: Long = 0,
+    val location: String = "",
+    val latitude: Double = 0.0,
+    val longitude: Double = 0.0,
+    val category: String = "other",
+    val estimatedCost: Double = 0.0,
+    val assignedTo: List<String> = emptyList(),
+    val completed: Boolean = false
+)
+
+data class TripDay(
+    val date: Long = 0,
+    val label: String = "",
+    val items: List<TripItineraryItem> = emptyList(),
+    val totalEstimatedCost: Double = 0.0
+)
+
+data class TripLocation(
+    val locationId: String = "",
+    val name: String = "",
+    val latitude: Double = 0.0,
+    val longitude: Double = 0.0,
+    val address: String = "",
+    val category: String = "other",
+    val visitedOn: Long = 0,
+    val expenseId: String = ""
+)
+
+data class TripData(
+    val startDate: Long = 0,
+    val endDate: Long = 0,
+    val destination: String = "",
+    val coverPhotoURL: String = "",
+    val itinerary: List<TripItineraryItem> = emptyList(),
+    val locations: List<TripLocation> = emptyList()
+)

@@ -15,6 +15,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.List
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
+import androidx.compose.material3.TabRowDefaults.tabIndicatorOffset
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -418,25 +419,64 @@ fun GroupDetailScreen(
             }
 
             item {
-                TabRow(
+                val membersTabIndex = if (isTrip) 4 else 3
+                val activityTabIndex = if (isTrip) 5 else 4
+                ScrollableTabRow(
                     selectedTabIndex = selectedTab,
-                    containerColor = MaterialTheme.colorScheme.surface
-                ) {
-                    Tab(selected = selectedTab == 0, onClick = { selectedTab = 0 }, text = { Text("Expenses") })
-                    Tab(selected = selectedTab == 1, onClick = { selectedTab = 1 }, text = { Text("Balances") })
-                    Tab(selected = selectedTab == 2, onClick = { selectedTab = 2 }, text = { Text("Insights") })
-                    if (isTrip) {
-                        Tab(selected = selectedTab == 3, onClick = { selectedTab = 3 }, text = { Text("Trip") })
+                    containerColor = MaterialTheme.colorScheme.surface,
+                    edgePadding = 0.dp,
+                    divider = {},
+                    indicator = {
+                        TabRowDefaults.SecondaryIndicator(
+                            Modifier.tabIndicatorOffset(it[selectedTab]),
+                            color = MaterialTheme.colorScheme.primary,
+                            height = 3.dp
+                        )
                     }
-                    val membersTabIndex = if (isTrip) 4 else 3
-                    val activityTabIndex = if (isTrip) 5 else 4
-                    Tab(selected = selectedTab == membersTabIndex, onClick = { selectedTab = membersTabIndex }, text = { Text("Members") })
-                    Tab(selected = selectedTab == activityTabIndex, onClick = {
-                        selectedTab = activityTabIndex
-                        if (state.activities.isEmpty() && !state.activitiesLoading) {
-                            viewModel.loadActivities()
-                        }
-                    }, text = { Text("Activity") })
+                ) {
+                    Tab(
+                        selected = selectedTab == 0,
+                        onClick = { selectedTab = 0 },
+                        text = { Text("Expenses", maxLines = 1) },
+                        icon = { Icon(Icons.Default.Receipt, contentDescription = null, modifier = Modifier.size(18.dp)) }
+                    )
+                    Tab(
+                        selected = selectedTab == 1,
+                        onClick = { selectedTab = 1 },
+                        text = { Text("Balances", maxLines = 1) },
+                        icon = { Icon(Icons.Default.AccountBalanceWallet, contentDescription = null, modifier = Modifier.size(18.dp)) }
+                    )
+                    Tab(
+                        selected = selectedTab == 2,
+                        onClick = { selectedTab = 2 },
+                        text = { Text("Insights", maxLines = 1) },
+                        icon = { Icon(Icons.Default.BarChart, contentDescription = null, modifier = Modifier.size(18.dp)) }
+                    )
+                    if (isTrip) {
+                        Tab(
+                            selected = selectedTab == 3,
+                            onClick = { selectedTab = 3 },
+                            text = { Text("Trip", maxLines = 1) },
+                            icon = { Icon(Icons.Default.Place, contentDescription = null, modifier = Modifier.size(18.dp)) }
+                        )
+                    }
+                    Tab(
+                        selected = selectedTab == membersTabIndex,
+                        onClick = { selectedTab = membersTabIndex },
+                        text = { Text("Members", maxLines = 1) },
+                        icon = { Icon(Icons.Default.Group, contentDescription = null, modifier = Modifier.size(18.dp)) }
+                    )
+                    Tab(
+                        selected = selectedTab == activityTabIndex,
+                        onClick = {
+                            selectedTab = activityTabIndex
+                            if (state.activities.isEmpty() && !state.activitiesLoading) {
+                                viewModel.loadActivities()
+                            }
+                        },
+                        text = { Text("Activity", maxLines = 1) },
+                        icon = { Icon(Icons.Default.Notifications, contentDescription = null, modifier = Modifier.size(18.dp)) }
+                    )
                 }
             }
 

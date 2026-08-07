@@ -1,9 +1,5 @@
 package com.trevio.android.ui.trip
 
-import android.widget.Toast
-import androidx.compose.foundation.background
-import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -15,15 +11,11 @@ import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.LocationOn
-import androidx.compose.material.icons.filled.Map
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextOverflow
@@ -32,12 +24,9 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.trevio.android.core.designsystem.components.MemberAvatar
 import com.trevio.android.domain.model.Member
 import com.trevio.android.domain.model.TripItineraryItem
 import com.trevio.android.domain.model.TripLocation
-import com.trevio.android.domain.repository.GroupInfo
-import com.trevio.android.domain.repository.GroupService
 import com.trevio.android.domain.repository.SettlementService
 import com.trevio.android.domain.repository.TripService
 import com.trevio.android.util.rememberCurrencyFormatter
@@ -51,7 +40,6 @@ import javax.inject.Inject
 class TripViewModel @Inject constructor(
     private val tripService: TripService,
     private val settlementService: SettlementService,
-    private val groupService: GroupService,
     savedStateHandle: SavedStateHandle
 ) : ViewModel() {
 
@@ -136,7 +124,6 @@ fun TripTab(
 ) {
     val state by viewModel.state.collectAsState()
     val currencyFormatter = rememberCurrencyFormatter()
-    val context = LocalContext.current
     var showAddItem by remember { mutableStateOf(false) }
     var showAddLocation by remember { mutableStateOf(false) }
 

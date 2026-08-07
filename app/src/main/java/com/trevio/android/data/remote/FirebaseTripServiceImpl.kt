@@ -128,7 +128,20 @@ class FirebaseTripServiceImpl @Inject constructor() : TripService {
     override suspend fun updateItineraryItem(groupId: String, itemId: String, updates: TripItineraryItem): Result<Unit> {
         return try {
             val tripData = getTripData(groupId).getOrNull() ?: return Result.failure(Exception("Trip data not found"))
-            val itinerary = tripData.itinerary.map { if (it.itemId == itemId) updates else it }
+            val itinerary = tripData.itinerary.map {
+                if (it.itemId == itemId) it.copy(
+                    title = if (updates.title.isNotEmpty()) updates.title else it.title,
+                    description = if (updates.description.isNotEmpty()) updates.description else it.description,
+                    date = if (updates.date != 0L) updates.date else it.date,
+                    location = if (updates.location.isNotEmpty()) updates.location else it.location,
+                    latitude = if (updates.latitude != 0.0) updates.latitude else it.latitude,
+                    longitude = if (updates.longitude != 0.0) updates.longitude else it.longitude,
+                    category = if (updates.category.isNotEmpty()) updates.category else it.category,
+                    estimatedCost = if (updates.estimatedCost != 0.0) updates.estimatedCost else it.estimatedCost,
+                    assignedTo = if (updates.assignedTo.isNotEmpty()) updates.assignedTo else it.assignedTo,
+                    completed = updates.completed
+                ) else it
+            }
             updateTripData(groupId, tripData.copy(itinerary = itinerary))
             Result.success(Unit)
         } catch (e: Exception) {

@@ -64,7 +64,6 @@ fun ItemizedSplitEditor(
     }
 
     fun assignAll(itemId: String) {
-        val item = itemizedData.items.find { it.itemId != itemId } ?: return
         val target = itemizedData.items.find { it.itemId == itemId } ?: return
         updateItem(itemId, target.copy(assignedTo = activeMembers.map { it.uid }))
     }

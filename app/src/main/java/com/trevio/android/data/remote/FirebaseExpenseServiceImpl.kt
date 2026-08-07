@@ -1,6 +1,7 @@
 package com.trevio.android.data.remote
 
 import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.Query
 import com.trevio.android.domain.model.BillItem
@@ -238,6 +239,8 @@ class FirebaseExpenseServiceImpl @Inject constructor(
                         "taxSplitMode" to itemizedData.taxSplitMode,
                         "tipSplitMode" to itemizedData.tipSplitMode
                     )
+                } else if (splitType != SplitType.ITEMIZED) {
+                    updateData["itemizedData"] = FieldValue.delete()
                 }
             }
 

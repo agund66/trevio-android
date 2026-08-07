@@ -45,6 +45,7 @@ import com.trevio.android.domain.repository.GroupInfo
 import com.trevio.android.domain.repository.GroupService
 import com.trevio.android.domain.repository.SettlementService
 import com.trevio.android.domain.repository.UserService
+import com.trevio.android.ui.analytics.AnalyticsTab
 import com.trevio.android.util.rememberCurrencyFormatter
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -420,9 +421,10 @@ fun GroupDetailScreen(
                 ) {
                     Tab(selected = selectedTab == 0, onClick = { selectedTab = 0 }, text = { Text("Expenses") })
                     Tab(selected = selectedTab == 1, onClick = { selectedTab = 1 }, text = { Text("Balances") })
-                    Tab(selected = selectedTab == 2, onClick = { selectedTab = 2 }, text = { Text("Members") })
-                    Tab(selected = selectedTab == 3, onClick = {
-                        selectedTab = 3
+                    Tab(selected = selectedTab == 2, onClick = { selectedTab = 2 }, text = { Text("Insights") })
+                    Tab(selected = selectedTab == 3, onClick = { selectedTab = 3 }, text = { Text("Members") })
+                    Tab(selected = selectedTab == 4, onClick = {
+                        selectedTab = 4
                         if (state.activities.isEmpty() && !state.activitiesLoading) {
                             viewModel.loadActivities()
                         }
@@ -473,6 +475,14 @@ fun GroupDetailScreen(
                     )
                 }
                 2 -> item {
+                    AnalyticsTab(
+                        groupId = state.groupInfo?.groupId ?: "",
+                        groupName = state.groupInfo?.name ?: "Group",
+                        expenses = state.expenses,
+                        members = state.members
+                    )
+                }
+                3 -> item {
                     MembersTab(
                         members = state.members,
                         currentUserId = state.currentUserId,
@@ -485,7 +495,7 @@ fun GroupDetailScreen(
                         onAddOffline = { showAddOfflineDialog = true }
                     )
                 }
-                3 -> item {
+                4 -> item {
                     ActivityTab(
                         activities = state.activities,
                         settlements = state.settlements,

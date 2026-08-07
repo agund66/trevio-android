@@ -1,0 +1,77 @@
+package com.trevio.android.data.remote
+
+import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.firestore.Query
+import com.trevio.android.domain.model.Expense
+import com.trevio.android.domain.model.GroupAnalytics
+import com.trevio.android.domain.model.Member
+import com.trevio.android.domain.model.UserAnalytics
+import com.trevio.android.domain.repository.AnalyticsService
+import com.trevio.android.util.computeGroupAnalytics
+import kotlinx.coroutines.tasks.await
+
+class FirebaseAnalyticsService : AnalyticsService {
+
+    private val db = FirebaseFirestore.getInstance()
+
+    override suspend fun getGroupAnalytics(groupId: String): Result<GroupAnalytics> {
+        return try {
+            val expensesRef = db.collection("groups").document(groupId).collection("expenses")
+                .orderBy("date", Query.Direction.DESCENDING).limit(500)
+            val expenseSnapshot = expensesRef.get().await()
+
+            val expenses = expenseSnapshot.documents.map { doc ->
+                val data = doc.data ?: emptyMap()
+                @Suppress("UNCHECKED_CAST")
+                val splits = (data["splits"] as? Map<String, Map<String, Any>>)?.mapValues { (_, v) ->
+                    com.trevio.android.domain.model.SplitEntry(
+                        amount = (v["amount"] as? Number)?.toDouble() ?: 0.0,
+                        shareValue = (v["shareValue"] as? Number)?.toDouble() ?: 0.0
+                    )
+                } ?: emptyMap()
+
+                Expense(
+                    expenseId = doc.id,
+                    description = data["description"] as? String ?: "",
+                    amount = (data["amount"] as? Number)?.toDouble() ?: 0.0,
+                    currency = data["currency"] as? String ?: "INR",
+                    paidBy = data["paidBy"] as? String ?: "",
+                    splitType = com.trevio.android.domain.model.SplitType.valueOf(
+                        (data["splitType"] as? String ?: "EQUAL").uppercase()
+                    ),
+                    splits = splits,
+                    category = data["category"] as? String ?: "other",
+                    date = (data["date"] as? Number)?.toLong() ?: 0,
+                    createdBy = data["createdBy"] as? String ?: "",
+                    note = data["note"] as? String ?: ""
+                )
+            }
+
+            val membersRef = db.collection("groups").document(groupId).collection("members")
+            val membersSnapshot = membersRef.get().await()
+            val members = membersSnapshot.documents.map { doc ->
+                val data = doc.data ?: emptyMap()
+                Member(
+                    uid = doc.id,
+                    displayName = data["displayName"] as? String ?: "",
+                    username = data["username"] as? String ?: "",
+                    photoURL = data["photoURL"] as? String ?: "",
+                    balance = (data["balance"] as? Number)?.toDouble() ?: 0.0,
+                    role = data["role"] as? String ?: "member",
+                    status = data["status"] as? String ?: "active"
+                )
+            }
+
+            val groupDoc = db.collection("groups").document(groupId).get().await()
+            val groupName = groupDoc.getString("name") ?: groupId
+
+            Result.success(computeGroupAnalytics(groupId, groupName, expenses, members))
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    override suspend fun getUserAnalytics(): Result<UserAnalytics> {
+        return Result.success(UserAnalytics())
+    }
+}

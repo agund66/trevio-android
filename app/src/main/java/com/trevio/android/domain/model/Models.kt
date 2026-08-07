@@ -181,3 +181,66 @@ data class BroadcastRead(
     val uid: String = "",
     val readAt: Long = 0
 )
+
+data class CategoryBreakdown(
+    val category: String = "",
+    val totalAmount: Double = 0.0,
+    val expenseCount: Int = 0,
+    val percentage: Double = 0.0
+)
+
+data class MonthlyTrend(
+    val month: String = "",
+    val label: String = "",
+    val totalAmount: Double = 0.0,
+    val expenseCount: Int = 0
+)
+
+data class MemberSpending(
+    val uid: String = "",
+    val displayName: String = "",
+    val photoURL: String = "",
+    val totalPaid: Double = 0.0,
+    val totalShare: Double = 0.0,
+    val expenseCount: Int = 0,
+    val netBalance: Double = 0.0
+)
+
+data class HighestExpense(
+    val description: String = "",
+    val amount: Double = 0.0,
+    val date: Long = 0
+)
+
+data class GroupAnalytics(
+    val groupId: String = "",
+    val groupName: String = "",
+    val totalExpenses: Double = 0.0,
+    val expenseCount: Int = 0,
+    val categoryBreakdown: List<CategoryBreakdown> = emptyList(),
+    val monthlyTrends: List<MonthlyTrend> = emptyList(),
+    val memberSpending: List<MemberSpending> = emptyList(),
+    val avgExpenseAmount: Double = 0.0,
+    val highestExpense: HighestExpense? = null,
+    val recentActivityRate: Double = 0.0
+)
+
+data class TopGroupSpending(
+    val groupId: String = "",
+    val groupName: String = "",
+    val totalSpent: Double = 0.0,
+    val expenseCount: Int = 0
+)
+
+data class UserAnalytics(
+    val totalSpent: Double = 0.0,
+    val totalPaid: Double = 0.0,
+    val totalOwed: Double = 0.0,
+    val totalOwing: Double = 0.0,
+    val netBalance: Double = 0.0,
+    val groupCount: Int = 0,
+    val expenseCount: Int = 0,
+    val categoryBreakdown: List<CategoryBreakdown> = emptyList(),
+    val monthlyTrends: List<MonthlyTrend> = emptyList(),
+    val topGroups: List<TopGroupSpending> = emptyList()
+)

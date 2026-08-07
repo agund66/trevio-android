@@ -104,4 +104,9 @@ dependencies {
 
     // QR Code scanning (Google Play Services code scanner — no camera permission needed)
     implementation("com.google.android.gms:play-services-code-scanner:16.1.0")
+
+    // Testing
+    testImplementation("junit:junit:4.13.2")
+    testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.9.0")
+    testImplementation("com.google.truth:truth:1.4.4")
 }

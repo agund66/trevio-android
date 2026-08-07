@@ -1307,4 +1307,84 @@ class CalculationsTest {
         assertThat(result["u1"]?.amount).isEqualTo(0.0)
         assertThat(result["u2"]?.amount).isEqualTo(0.0)
     }
+
+    @Test
+    fun itemized_ignoresAssignedToUidNotInMemberUids() {
+        val data = mkItemized(listOf(Triple("A", 100.0, listOf("u1", "uX"))))
+        val result = Calculations.calculateSplits(100.0, SplitType.ITEMIZED, listOf("u1", "u2"), itemizedData = data)
+        assertThat(result["u1"]?.amount).isEqualTo(50.0)
+        assertThat(result["u2"]?.amount).isEqualTo(50.0)
+    }
+
+    @Test
+    fun itemized_memberWithNoItemsGetsZero() {
+        val data = mkItemized(listOf(
+            Triple("A", 100.0, listOf("u1")),
+            Triple("B", 200.0, listOf("u2"))
+        ))
+        val result = Calculations.calculateSplits(300.0, SplitType.ITEMIZED, listOf("u1", "u2", "u3"), itemizedData = data)
+        assertThat(result["u3"]?.amount).isEqualTo(0.0)
+    }
+
+    @Test
+    fun itemized_proportionalTax3MembersUnequal() {
+        val data = mkItemized(listOf(
+            Triple("A", 300.0, listOf("u1")),
+            Triple("B", 100.0, listOf("u2")),
+            Triple("C", 100.0, listOf("u3"))
+        ), tax = 50.0)
+        val result = Calculations.calculateSplits(550.0, SplitType.ITEMIZED, listOf("u1", "u2", "u3"), itemizedData = data)
+        assertThat(result["u1"]?.amount).isWithin(0.01).of(330.0)
+        assertThat(result["u2"]?.amount).isWithin(0.01).of(110.0)
+        assertThat(result["u3"]?.amount).isWithin(0.01).of(110.0)
+    }
+
+    @Test
+    fun itemized_equalTaxSkipsMembersWithNoItems() {
+        val data = mkItemized(listOf(
+            Triple("A", 200.0, listOf("u1")),
+            Triple("B", 100.0, listOf("u2"))
+        ), tax = 30.0, taxMode = "equal")
+        val result = Calculations.calculateSplits(330.0, SplitType.ITEMIZED, listOf("u1", "u2", "u3"), itemizedData = data)
+        assertThat(result["u1"]?.amount).isWithin(0.01).of(215.0)
+        assertThat(result["u2"]?.amount).isWithin(0.01).of(115.0)
+        assertThat(result["u3"]?.amount).isWithin(0.01).of(0.0)
+    }
+
+    @Test
+    fun itemized_proportionalTipBasedOnItemsPlusTax() {
+        val data = mkItemized(listOf(
+            Triple("A", 200.0, listOf("u1")),
+            Triple("B", 100.0, listOf("u2"))
+        ), tax = 30.0, tip = 15.0)
+        val result = Calculations.calculateSplits(345.0, SplitType.ITEMIZED, listOf("u1", "u2"), itemizedData = data)
+        assertThat(result["u1"]?.amount).isWithin(0.01).of(230.0)
+        assertThat(result["u2"]?.amount).isWithin(0.01).of(115.0)
+    }
+
+    @Test
+    fun itemized_sumEqualsGrandTotalWithTaxAndTip() {
+        val data = mkItemized(listOf(
+            Triple("A", 120.0, listOf("u1", "u2")),
+            Triple("B", 80.0, listOf("u3")),
+            Triple("C", 50.0, listOf("u1"))
+        ), tax = 20.0, tip = 10.0)
+        val grandTotal = 250.0 + 20.0 + 10.0
+        val result = Calculations.calculateSplits(grandTotal, SplitType.ITEMIZED, listOf("u1", "u2", "u3"), itemizedData = data)
+        val sum = result.values.sumOf { it.amount }
+        assertThat(sum).isWithin(0.01).of(grandTotal)
+    }
+
+    @Test
+    fun itemized_manyItemsWithVaryingAssignments() {
+        val items = (0 until 10).map { i ->
+            Triple("Item$i", (i + 1) * 10.0, if (i % 2 == 0) listOf("u1", "u2") else listOf("u2", "u3"))
+        }
+        val data = mkItemized(items, tax = 25.0, tip = 15.0)
+        val itemsTotal = items.sumOf { it.second }
+        val grandTotal = itemsTotal + 25.0 + 15.0
+        val result = Calculations.calculateSplits(grandTotal, SplitType.ITEMIZED, listOf("u1", "u2", "u3"), itemizedData = data)
+        val sum = result.values.sumOf { it.amount }
+        assertThat(sum).isWithin(0.01).of(grandTotal)
+    }
 }

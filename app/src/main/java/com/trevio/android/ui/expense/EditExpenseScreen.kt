@@ -19,6 +19,7 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.trevio.android.core.designsystem.components.TrevioHeader
+import com.trevio.android.domain.model.ItemizedSplitData
 import com.trevio.android.domain.model.SplitEntry
 import com.trevio.android.domain.model.SplitType
 import com.trevio.android.domain.repository.AuthService
@@ -56,6 +57,7 @@ class EditExpenseViewModel @Inject constructor(
         val paidByUid: String = "",
         val note: String = "",
         val splitValues: Map<String, String> = emptyMap(),
+        val itemizedData: ItemizedSplitData = ItemizedSplitData(),
         val isSaving: Boolean = false,
         val isDeleting: Boolean = false,
         val error: String? = null,
@@ -84,7 +86,7 @@ class EditExpenseViewModel @Inject constructor(
             val canEdit = expense.createdBy == uid || member?.role == "admin"
 
             val splitVals = mutableMapOf<String, String>()
-            if (expense.splitType != SplitType.EQUAL) {
+            if (expense.splitType != SplitType.EQUAL && expense.splitType != SplitType.ITEMIZED) {
                 for ((uid2, split) in expense.splits) {
                     splitVals[uid2] = if (split.shareValue > 0) split.shareValue.toString() else split.amount.toString()
                 }
@@ -103,6 +105,7 @@ class EditExpenseViewModel @Inject constructor(
                 paidByUid = expense.paidBy,
                 note = expense.note,
                 splitValues = splitVals,
+                itemizedData = expense.itemizedData ?: ItemizedSplitData(),
                 loaded = true
             )
         }
@@ -115,6 +118,7 @@ class EditExpenseViewModel @Inject constructor(
     fun updatePaidBy(v: String) { _state.value = _state.value.copy(paidByUid = v) }
     fun updateNote(v: String) { _state.value = _state.value.copy(note = v) }
     fun updateSplitValue(uid: String, v: String) { _state.value = _state.value.copy(splitValues = _state.value.splitValues + (uid to v.filter { it.isDigit() || it == '.' })) }
+    fun updateItemizedData(v: ItemizedSplitData) { _state.value = _state.value.copy(itemizedData = v) }
 
     fun save(onDone: () -> Unit) {
         val s = _state.value
@@ -123,11 +127,17 @@ class EditExpenseViewModel @Inject constructor(
             _state.value = s.copy(error = "Description and amount are required")
             return
         }
+        if (s.splitType == SplitType.ITEMIZED) {
+            if (s.itemizedData.items.isEmpty() || s.itemizedData.items.any { it.name.isBlank() || it.amount <= 0.0 || it.assignedTo.isEmpty() }) {
+                _state.value = s.copy(error = "All items must have a name, amount, and assigned member")
+                return
+            }
+        }
         _state.value = s.copy(isSaving = true, error = null)
         viewModelScope.launch {
             val activeMembers = s.members.filter { it.status == "active" }
             val splits = mutableMapOf<String, SplitEntry>()
-            if (s.splitType != SplitType.EQUAL) {
+            if (s.splitType != SplitType.EQUAL && s.splitType != SplitType.ITEMIZED) {
                 for (m in activeMembers) {
                     val v = s.splitValues[m.uid]?.toDoubleOrNull() ?: 0.0
                     if (v > 0) {
@@ -148,7 +158,8 @@ class EditExpenseViewModel @Inject constructor(
                 memberUids = activeMembers.map { it.uid },
                 category = s.category,
                 date = 0,
-                note = s.note
+                note = s.note,
+                itemizedData = if (s.splitType == SplitType.ITEMIZED) s.itemizedData else null
             ).onSuccess {
                 _state.value = s.copy(isSaving = false)
                 onDone()
@@ -223,6 +234,15 @@ fun EditExpenseScreen(
 
                 val activeMembers = state.members.filter { it.status == "active" }
 
+                val isSplitValid = when (state.splitType) {
+                    SplitType.EQUAL -> activeMembers.isNotEmpty()
+                    SplitType.ITEMIZED -> {
+                        state.itemizedData.items.isNotEmpty() &&
+                            state.itemizedData.items.all { it.name.isNotBlank() && it.amount > 0.0 && it.assignedTo.isNotEmpty() }
+                    }
+                    else -> state.amount.isNotBlank() && activeMembers.isNotEmpty()
+                }
+
                 OutlinedTextField(
                     value = state.amount,
                     onValueChange = { viewModel.updateAmount(it) },
@@ -283,7 +303,20 @@ fun EditExpenseScreen(
                     }
                 }
 
-                if (state.splitType != SplitType.EQUAL && activeMembers.isNotEmpty()) {
+                if (state.splitType == SplitType.ITEMIZED && activeMembers.isNotEmpty()) {
+                    val currencySymbol = remember(state.currency) {
+                        val symbols = mapOf("INR" to "\u20B9", "USD" to "$", "EUR" to "\u20AC", "GBP" to "\u00A3", "JPY" to "\u00A5", "AUD" to "A$", "CAD" to "C$", "SGD" to "S$", "AED" to "\u062F.\u0625")
+                        symbols[state.currency] ?: state.currency
+                    }
+                    ItemizedSplitEditor(
+                        members = activeMembers,
+                        currencySymbol = currencySymbol,
+                        itemizedData = state.itemizedData,
+                        onItemizedDataChange = { viewModel.updateItemizedData(it) }
+                    )
+                }
+
+                if (state.splitType != SplitType.EQUAL && state.splitType != SplitType.ITEMIZED && activeMembers.isNotEmpty()) {
                     Surface(shape = RoundedCornerShape(12.dp), tonalElevation = 1.dp) {
                         Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                             activeMembers.forEach { m ->
@@ -308,7 +341,7 @@ fun EditExpenseScreen(
 
                 Button(
                     onClick = { viewModel.save { navController.popBackStack() } },
-                    enabled = !state.isSaving && state.description.isNotBlank() && state.amount.isNotBlank(),
+                    enabled = !state.isSaving && state.description.isNotBlank() && state.amount.isNotBlank() && isSplitValid,
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     if (state.isSaving) CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp, color = MaterialTheme.colorScheme.onPrimary)

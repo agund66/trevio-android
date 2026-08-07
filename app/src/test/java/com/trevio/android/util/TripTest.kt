@@ -111,4 +111,77 @@ class TripTest {
         )
         assertThat(trip.endDate - trip.startDate).isEqualTo(7 * 24 * 60 * 60 * 1000L)
     }
+
+    // ─── Edge cases ──────────────────────────────────────────────
+
+    @Test
+    fun `empty itinerary and locations is valid`() {
+        val trip = TripData(destination = "Goa")
+        assertThat(trip.itinerary).isEmpty()
+        assertThat(trip.locations).isEmpty()
+    }
+
+    @Test
+    fun `itinerary items sort by date chronologically`() {
+        val items = listOf(
+            TripItineraryItem(itemId = "3", title = "Dinner", date = 1718520000000L),
+            TripItineraryItem(itemId = "1", title = "Breakfast", date = 1718433600000L),
+            TripItineraryItem(itemId = "2", title = "Lunch", date = 1718476800000L)
+        )
+        val sorted = items.sortedBy { it.date }
+        assertThat(sorted[0].title).isEqualTo("Breakfast")
+        assertThat(sorted[1].title).isEqualTo("Lunch")
+        assertThat(sorted[2].title).isEqualTo("Dinner")
+    }
+
+    @Test
+    fun `trip with only locations is valid`() {
+        val trip = TripData(
+            destination = "Goa",
+            itinerary = emptyList(),
+            locations = listOf(
+                TripLocation(locationId = "1", name = "Beach", latitude = 15.5, longitude = 73.8),
+                TripLocation(locationId = "2", name = "Hotel", latitude = 15.4, longitude = 73.9)
+            )
+        )
+        assertThat(trip.itinerary).isEmpty()
+        assertThat(trip.locations).hasSize(2)
+    }
+
+    @Test
+    fun `completed percentage calculation`() {
+        val items = listOf(
+            TripItineraryItem(itemId = "1", title = "A", completed = true),
+            TripItineraryItem(itemId = "2", title = "B", completed = false),
+            TripItineraryItem(itemId = "3", title = "C", completed = true),
+            TripItineraryItem(itemId = "4", title = "D", completed = true)
+        )
+        val completed = items.count { it.completed }
+        val pct = (completed.toDouble() / items.size) * 100
+        assertThat(pct).isEqualTo(75.0)
+    }
+
+    @Test
+    fun `location can be linked to an expense via expenseId`() {
+        val loc = TripLocation(
+            locationId = "loc_1",
+            name = "Restaurant",
+            category = "food",
+            visitedOn = System.currentTimeMillis(),
+            expenseId = "exp_123"
+        )
+        assertThat(loc.expenseId).isEqualTo("exp_123")
+    }
+
+    @Test
+    fun `itinerary item with assignedTo tracks participants`() {
+        val item = TripItineraryItem(
+            itemId = "i1",
+            title = "Safari",
+            estimatedCost = 1500.0,
+            assignedTo = listOf("u1", "u2", "u3")
+        )
+        assertThat(item.assignedTo).hasSize(3)
+        assertThat(item.assignedTo).contains("u2")
+    }
 }

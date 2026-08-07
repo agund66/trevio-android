@@ -235,4 +235,61 @@ class AnalyticsTest {
         assertThat(result.expenseCount).isEqualTo(0)
         assertThat(result.topGroups).isEmpty()
     }
+
+    // ─── Edge cases ──────────────────────────────────────────────
+
+    @Test
+    fun `computeCategoryBreakdown handles empty category as other`() {
+        val expenses = listOf(makeExpense("1", 100.0, "", "u1"))
+        val result = computeCategoryBreakdown(expenses)
+        assertThat(result).hasSize(1)
+        assertThat(result[0].category).isEqualTo("other")
+    }
+
+    @Test
+    fun `computeMemberSpending handles expense paid by non-member`() {
+        val members = listOf(makeMember("u1", "Alice"))
+        val expenses = listOf(makeExpense("1", 100.0, "food", "u2", mapOf("u1" to SplitEntry(100.0))))
+        val result = computeMemberSpending(expenses, members)
+        val alice = result.find { it.uid == "u1" }!!
+        assertThat(alice.totalPaid).isEqualTo(0.0)
+        assertThat(alice.totalShare).isEqualTo(100.0)
+    }
+
+    @Test
+    fun `computeMonthlyTrends ignores expenses older than 6 months`() {
+        val oldCal = java.util.Calendar.getInstance().apply { add(java.util.Calendar.MONTH, -8) }
+        val expenses = listOf(makeExpense("1", 500.0, "food", "u1", date = oldCal.timeInMillis))
+        val result = computeMonthlyTrends(expenses)
+        val totalAcrossMonths = result.sumOf { it.totalAmount }
+        assertThat(totalAcrossMonths).isEqualTo(0.0)
+    }
+
+    @Test
+    fun `computeCategoryBreakdown all same category returns 100 percent`() {
+        val expenses = listOf(
+            makeExpense("1", 100.0, "food", "u1"),
+            makeExpense("2", 200.0, "food", "u1")
+        )
+        val result = computeCategoryBreakdown(expenses)
+        assertThat(result).hasSize(1)
+        assertThat(result[0].percentage).isEqualTo(100.0)
+    }
+
+    @Test
+    fun `computeGroupAnalytics with single expense`() {
+        val expenses = listOf(makeExpense("1", 250.0, "food", "u1"))
+        val result = computeGroupAnalytics("g1", "Solo", expenses, emptyList())
+        assertThat(result.expenseCount).isEqualTo(1)
+        assertThat(result.avgExpenseAmount).isEqualTo(250.0)
+        assertThat(result.highestExpense!!.amount).isEqualTo(250.0)
+        assertThat(result.recentActivityRate).isEqualTo(100.0)
+    }
+
+    @Test
+    fun `computeMemberSpending preserves member balance from input`() {
+        val members = listOf(makeMember("u1", "Alice", balance = 75.5))
+        val result = computeMemberSpending(emptyList(), members)
+        assertThat(result[0].netBalance).isEqualTo(75.5)
+    }
 }

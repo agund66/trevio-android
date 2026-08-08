@@ -1,6 +1,7 @@
 package com.trevio.android.data.remote
 
 import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
 import com.trevio.android.domain.model.User
 import com.trevio.android.domain.model.UserSearchResult
@@ -45,6 +46,8 @@ class FirebaseUserServiceImpl @Inject constructor(
 
     override suspend fun updateUser(user: User): Result<Unit> {
         return try {
+            val uid = auth.currentUser?.uid ?: return Result.failure(Exception("User not authenticated"))
+            if (uid != user.uid) return Result.failure(Exception("Cannot update another user's profile"))
             val updates = mapOf(
                 "displayName" to user.displayName,
                 "firstName" to user.firstName,
@@ -53,7 +56,8 @@ class FirebaseUserServiceImpl @Inject constructor(
                 "defaultCurrency" to user.defaultCurrency,
                 "upiId" to user.upiId,
                 "phoneNumber" to user.phoneNumber,
-                "countryCode" to user.countryCode
+                "countryCode" to user.countryCode,
+                "updatedAt" to System.currentTimeMillis()
             )
             firestore.collection("users").document(user.uid)
                 .update(updates).await()
@@ -89,15 +93,11 @@ class FirebaseUserServiceImpl @Inject constructor(
                 ).await()
             }
 
-            // Re-read to get latest state
-            val updatedDoc = userDocRef.get().await()
-            val updatedData = updatedDoc.data ?: return Result.failure(Exception("Failed to read user data"))
-
-            val existingUsername = updatedData["username"] as? String
+            val existingUsername = data?.get("username") as? String
             if (existingUsername.isNullOrEmpty()) {
-                val firstName = updatedData["firstName"] as? String ?: ""
-                val lastName = updatedData["lastName"] as? String ?: ""
-                val email = updatedData["email"] as? String ?: ""
+                val firstName = data?.get("firstName") as? String ?: ""
+                val lastName = data?.get("lastName") as? String ?: ""
+                val email = data?.get("email") as? String ?: ""
                 var baseUsername = Calculations.generateBaseUsername(firstName, lastName)
                 if (baseUsername.isEmpty()) {
                     // Fall back to email prefix
@@ -230,19 +230,18 @@ class FirebaseUserServiceImpl @Inject constructor(
                 .whereEqualTo("status", "active")
                 .get().await()
 
-            for (memberDoc in membersSnapshot.documents) {
-                val pathSegments = memberDoc.reference.path.split("/")
-                val groupId = pathSegments.getOrNull(1) ?: continue
-                memberDoc.reference.update(
-                    mapOf("status" to "left", "leftAt" to System.currentTimeMillis())
-                ).await()
-                // Decrement group memberCount
-                val groupRef = firestore.collection("groups").document(groupId)
-                val groupDoc = groupRef.get().await()
-                if (groupDoc.exists()) {
-                    val count = (groupDoc.getLong("memberCount") ?: 0L).toInt()
-                    groupRef.update("memberCount", maxOf(0, count - 1)).await()
+            val memberDocs = membersSnapshot.documents
+            val batchSize = 200
+            for (i in memberDocs.indices step batchSize) {
+                val chunk = memberDocs.subList(i, minOf(i + batchSize, memberDocs.size))
+                val batch = firestore.batch()
+                for (memberDoc in chunk) {
+                    val pathSegments = memberDoc.reference.path.split("/")
+                    val groupId = pathSegments.getOrNull(1) ?: continue
+                    batch.update(memberDoc.reference, mapOf("status" to "left", "leftAt" to System.currentTimeMillis()))
+                    batch.update(firestore.collection("groups").document(groupId), mapOf("memberCount" to FieldValue.increment(-1)))
                 }
+                batch.commit().await()
             }
 
             // 3. Delete username doc if exists

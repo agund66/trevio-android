@@ -10,6 +10,8 @@ import com.trevio.android.domain.model.BroadcastRead
 import com.trevio.android.domain.model.BroadcastTargetType
 import com.trevio.android.domain.repository.BroadcastService
 import kotlinx.coroutines.tasks.await
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
 import java.util.Date
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -88,6 +90,7 @@ class FirebaseBroadcastServiceImpl @Inject constructor(
         return try {
             val snapshot = firestore.collection("broadcasts")
                 .orderBy("createdAt", Query.Direction.DESCENDING)
+                .limit(100)
                 .get().await()
 
             val broadcasts = snapshot.documents.mapNotNull { doc ->
@@ -131,6 +134,7 @@ class FirebaseBroadcastServiceImpl @Inject constructor(
             val snapshot = firestore.collection("broadcasts")
                 .document(broadcastId)
                 .collection("reads")
+                .limit(500)
                 .get().await()
             Result.success(snapshot.size())
         } catch (e: Exception) {
@@ -143,6 +147,7 @@ class FirebaseBroadcastServiceImpl @Inject constructor(
             val snapshot = firestore.collection("broadcasts")
                 .document(broadcastId)
                 .collection("reads")
+                .limit(500)
                 .get().await()
             val reads = snapshot.documents.map { doc ->
                 val data = doc.data ?: emptyMap()
@@ -166,6 +171,7 @@ class FirebaseBroadcastServiceImpl @Inject constructor(
             val snapshot = firestore.collection("broadcasts")
                 .whereEqualTo("active", true)
                 .whereLessThanOrEqualTo("startAt", now)
+                .limit(50)
                 .get().await()
 
             val broadcasts = snapshot.documents.mapNotNull { doc ->
@@ -213,17 +219,21 @@ class FirebaseBroadcastServiceImpl @Inject constructor(
             if (activeResult.isFailure) return activeResult
 
             val active = activeResult.getOrThrow()
-            val unread = mutableListOf<BroadcastMessage>()
 
-            for (b in active) {
-                val readDoc = firestore.collection("broadcasts")
-                    .document(b.id)
-                    .collection("reads")
-                    .document(uid)
-                    .get().await()
-                if (!readDoc.exists()) {
-                    unread.add(b)
-                }
+            val readDocs = coroutineScope {
+                active.associate { b ->
+                    b.id to async {
+                        firestore.collection("broadcasts")
+                            .document(b.id)
+                            .collection("reads")
+                            .document(uid)
+                            .get().await()
+                    }
+                }.mapValues { it.value.await() }
+            }
+
+            val unread = active.filter { b ->
+                !(readDocs[b.id]?.exists() ?: false)
             }
             Result.success(unread)
         } catch (e: Exception) {

@@ -32,6 +32,7 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.trevio.android.core.UserRefreshNotifier
 import com.trevio.android.core.designsystem.components.EmptyState
 import com.trevio.android.core.designsystem.components.TrevioCard
 import com.trevio.android.core.designsystem.theme.TrevioBorder
@@ -53,7 +54,8 @@ import javax.inject.Inject
 @HiltViewModel
 class HomeViewModel @Inject constructor(
     private val groupService: GroupService,
-    private val authService: AuthService
+    private val authService: AuthService,
+    private val userRefreshNotifier: UserRefreshNotifier
 ) : ViewModel() {
 
     data class HomeData(
@@ -73,6 +75,14 @@ class HomeViewModel @Inject constructor(
     val state: StateFlow<HomeData> = _state
 
     init { loadGroups() }
+
+    init {
+        viewModelScope.launch {
+            userRefreshNotifier.userRefreshed.collect {
+                refreshGroups()
+            }
+        }
+    }
 
     fun loadGroups() {
         _state.value = _state.value.copy(isLoading = true, error = null)

@@ -62,10 +62,16 @@ class TripViewModel @Inject constructor(
     init { loadData() }
 
     fun loadData() {
-        _state.value = _state.value.copy(isLoading = true)
+        _state.value = _state.value.copy(isLoading = true, error = null)
         viewModelScope.launch {
-            val tripData = tripService.getTripData(groupId).getOrNull()
-            val members = settlementService.getGroupBalances(groupId).getOrDefault(emptyList())
+            val tripResult = tripService.getTripData(groupId)
+            val membersResult = settlementService.getGroupBalances(groupId)
+            if (tripResult.isFailure && membersResult.isFailure) {
+                _state.value = _state.value.copy(isLoading = false, error = tripResult.exceptionOrNull()?.message ?: "Failed to load trip data")
+                return@launch
+            }
+            val tripData = tripResult.getOrNull()
+            val members = membersResult.getOrDefault(emptyList())
             _state.value = TripState(
                 isLoading = false,
                 destination = tripData?.destination ?: "",
@@ -81,37 +87,67 @@ class TripViewModel @Inject constructor(
     fun addItineraryItem(item: TripItineraryItem, onSuccess: () -> Unit) {
         viewModelScope.launch {
             tripService.addItineraryItem(groupId, item)
-            loadData()
-            onSuccess()
+                .onSuccess {
+                    _state.value = _state.value.copy(error = null)
+                    loadData()
+                    onSuccess()
+                }
+                .onFailure { e ->
+                    _state.value = _state.value.copy(error = e.message)
+                }
         }
     }
 
     fun toggleComplete(item: TripItineraryItem) {
         viewModelScope.launch {
             tripService.updateItineraryItem(groupId, item.itemId, item.copy(completed = !item.completed))
-            loadData()
+                .onSuccess {
+                    _state.value = _state.value.copy(error = null)
+                    loadData()
+                }
+                .onFailure { e ->
+                    _state.value = _state.value.copy(error = e.message)
+                }
         }
     }
 
     fun removeItineraryItem(itemId: String) {
         viewModelScope.launch {
             tripService.removeItineraryItem(groupId, itemId)
-            loadData()
+                .onSuccess {
+                    _state.value = _state.value.copy(error = null)
+                    loadData()
+                }
+                .onFailure { e ->
+                    _state.value = _state.value.copy(error = e.message)
+                }
         }
     }
 
     fun addLocation(location: TripLocation, onSuccess: () -> Unit) {
         viewModelScope.launch {
             tripService.addLocation(groupId, location)
-            loadData()
-            onSuccess()
+                .onSuccess {
+                    _state.value = _state.value.copy(error = null)
+                    loadData()
+                    onSuccess()
+                }
+                .onFailure { e ->
+                    _state.value = _state.value.copy(error = e.message)
+                }
         }
     }
 
     fun removeLocation(locationId: String) {
         viewModelScope.launch {
             tripService.removeLocation(groupId, locationId)
-            loadData()
+                .onSuccess {
+                    _state.value = _state.value.copy(error = null)
+                    loadData()
+                }
+                .onFailure { e ->
+                    _state.value = _state.value.copy(error = e.message)
+                }
         }
     }
 }
@@ -139,6 +175,31 @@ fun TripTab(
         contentPadding = PaddingValues(16.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
+        if (state.error != null) {
+            item {
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer)
+                ) {
+                    Row(
+                        modifier = Modifier.padding(12.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Text(
+                            text = state.error!!,
+                            modifier = Modifier.weight(1f),
+                            color = MaterialTheme.colorScheme.onErrorContainer,
+                            style = MaterialTheme.typography.bodySmall
+                        )
+                        TextButton(onClick = { viewModel.loadData() }) {
+                            Text("Retry")
+                        }
+                    }
+                }
+            }
+        }
         // Trip Header
         item {
             Card(

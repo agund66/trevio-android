@@ -28,6 +28,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.trevio.android.core.UserRefreshNotifier
 import com.trevio.android.core.designsystem.components.LoadingIndicator
 import com.trevio.android.core.designsystem.components.MemberAvatar
 import com.trevio.android.core.designsystem.components.TrevioCard
@@ -62,6 +63,7 @@ class GroupViewModel @Inject constructor(
     private val groupService: GroupService,
     private val userService: UserService,
     private val authService: AuthService,
+    private val userRefreshNotifier: UserRefreshNotifier,
     savedStateHandle: SavedStateHandle
 ) : ViewModel() {
 
@@ -92,6 +94,14 @@ class GroupViewModel @Inject constructor(
     val state: StateFlow<GroupState> = _state
 
     init { loadData() }
+
+    init {
+        viewModelScope.launch {
+            userRefreshNotifier.userRefreshed.collect {
+                refreshData()
+            }
+        }
+    }
 
     fun loadData() {
         _state.value = _state.value.copy(isLoading = true)

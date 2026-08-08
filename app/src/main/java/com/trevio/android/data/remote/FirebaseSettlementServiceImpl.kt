@@ -12,6 +12,8 @@ import com.trevio.android.domain.repository.SettlementService
 import com.trevio.android.domain.repository.ExchangeRateService
 import com.trevio.android.util.Calculations
 import kotlinx.coroutines.tasks.await
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -65,16 +67,19 @@ class FirebaseSettlementServiceImpl @Inject constructor(
             )
             if (upiRefId != null) settlementData["upiRefId"] = upiRefId
 
-            val fromUserDoc = firestore.collection("users").document(fromUid).get().await()
-            val fromMemberDoc = groupRef.collection("members").document(fromUid).get().await()
+            val (fromUserDoc, fromMemberDoc, toUserDoc, toMemberDoc) = coroutineScope {
+                val fromUserAsync = async { firestore.collection("users").document(fromUid).get().await() }
+                val fromMemberAsync = async { groupRef.collection("members").document(fromUid).get().await() }
+                val toUserAsync = async { firestore.collection("users").document(toUid).get().await() }
+                val toMemberAsync = async { groupRef.collection("members").document(toUid).get().await() }
+                listOf(fromUserAsync.await(), fromMemberAsync.await(), toUserAsync.await(), toMemberAsync.await())
+            }
             val fromIsOffline = fromMemberDoc.data?.get("isOffline") as? Boolean ?: false
             val fromUserName = if (fromIsOffline) {
                 fromMemberDoc.data?.get("displayName") as? String ?: "Someone"
             } else {
                 fromUserDoc.data?.get("displayName") as? String ?: "Someone"
             }
-            val toUserDoc = firestore.collection("users").document(toUid).get().await()
-            val toMemberDoc = groupRef.collection("members").document(toUid).get().await()
             val toIsOffline = toMemberDoc.data?.get("isOffline") as? Boolean ?: false
             val toUserName = if (toIsOffline) {
                 toMemberDoc.data?.get("displayName") as? String ?: "Someone"
@@ -147,28 +152,39 @@ class FirebaseSettlementServiceImpl @Inject constructor(
 
             val debts = calculateSimplifiedDebts(groupId)
 
-            val enrichedDebts = debts.map { debt ->
-                val fromMemberDoc = groupRef.collection("members").document(debt.fromUid).get().await()
-                val toMemberDoc = groupRef.collection("members").document(debt.toUid).get().await()
-                val fromData = fromMemberDoc.data
-                val toData = toMemberDoc.data
+            val allUids = debts.flatMap { listOf(it.fromUid, it.toUid) }.filter { it.isNotEmpty() }.distinct()
 
-                val fromIsOffline = fromData?.get("isOffline") as? Boolean ?: false
-                val toIsOffline = toData?.get("isOffline") as? Boolean ?: false
+            val (memberDocs, userDocs) = coroutineScope {
+                val members = allUids.associateWith { async { groupRef.collection("members").document(it).get().await() } }
+                    .mapValues { it.value.await() }
+                val users = allUids.associateWith { async { firestore.collection("users").document(it).get().await() } }
+                    .mapValues { it.value.await() }
+                members to users
+            }
+
+            val memberMap = mutableMapOf<String, Map<String, Any>?>()
+            memberDocs.forEach { (uid, doc) -> memberMap[uid] = doc.data }
+            val userMap = mutableMapOf<String, Map<String, Any>?>()
+            userDocs.forEach { (uid, doc) -> userMap[uid] = doc.data }
+
+            val enrichedDebts = debts.map { debt ->
+                val fromMemberData = memberMap[debt.fromUid]
+                val toMemberData = memberMap[debt.toUid]
+                val fromIsOffline = fromMemberData?.get("isOffline") as? Boolean ?: false
+                val toIsOffline = toMemberData?.get("isOffline") as? Boolean ?: false
 
                 val fromName: String
                 val fromPhotoURL: String
                 val fromUpiId: String
                 if (fromIsOffline) {
-                    fromName = fromData?.get("displayName") as? String ?: "Unknown"
+                    fromName = fromMemberData?.get("displayName") as? String ?: "Unknown"
                     fromPhotoURL = ""
                     fromUpiId = ""
                 } else {
-                    val fromUserDoc = firestore.collection("users").document(debt.fromUid).get().await()
-                    val userData = fromUserDoc.data
-                    fromName = userData?.get("displayName") as? String ?: "Unknown"
-                    fromPhotoURL = userData?.get("photoURL") as? String ?: ""
-                    fromUpiId = userData?.get("upiId") as? String ?: ""
+                    val fromData = userMap[debt.fromUid]
+                    fromName = fromData?.get("displayName") as? String ?: "Unknown"
+                    fromPhotoURL = fromData?.get("photoURL") as? String ?: ""
+                    fromUpiId = fromData?.get("upiId") as? String ?: ""
                 }
 
                 val toName: String
@@ -177,19 +193,18 @@ class FirebaseSettlementServiceImpl @Inject constructor(
                 val toPhoneNumber: String
                 val toCountryCode: String
                 if (toIsOffline) {
-                    toName = toData?.get("displayName") as? String ?: "Unknown"
+                    toName = toMemberData?.get("displayName") as? String ?: "Unknown"
                     toPhotoURL = ""
                     toUpiId = ""
                     toPhoneNumber = ""
                     toCountryCode = ""
                 } else {
-                    val toUserDoc = firestore.collection("users").document(debt.toUid).get().await()
-                    val userData = toUserDoc.data
-                    toName = userData?.get("displayName") as? String ?: "Unknown"
-                    toPhotoURL = userData?.get("photoURL") as? String ?: ""
-                    toUpiId = userData?.get("upiId") as? String ?: ""
-                    toPhoneNumber = userData?.get("phoneNumber") as? String ?: ""
-                    toCountryCode = userData?.get("countryCode") as? String ?: ""
+                    val toData = userMap[debt.toUid]
+                    toName = toData?.get("displayName") as? String ?: "Unknown"
+                    toPhotoURL = toData?.get("photoURL") as? String ?: ""
+                    toUpiId = toData?.get("upiId") as? String ?: ""
+                    toPhoneNumber = toData?.get("phoneNumber") as? String ?: ""
+                    toCountryCode = toData?.get("countryCode") as? String ?: ""
                 }
 
                 SimplifiedDebt(
@@ -223,6 +238,18 @@ class FirebaseSettlementServiceImpl @Inject constructor(
                 .whereIn("status", listOf("active", "pending"))
                 .get().await()
 
+            val onlineMemberIds = membersSnapshot.documents
+                .filter { (it.data ?: emptyMap())["isOffline"] as? Boolean != true }
+                .map { it.id }
+
+            val userDocs = coroutineScope {
+                onlineMemberIds.associateWith { uid ->
+                    async { firestore.collection("users").document(uid).get().await() }
+                }.mapValues { it.value.await() }
+            }
+            val userMap = mutableMapOf<String, Map<String, Any>?>()
+            userDocs.forEach { (uid, doc) -> userMap[uid] = doc.data }
+
             val members = membersSnapshot.documents.mapNotNull { doc ->
                 val data = doc.data ?: return@mapNotNull null
                 val isOffline = data["isOffline"] as? Boolean ?: false
@@ -238,8 +265,7 @@ class FirebaseSettlementServiceImpl @Inject constructor(
                         isOffline = true
                     )
                 } else {
-                    val userDoc = firestore.collection("users").document(doc.id).get().await()
-                    val userData = userDoc.data
+                    val userData = userMap[doc.id]
                     Member(
                         uid = doc.id,
                         displayName = userData?.get("displayName") as? String ?: "Unknown",
@@ -270,27 +296,43 @@ class FirebaseSettlementServiceImpl @Inject constructor(
                 .limit(50)
                 .get().await()
 
+            val allUids = snapshot.documents.flatMap { doc ->
+                val data = doc.data ?: emptyMap()
+                listOf(data["fromUid"] as? String ?: "", data["toUid"] as? String ?: "")
+            }.filter { it.isNotEmpty() }.distinct()
+
+            val (memberDocs, userDocs) = coroutineScope {
+                val members = allUids.associateWith { async { groupRef.collection("members").document(it).get().await() } }
+                    .mapValues { it.value.await() }
+                val users = allUids.associateWith { async { firestore.collection("users").document(it).get().await() } }
+                    .mapValues { it.value.await() }
+                members to users
+            }
+
+            val memberMap = mutableMapOf<String, Map<String, Any>?>()
+            memberDocs.forEach { (uid, doc) -> memberMap[uid] = doc.data }
+            val userMap = mutableMapOf<String, Map<String, Any>?>()
+            userDocs.forEach { (uid, doc) -> userMap[uid] = doc.data }
+
             val settlements = snapshot.documents.map { doc ->
                 val data = doc.data ?: emptyMap()
                 val fromUid = data["fromUid"] as? String ?: ""
                 val toUid = data["toUid"] as? String ?: ""
 
-                val fromMemberDoc = groupRef.collection("members").document(fromUid).get().await()
-                val toMemberDoc = groupRef.collection("members").document(toUid).get().await()
-                val fromIsOffline = fromMemberDoc.data?.get("isOffline") as? Boolean ?: false
-                val toIsOffline = toMemberDoc.data?.get("isOffline") as? Boolean ?: false
+                val fromMemberData = memberMap[fromUid]
+                val toMemberData = memberMap[toUid]
+                val fromIsOffline = fromMemberData?.get("isOffline") as? Boolean ?: false
+                val toIsOffline = toMemberData?.get("isOffline") as? Boolean ?: false
 
                 val fromName = if (fromIsOffline) {
-                    fromMemberDoc.data?.get("displayName") as? String ?: "Unknown"
+                    fromMemberData?.get("displayName") as? String ?: "Unknown"
                 } else {
-                    val fromUserDoc = firestore.collection("users").document(fromUid).get().await()
-                    fromUserDoc.data?.get("displayName") as? String ?: "Unknown"
+                    userMap[fromUid]?.get("displayName") as? String ?: "Unknown"
                 }
                 val toName = if (toIsOffline) {
-                    toMemberDoc.data?.get("displayName") as? String ?: "Unknown"
+                    toMemberData?.get("displayName") as? String ?: "Unknown"
                 } else {
-                    val toUserDoc = firestore.collection("users").document(toUid).get().await()
-                    toUserDoc.data?.get("displayName") as? String ?: "Unknown"
+                    userMap[toUid]?.get("displayName") as? String ?: "Unknown"
                 }
 
                 Settlement(
@@ -389,11 +431,16 @@ class FirebaseSettlementServiceImpl @Inject constructor(
 
         val balances = Calculations.calculateBalances(expenses, settlements, memberUids)
 
-        val batch = firestore.batch()
-        balances.forEach { (memberUid, balance) ->
-            val roundedBalance = kotlin.math.round(balance * 100) / 100
-            batch.update(groupRef.collection("members").document(memberUid), mapOf("balance" to roundedBalance))
+        val balanceEntries = balances.entries.toList()
+        val batchSize = 400
+        for (i in balanceEntries.indices step batchSize) {
+            val chunk = balanceEntries.subList(i, minOf(i + batchSize, balanceEntries.size))
+            val batch = firestore.batch()
+            for ((memberUid, balance) in chunk) {
+                val roundedBalance = kotlin.math.round(balance * 100) / 100
+                batch.update(groupRef.collection("members").document(memberUid), mapOf("balance" to roundedBalance))
+            }
+            batch.commit().await()
         }
-        batch.commit().await()
     }
 }

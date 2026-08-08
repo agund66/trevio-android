@@ -2,6 +2,7 @@ package com.trevio.android.data.remote
 
 import com.google.firebase.Timestamp
 import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
 import com.trevio.android.domain.model.Activity
 import com.trevio.android.domain.model.Group
@@ -140,7 +141,7 @@ class FirebaseGroupServiceImpl @Inject constructor(
                     "status" to "active"
                 ))
                 batch.update(groupDoc.reference, mapOf(
-                    "memberCount" to ((groupData["memberCount"] as? Number)?.toLong() ?: 0L) + 1,
+                    "memberCount" to FieldValue.increment(1),
                     "updatedAt" to now
                 ))
             }
@@ -217,9 +218,7 @@ class FirebaseGroupServiceImpl @Inject constructor(
                 "balance" to 0.0,
                 "status" to "pending"
             )).await()
-            val groupDoc = groupRef.get().await()
-            val currentCount = (groupDoc.data?.get("memberCount") as? Number)?.toLong() ?: 1L
-            groupRef.update(mapOf("memberCount" to (currentCount + 1), "updatedAt" to now)).await()
+            groupRef.update(mapOf("memberCount" to FieldValue.increment(1), "updatedAt" to now)).await()
         }
 
         try {
@@ -267,7 +266,7 @@ class FirebaseGroupServiceImpl @Inject constructor(
                     "uid" to uid, "role" to "member", "joinedAt" to now, "balance" to 0.0, "status" to "active"
                 ))
                 batch.update(groupDoc.reference, mapOf(
-                    "memberCount" to ((groupData["memberCount"] as? Number)?.toLong() ?: 0L) + 1,
+                    "memberCount" to FieldValue.increment(1),
                     "updatedAt" to now
                 ))
             }
@@ -305,9 +304,7 @@ class FirebaseGroupServiceImpl @Inject constructor(
 
             if (memberDoc.exists() && memberDoc.data?.get("status") == "pending") {
                 batch.delete(memberDoc.reference)
-                val groupDoc = groupRef.get().await()
-                val currentCount = (groupDoc.data?.get("memberCount") as? Number)?.toLong() ?: 1L
-                batch.update(groupRef, mapOf("memberCount" to maxOf(0L, currentCount - 1), "updatedAt" to System.currentTimeMillis()))
+                batch.update(groupRef, mapOf("memberCount" to FieldValue.increment(-1), "updatedAt" to System.currentTimeMillis()))
             }
 
             batch.commit().await()
@@ -339,7 +336,7 @@ class FirebaseGroupServiceImpl @Inject constructor(
             val batch = firestore.batch()
             batch.update(memberDoc.reference, mapOf("status" to "left"))
             batch.update(groupDoc.reference, mapOf(
-                "memberCount" to ((groupDoc.data?.get("memberCount") as? Number)?.toLong() ?: 1L) - 1,
+                "memberCount" to FieldValue.increment(-1),
                 "updatedAt" to now
             ))
             batch.set(groupDoc.reference.collection("activities").document(), mapOf(
@@ -449,11 +446,20 @@ class FirebaseGroupServiceImpl @Inject constructor(
                 .get().await()
 
             val activities = mutableListOf<Activity>()
+
+            val uniqueUserIds = snapshot.documents.mapNotNull { (it.data ?: emptyMap())["userId"] as? String }.filter { it.isNotEmpty() }.distinct()
+            val userDocs = coroutineScope {
+                uniqueUserIds.associateWith { uid ->
+                    async { firestore.collection("users").document(uid).get().await() }
+                }.mapValues { it.value.await() }
+            }
+            val userMap = mutableMapOf<String, Map<String, Any>?>()
+            userDocs.forEach { (uid, doc) -> userMap[uid] = doc.data }
+
             for (doc in snapshot.documents) {
                 val data = doc.data ?: emptyMap()
                 val userId = data["userId"] as? String ?: ""
-                val userDoc = firestore.collection("users").document(userId).get().await()
-                val userData = userDoc.data
+                val userData = userMap[userId]
                 activities.add(
                     Activity(
                         activityId = doc.id,
@@ -517,16 +523,23 @@ class FirebaseGroupServiceImpl @Inject constructor(
             val activeCount = membersSnapshot.documents.count { it.data?.get("status") == "active" }
             if (activeCount > 1) return Result.failure(Exception("Cannot delete group with other active members. Remove all members first."))
 
-            val batch = firestore.batch()
-            for (memberDoc in membersSnapshot.documents) batch.delete(memberDoc.reference)
             val expensesSnapshot = groupRef.collection("expenses").get().await()
-            for (expDoc in expensesSnapshot.documents) batch.delete(expDoc.reference)
             val settlementsSnapshot = groupRef.collection("settlements").get().await()
-            for (setDoc in settlementsSnapshot.documents) batch.delete(setDoc.reference)
             val activitiesSnapshot = groupRef.collection("activities").get().await()
-            for (actDoc in activitiesSnapshot.documents) batch.delete(actDoc.reference)
-            batch.delete(groupRef)
-            batch.commit().await()
+
+            val allRefs = membersSnapshot.documents.map { it.reference } +
+                expensesSnapshot.documents.map { it.reference } +
+                settlementsSnapshot.documents.map { it.reference } +
+                activitiesSnapshot.documents.map { it.reference } +
+                listOf(groupRef)
+
+            val batchSize = 400
+            for (i in allRefs.indices step batchSize) {
+                val chunk = allRefs.subList(i, minOf(i + batchSize, allRefs.size))
+                val batch = firestore.batch()
+                for (ref in chunk) batch.delete(ref)
+                batch.commit().await()
+            }
 
             Result.success(Unit)
         } catch (e: Exception) {
@@ -616,7 +629,7 @@ class FirebaseGroupServiceImpl @Inject constructor(
                 "addedBy" to uid
             ))
             batch.update(groupRef, mapOf(
-                "memberCount" to ((groupDoc.data?.get("memberCount") as? Number)?.toLong() ?: 0L) + 1,
+                "memberCount" to FieldValue.increment(1),
                 "updatedAt" to now
             ))
             batch.set(groupRef.collection("activities").document(), mapOf(
@@ -653,11 +666,7 @@ class FirebaseGroupServiceImpl @Inject constructor(
                 // User already has a member doc (e.g. joined via invite code)
                 // Keep existing doc, just delete the offline profile doc
                 batch.delete(memberDoc.reference)
-                val groupDocForCount = groupRef.get().await()
-                val currentCount = (groupDocForCount.data?.get("memberCount") as? Number)?.toLong() ?: 0L
-                if (currentCount > 0) {
-                    batch.update(groupRef, mapOf("memberCount" to currentCount - 1))
-                }
+                batch.update(groupRef, mapOf("memberCount" to FieldValue.increment(-1)))
             } else {
                 // No existing doc — create one with offline member's data
                 val claimedData = memberData.toMutableMap()
@@ -710,11 +719,7 @@ class FirebaseGroupServiceImpl @Inject constructor(
                 // Target user already has a member doc (e.g. joined via invite code)
                 // Keep existing doc, just delete the offline profile doc
                 batch.delete(memberDoc.reference)
-                val groupDocForCount = groupRef.get().await()
-                val currentCount = (groupDocForCount.data?.get("memberCount") as? Number)?.toLong() ?: 0L
-                if (currentCount > 0) {
-                    batch.update(groupRef, mapOf("memberCount" to currentCount - 1))
-                }
+                batch.update(groupRef, mapOf("memberCount" to FieldValue.increment(-1)))
             } else {
                 // No existing doc — create one with offline member's data
                 val linkedData = memberData.toMutableMap()
@@ -747,15 +752,16 @@ class FirebaseGroupServiceImpl @Inject constructor(
 
     private suspend fun migrateMemberReferences(groupId: String, oldId: String, newId: String) {
         val groupRef = firestore.collection("groups").document(groupId)
+        val ops = mutableListOf<Pair<com.google.firebase.firestore.DocumentReference, Map<String, Any>>>()
 
         val expenses = groupRef.collection("expenses").get().await()
         for (expenseDoc in expenses.documents) {
             val data = expenseDoc.data ?: continue
-            val batch = firestore.batch()
+            val updates = mutableMapOf<String, Any>()
             var changed = false
 
             if (data["paidBy"] == oldId) {
-                batch.update(expenseDoc.reference, mapOf("paidBy" to newId))
+                updates["paidBy"] = newId
                 changed = true
             }
 
@@ -764,29 +770,37 @@ class FirebaseGroupServiceImpl @Inject constructor(
             if (splits != null && splits.containsKey(oldId)) {
                 val newSplits = splits.toMutableMap()
                 newSplits[newId] = newSplits.remove(oldId)!!
-                batch.update(expenseDoc.reference, mapOf("splits" to newSplits))
+                updates["splits"] = newSplits
                 changed = true
             }
 
-            if (changed) batch.commit().await()
+            if (changed) ops.add(expenseDoc.reference to updates)
         }
 
         val settlements = groupRef.collection("settlements").get().await()
         for (settlementDoc in settlements.documents) {
             val data = settlementDoc.data ?: continue
-            val batch = firestore.batch()
+            val updates = mutableMapOf<String, Any>()
             var changed = false
 
             if (data["fromUid"] == oldId) {
-                batch.update(settlementDoc.reference, mapOf("fromUid" to newId))
+                updates["fromUid"] = newId
                 changed = true
             }
             if (data["toUid"] == oldId) {
-                batch.update(settlementDoc.reference, mapOf("toUid" to newId))
+                updates["toUid"] = newId
                 changed = true
             }
 
-            if (changed) batch.commit().await()
+            if (changed) ops.add(settlementDoc.reference to updates)
+        }
+
+        val batchSize = 400
+        for (i in ops.indices step batchSize) {
+            val chunk = ops.subList(i, minOf(i + batchSize, ops.size))
+            val batch = firestore.batch()
+            for ((ref, updates) in chunk) batch.update(ref, updates)
+            batch.commit().await()
         }
     }
 
@@ -827,11 +841,16 @@ class FirebaseGroupServiceImpl @Inject constructor(
 
         val balances = Calculations.calculateBalances(expenses, settlements, memberUids)
 
-        val batch = firestore.batch()
-        balances.forEach { (memberUid, balance) ->
-            val roundedBalance = kotlin.math.round(balance * 100) / 100
-            batch.update(groupRef.collection("members").document(memberUid), mapOf("balance" to roundedBalance))
+        val balanceEntries = balances.entries.toList()
+        val batchSize = 400
+        for (i in balanceEntries.indices step batchSize) {
+            val chunk = balanceEntries.subList(i, minOf(i + batchSize, balanceEntries.size))
+            val batch = firestore.batch()
+            for ((memberUid, balance) in chunk) {
+                val roundedBalance = kotlin.math.round(balance * 100) / 100
+                batch.update(groupRef.collection("members").document(memberUid), mapOf("balance" to roundedBalance))
+            }
+            batch.commit().await()
         }
-        batch.commit().await()
     }
 }

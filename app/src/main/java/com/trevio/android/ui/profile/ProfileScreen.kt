@@ -37,6 +37,7 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.trevio.android.core.UserRefreshNotifier
 import com.trevio.android.core.designsystem.components.MemberAvatar
 import com.trevio.android.core.designsystem.components.TrevioCard
 import com.trevio.android.core.designsystem.theme.ThemeMode
@@ -93,7 +94,8 @@ private fun getPaymentAddress(user: User): String {
 @HiltViewModel
 class ProfileViewModel @Inject constructor(
     private val authService: AuthService,
-    private val userService: UserService
+    private val userService: UserService,
+    private val userRefreshNotifier: UserRefreshNotifier
 ) : ViewModel() {
 
     data class ProfileState(
@@ -139,6 +141,7 @@ class ProfileViewModel @Inject constructor(
             userService.updateUser(updated)
                 .onSuccess {
                     _state.value = ProfileState(user = updated, isLoading = false, isEditing = false)
+                    userRefreshNotifier.notifyUserRefreshed()
                 }
                 .onFailure { e ->
                     _state.value = _state.value.copy(isSaving = false, error = e.message)

@@ -1,5 +1,6 @@
 package com.trevio.android.data.remote
 
+import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.Query
 import com.trevio.android.domain.model.Expense
@@ -10,13 +11,19 @@ import com.trevio.android.domain.repository.AnalyticsService
 import com.trevio.android.util.computeGroupAnalytics
 import kotlinx.coroutines.tasks.await
 import javax.inject.Inject
+import javax.inject.Singleton
 
-class FirebaseAnalyticsService @Inject constructor() : AnalyticsService {
+@Singleton
+class FirebaseAnalyticsService @Inject constructor(
+    private val auth: FirebaseAuth
+) : AnalyticsService {
 
     private val db = FirebaseFirestore.getInstance()
 
     override suspend fun getGroupAnalytics(groupId: String): Result<GroupAnalytics> {
         return try {
+            auth.currentUser?.uid ?: return Result.failure(Exception("User not authenticated"))
+            if (groupId.isBlank()) return Result.failure(Exception("Group ID is required"))
             val expensesRef = db.collection("groups").document(groupId).collection("expenses")
                 .orderBy("date", Query.Direction.DESCENDING).limit(500)
             val expenseSnapshot = expensesRef.get().await()
@@ -49,6 +56,7 @@ class FirebaseAnalyticsService @Inject constructor() : AnalyticsService {
             }
 
             val membersRef = db.collection("groups").document(groupId).collection("members")
+                .whereIn("status", listOf("active", "pending"))
             val membersSnapshot = membersRef.get().await()
             val members = membersSnapshot.documents.map { doc ->
                 val data = doc.data ?: emptyMap()
@@ -73,6 +81,7 @@ class FirebaseAnalyticsService @Inject constructor() : AnalyticsService {
     }
 
     override suspend fun getUserAnalytics(): Result<UserAnalytics> {
+        auth.currentUser?.uid ?: return Result.failure(Exception("User not authenticated"))
         return Result.success(UserAnalytics())
     }
 }

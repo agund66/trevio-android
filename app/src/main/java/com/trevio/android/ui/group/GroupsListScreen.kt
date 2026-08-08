@@ -28,6 +28,7 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.trevio.android.core.UserRefreshNotifier
 import com.trevio.android.core.designsystem.components.EmptyState
 import com.trevio.android.core.designsystem.components.TrevioCard
 import com.trevio.android.core.designsystem.components.TrevioHeader
@@ -45,7 +46,8 @@ import javax.inject.Inject
 
 @HiltViewModel
 class GroupsListViewModel @Inject constructor(
-    private val groupService: GroupService
+    private val groupService: GroupService,
+    private val userRefreshNotifier: UserRefreshNotifier
 ) : ViewModel() {
 
     data class GroupsListState(
@@ -58,6 +60,14 @@ class GroupsListViewModel @Inject constructor(
     val state: StateFlow<GroupsListState> = _state
 
     init { loadGroups() }
+
+    init {
+        viewModelScope.launch {
+            userRefreshNotifier.userRefreshed.collect {
+                refreshGroups()
+            }
+        }
+    }
 
     fun loadGroups() {
         _state.value = _state.value.copy(isLoading = true)

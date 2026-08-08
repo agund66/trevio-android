@@ -112,7 +112,7 @@ class FirebaseExpenseServiceImpl @Inject constructor(
                 "createdAt" to now
             ))
             batch.update(groupRef, mapOf(
-                "totalExpenses" to ((groupDoc.data?.get("totalExpenses") as? Number)?.toDouble() ?: 0.0) + amountInBase,
+                "totalExpenses" to FieldValue.increment(amountInBase),
                 "updatedAt" to now
             ))
             batch.commit().await()
@@ -127,7 +127,7 @@ class FirebaseExpenseServiceImpl @Inject constructor(
                 val activeMembers = groupRef.collection("members")
                     .whereEqualTo("status", "active").get().await()
 
-                val notifyBatch = firestore.batch()
+                var notifyBatch = firestore.batch()
                 var count = 0
                 for (memberDoc in activeMembers.documents) {
                     val memberUid = memberDoc.id
@@ -148,12 +148,12 @@ class FirebaseExpenseServiceImpl @Inject constructor(
                         "createdAt" to now
                     ))
                     count++
-                    if (count >= 450) {
+                    if (count % 400 == 0) {
                         notifyBatch.commit().await()
-                        break
+                        notifyBatch = firestore.batch()
                     }
                 }
-                if (count > 0 && count < 450) {
+                if (count % 400 != 0) {
                     notifyBatch.commit().await()
                 }
             } catch (notifError: Exception) {
@@ -251,15 +251,11 @@ class FirebaseExpenseServiceImpl @Inject constructor(
             val newAmountInBase = effectiveAmount * newRate
             val amountDiffInBase = newAmountInBase - oldAmountInBase
 
-            val currentTotalExpenses = if (amountDiffInBase != 0.0) {
-                (groupRef.get().await().data?.get("totalExpenses") as? Number)?.toDouble() ?: 0.0
-            } else 0.0
-
             val batch = firestore.batch()
             batch.update(expenseRef, updateData)
             if (amountDiffInBase != 0.0) {
                 batch.update(groupRef, mapOf(
-                    "totalExpenses" to (currentTotalExpenses + amountDiffInBase),
+                    "totalExpenses" to FieldValue.increment(amountDiffInBase),
                     "updatedAt" to now
                 ))
             }
@@ -303,12 +299,11 @@ class FirebaseExpenseServiceImpl @Inject constructor(
             val expenseAmount = (expenseData["amount"] as? Number)?.toDouble() ?: 0.0
             val expenseRate = (expenseData["exchangeRateToBase"] as? Number)?.toDouble() ?: 1.0
             val amountInBase = expenseAmount * expenseRate
-            val groupDoc = groupRef.get().await()
 
             val batch = firestore.batch()
             batch.delete(expenseRef)
             batch.update(groupRef, mapOf(
-                "totalExpenses" to maxOf(0.0, ((groupDoc.data?.get("totalExpenses") as? Number)?.toDouble() ?: 0.0) - amountInBase),
+                "totalExpenses" to FieldValue.increment(-amountInBase),
                 "updatedAt" to now
             ))
             batch.set(groupRef.collection("activities").document(), mapOf(
@@ -445,11 +440,16 @@ class FirebaseExpenseServiceImpl @Inject constructor(
 
         val balances = Calculations.calculateBalances(expenses, settlements, memberUids)
 
-        val batch = firestore.batch()
-        balances.forEach { (memberUid, balance) ->
-            val roundedBalance = kotlin.math.round(balance * 100) / 100
-            batch.update(groupRef.collection("members").document(memberUid), mapOf("balance" to roundedBalance))
+        val balanceEntries = balances.entries.toList()
+        val batchSize = 400
+        for (i in balanceEntries.indices step batchSize) {
+            val chunk = balanceEntries.subList(i, minOf(i + batchSize, balanceEntries.size))
+            val batch = firestore.batch()
+            for ((memberUid, balance) in chunk) {
+                val roundedBalance = kotlin.math.round(balance * 100) / 100
+                batch.update(groupRef.collection("members").document(memberUid), mapOf("balance" to roundedBalance))
+            }
+            batch.commit().await()
         }
-        batch.commit().await()
     }
 }

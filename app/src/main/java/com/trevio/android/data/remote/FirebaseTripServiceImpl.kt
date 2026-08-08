@@ -1,5 +1,6 @@
 package com.trevio.android.data.remote
 
+import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.SetOptions
 import com.trevio.android.domain.model.TripData
@@ -8,8 +9,12 @@ import com.trevio.android.domain.model.TripLocation
 import com.trevio.android.domain.repository.TripService
 import kotlinx.coroutines.tasks.await
 import javax.inject.Inject
+import javax.inject.Singleton
 
-class FirebaseTripServiceImpl @Inject constructor() : TripService {
+@Singleton
+class FirebaseTripServiceImpl @Inject constructor(
+    private val auth: FirebaseAuth
+) : TripService {
 
     private val db = FirebaseFirestore.getInstance()
 
@@ -18,6 +23,8 @@ class FirebaseTripServiceImpl @Inject constructor() : TripService {
 
     override suspend fun getTripData(groupId: String): Result<TripData?> {
         return try {
+            auth.currentUser?.uid ?: return Result.failure(Exception("User not authenticated"))
+            if (groupId.isBlank()) return Result.failure(Exception("Group ID is required"))
             val snap = tripDocRef(groupId).get().await()
             if (!snap.exists()) return Result.success(null)
             val data = snap.data ?: return Result.success(null)
@@ -72,6 +79,8 @@ class FirebaseTripServiceImpl @Inject constructor() : TripService {
 
     override suspend fun updateTripData(groupId: String, tripData: TripData): Result<Unit> {
         return try {
+            auth.currentUser?.uid ?: return Result.failure(Exception("User not authenticated"))
+            if (groupId.isBlank()) return Result.failure(Exception("Group ID is required"))
             val data = mapOf(
                 "startDate" to tripData.startDate,
                 "endDate" to tripData.endDate,
@@ -114,6 +123,8 @@ class FirebaseTripServiceImpl @Inject constructor() : TripService {
 
     override suspend fun addItineraryItem(groupId: String, item: TripItineraryItem): Result<String> {
         return try {
+            auth.currentUser?.uid ?: return Result.failure(Exception("User not authenticated"))
+            if (groupId.isBlank()) return Result.failure(Exception("Group ID is required"))
             val tripData = getTripData(groupId).getOrNull() ?: TripData()
             val itemId = "item_${System.currentTimeMillis()}_${(1..9999).random()}"
             val newItem = item.copy(itemId = itemId)
@@ -127,6 +138,8 @@ class FirebaseTripServiceImpl @Inject constructor() : TripService {
 
     override suspend fun updateItineraryItem(groupId: String, itemId: String, updates: TripItineraryItem): Result<Unit> {
         return try {
+            auth.currentUser?.uid ?: return Result.failure(Exception("User not authenticated"))
+            if (groupId.isBlank() || itemId.isBlank()) return Result.failure(Exception("Group ID and Item ID are required"))
             val tripData = getTripData(groupId).getOrNull() ?: return Result.failure(Exception("Trip data not found"))
             val itinerary = tripData.itinerary.map {
                 if (it.itemId == itemId) it.copy(
@@ -151,6 +164,8 @@ class FirebaseTripServiceImpl @Inject constructor() : TripService {
 
     override suspend fun removeItineraryItem(groupId: String, itemId: String): Result<Unit> {
         return try {
+            auth.currentUser?.uid ?: return Result.failure(Exception("User not authenticated"))
+            if (groupId.isBlank() || itemId.isBlank()) return Result.failure(Exception("Group ID and Item ID are required"))
             val tripData = getTripData(groupId).getOrNull() ?: return Result.failure(Exception("Trip data not found"))
             val itinerary = tripData.itinerary.filter { it.itemId != itemId }
             updateTripData(groupId, tripData.copy(itinerary = itinerary))
@@ -162,6 +177,8 @@ class FirebaseTripServiceImpl @Inject constructor() : TripService {
 
     override suspend fun addLocation(groupId: String, location: TripLocation): Result<String> {
         return try {
+            auth.currentUser?.uid ?: return Result.failure(Exception("User not authenticated"))
+            if (groupId.isBlank()) return Result.failure(Exception("Group ID is required"))
             val tripData = getTripData(groupId).getOrNull() ?: TripData()
             val locationId = "loc_${System.currentTimeMillis()}_${(1..9999).random()}"
             val newLoc = location.copy(locationId = locationId)
@@ -175,6 +192,8 @@ class FirebaseTripServiceImpl @Inject constructor() : TripService {
 
     override suspend fun removeLocation(groupId: String, locationId: String): Result<Unit> {
         return try {
+            auth.currentUser?.uid ?: return Result.failure(Exception("User not authenticated"))
+            if (groupId.isBlank() || locationId.isBlank()) return Result.failure(Exception("Group ID and Location ID are required"))
             val tripData = getTripData(groupId).getOrNull() ?: return Result.failure(Exception("Trip data not found"))
             val locations = tripData.locations.filter { it.locationId != locationId }
             updateTripData(groupId, tripData.copy(locations = locations))

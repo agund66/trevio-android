@@ -24,6 +24,7 @@ class FirebaseAdminServiceImpl @Inject constructor(
 
             val snapshot = firestore.collection("users")
                 .orderBy("createdAt", Query.Direction.DESCENDING)
+                .limit(500)
                 .get().await()
 
             val users = snapshot.documents.mapNotNull { doc ->

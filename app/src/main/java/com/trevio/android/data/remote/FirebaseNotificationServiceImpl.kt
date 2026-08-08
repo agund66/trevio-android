@@ -108,14 +108,26 @@ class FirebaseNotificationServiceImpl @Inject constructor(
         return try {
             val uid = auth.currentUser?.uid ?: return Result.failure(Exception("User not authenticated"))
 
-            val snapshot = firestore.collection("users").document(uid).collection("notifications")
-                .whereEqualTo("read", false).get().await()
+            var hasMore = true
+            while (hasMore) {
+                val snapshot = firestore.collection("users").document(uid).collection("notifications")
+                    .whereEqualTo("read", false)
+                    .limit(100)
+                    .get().await()
 
-            val batch = firestore.batch()
-            snapshot.documents.forEach { doc ->
-                batch.update(doc.reference, "read", true)
+                if (snapshot.isEmpty) {
+                    hasMore = false
+                    break
+                }
+
+                val batch = firestore.batch()
+                snapshot.documents.forEach { doc ->
+                    batch.update(doc.reference, "read", true)
+                }
+                batch.commit().await()
+
+                if (snapshot.size() < 100) hasMore = false
             }
-            batch.commit().await()
 
             Result.success(Unit)
         } catch (e: Exception) {

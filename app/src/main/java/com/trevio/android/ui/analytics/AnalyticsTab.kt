@@ -60,6 +60,19 @@ fun AnalyticsTab(
         computeGroupAnalytics(groupId, groupName, expenses, members)
     }
 
+    if (analytics.expenseCount == 0) {
+        Box(modifier = Modifier.fillMaxWidth().padding(48.dp), contentAlignment = Alignment.Center) {
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Icon(Icons.Default.BarChart, contentDescription = null, modifier = Modifier.size(48.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                Spacer(Modifier.height(16.dp))
+                Text("No analytics data yet", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                Spacer(Modifier.height(4.dp))
+                Text("Add expenses to see spending insights.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        }
+        return
+    }
+
     Column(modifier = Modifier.fillMaxWidth().padding(16.dp)) {
         // Key Stats Cards
         Row(

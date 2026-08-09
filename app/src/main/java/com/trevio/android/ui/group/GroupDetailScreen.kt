@@ -416,6 +416,31 @@ fun GroupDetailScreen(
             return@Scaffold
         }
 
+        if (state.groupInfo == null) {
+            Column(modifier = Modifier.padding(padding).background(MaterialTheme.colorScheme.background)) {
+                TrevioHeader(
+                    title = "Group",
+                    onBack = { navController.popBackStack() }
+                )
+                Box(modifier = Modifier.weight(1f).fillMaxWidth().padding(32.dp), contentAlignment = Alignment.Center) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Icon(Icons.Default.Warning, contentDescription = null, modifier = Modifier.size(48.dp), tint = MaterialTheme.colorScheme.error)
+                        Spacer(Modifier.height(16.dp))
+                        Text(
+                            state.error ?: "Failed to load group",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Spacer(Modifier.height(16.dp))
+                        OutlinedButton(onClick = { viewModel.loadData() }) {
+                            Text("Retry")
+                        }
+                    }
+                }
+            }
+            return@Scaffold
+        }
+
         val groupInfo = state.groupInfo
         val isAdmin = state.currentUserId == groupInfo?.createdBy ||
             state.members.find { it.uid == state.currentUserId }?.role == "admin"

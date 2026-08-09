@@ -222,6 +222,23 @@ fun TripTab(
                             color = MaterialTheme.colorScheme.onPrimaryContainer
                         )
                     }
+                    if (state.startDate > 0 || state.endDate > 0) {
+                        Spacer(modifier = Modifier.height(4.dp))
+                        val dateFmt = java.text.SimpleDateFormat("EEE, dd MMM yyyy", java.util.Locale.getDefault())
+                        val dateText = when {
+                            state.startDate > 0 && state.endDate > 0 ->
+                                "${dateFmt.format(java.util.Date(state.startDate))} - ${dateFmt.format(java.util.Date(state.endDate))}"
+                            state.startDate > 0 ->
+                                "Starts ${dateFmt.format(java.util.Date(state.startDate))}"
+                            else ->
+                                "Ends ${dateFmt.format(java.util.Date(state.endDate))}"
+                        }
+                        Text(
+                            text = dateText,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f)
+                        )
+                    }
                     Spacer(modifier = Modifier.height(8.dp))
                     val totalEst = state.itinerary.sumOf { it.estimatedCost }
                     val completed = state.itinerary.count { it.completed }

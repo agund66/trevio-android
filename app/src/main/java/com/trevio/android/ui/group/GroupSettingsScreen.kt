@@ -54,6 +54,7 @@ class GroupSettingsViewModel @Inject constructor(
         val success: String? = null,
         val transferTargetUid: String? = null,
         val showDeleteConfirm: Boolean = false,
+        val showLeaveConfirm: Boolean = false,
         val isSaving: Boolean = false
     )
 
@@ -98,6 +99,7 @@ class GroupSettingsViewModel @Inject constructor(
     fun updateDescription(v: String) { _state.value = _state.value.copy(description = v) }
     fun setTransferTarget(uid: String?) { _state.value = _state.value.copy(transferTargetUid = uid) }
     fun setShowDeleteConfirm(v: Boolean) { _state.value = _state.value.copy(showDeleteConfirm = v) }
+    fun setShowLeaveConfirm(v: Boolean) { _state.value = _state.value.copy(showLeaveConfirm = v) }
 
     val isAdmin: Boolean get() = _state.value.currentUserId == _state.value.groupInfo?.createdBy ||
         _state.value.members.find { it.uid == _state.value.currentUserId }?.role == "admin"
@@ -143,6 +145,20 @@ class GroupSettingsViewModel @Inject constructor(
                 }
                 .onFailure { e ->
                     _state.value = s.copy(isSaving = false, error = e.message, showDeleteConfirm = false)
+                }
+        }
+    }
+
+    fun leaveGroup() {
+        val s = _state.value
+        _state.value = s.copy(isSaving = true, error = null)
+        viewModelScope.launch {
+            groupService.leaveGroup(groupId)
+                .onSuccess {
+                    _state.value = s.copy(isSaving = false, showLeaveConfirm = false, groupInfo = null)
+                }
+                .onFailure { e ->
+                    _state.value = s.copy(isSaving = false, error = e.message, showLeaveConfirm = false)
                 }
         }
     }
@@ -309,6 +325,43 @@ fun GroupSettingsScreen(
                                 else Text("Yes, Delete")
                             }
                             OutlinedButton(onClick = { viewModel.setShowDeleteConfirm(false) }) { Text("Cancel") }
+                        }
+                    }
+                }
+            }
+
+            // Leave Group (non-admins only)
+            if (!viewModel.isAdmin) {
+                Surface(
+                    shape = RoundedCornerShape(16.dp),
+                    color = MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.3f),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                        Text("Leave Group", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.tertiary)
+                        Text("You will no longer have access to this group's expenses and activity.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.tertiary.copy(alpha = 0.8f))
+                        if (!state.showLeaveConfirm) {
+                            OutlinedButton(
+                                onClick = { viewModel.setShowLeaveConfirm(true) },
+                                colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.tertiary)
+                            ) {
+                                Icon(Icons.Default.Logout, contentDescription = null, modifier = Modifier.size(18.dp))
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text("Leave Group")
+                            }
+                        } else {
+                            Text("Are you sure you want to leave this group?", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium, color = MaterialTheme.colorScheme.tertiary)
+                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                Button(
+                                    onClick = { viewModel.leaveGroup() },
+                                    enabled = !state.isSaving,
+                                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.tertiary)
+                                ) {
+                                    if (state.isSaving) CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp, color = Color.White)
+                                    else Text("Yes, Leave")
+                                }
+                                OutlinedButton(onClick = { viewModel.setShowLeaveConfirm(false) }) { Text("Cancel") }
+                            }
                         }
                     }
                 }

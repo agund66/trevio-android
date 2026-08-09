@@ -43,6 +43,8 @@ class AdminViewModel @Inject constructor(
 
     data class AdminState(
         val isLoading: Boolean = true,
+        val isCheckingAdmin: Boolean = true,
+        val isSuperadmin: Boolean = false,
         val users: List<User> = emptyList(),
         val usersHasMore: Boolean = false,
         val usersLoadingMore: Boolean = false,
@@ -57,7 +59,16 @@ class AdminViewModel @Inject constructor(
 
     init {
         viewModelScope.launch {
-            _state.value = _state.value.copy(currentUid = authService.getCurrentUserId())
+            val user = authService.getCurrentUser()
+            if (user == null) {
+                _state.value = _state.value.copy(isCheckingAdmin = false, isLoading = false, error = "Not authenticated")
+                return@launch
+            }
+            if (user.role != "superadmin") {
+                _state.value = _state.value.copy(isCheckingAdmin = false, isLoading = false, error = "Access denied: superadmin only")
+                return@launch
+            }
+            _state.value = _state.value.copy(isCheckingAdmin = false, isSuperadmin = true, currentUid = authService.getCurrentUserId())
             loadUsers()
         }
     }
@@ -143,6 +154,32 @@ fun AdminScreen(
 ) {
     val state by viewModel.state.collectAsState()
     val tabs = listOf("Users" to Icons.Default.People, "Broadcasts" to Icons.Default.Campaign, "Support" to Icons.Default.Support)
+
+    if (state.isCheckingAdmin) {
+        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            CircularProgressIndicator()
+        }
+        return
+    }
+
+    if (!state.isSuperadmin) {
+        Column(
+            modifier = Modifier.fillMaxSize().padding(32.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center
+        ) {
+            Icon(Icons.Default.Shield, contentDescription = null, modifier = Modifier.size(48.dp), tint = MaterialTheme.colorScheme.error)
+            Spacer(Modifier.height(16.dp))
+            Text("Access Denied", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+            Spacer(Modifier.height(8.dp))
+            Text("You need superadmin privileges to access this page.", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Spacer(Modifier.height(24.dp))
+            OutlinedButton(onClick = { navController.popBackStack() }) {
+                Text("Go Back")
+            }
+        }
+        return
+    }
 
     Column(
         modifier = Modifier

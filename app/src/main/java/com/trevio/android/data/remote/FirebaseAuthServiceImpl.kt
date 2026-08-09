@@ -21,7 +21,7 @@ class FirebaseAuthServiceImpl @Inject constructor(
         return try {
             val credential = GoogleAuthProvider.getCredential(idToken, null)
             val result = auth.signInWithCredential(credential).await()
-            val firebaseUser = result.user!!
+            val firebaseUser = result.user ?: return Result.failure(Exception("Authentication failed: no user returned"))
 
             val userDoc = firestore.collection("users").document(firebaseUser.uid).get().await()
             if (!userDoc.exists()) {
@@ -65,7 +65,7 @@ class FirebaseAuthServiceImpl @Inject constructor(
                 auth.startActivityForSignInWithProvider(activity, provider.build()).await()
             }
 
-            val firebaseUser = auth.currentUser!!
+            val firebaseUser = auth.currentUser ?: return Result.failure(Exception("Authentication failed: no user returned"))
 
             val userDoc = firestore.collection("users").document(firebaseUser.uid).get().await()
             if (!userDoc.exists()) {

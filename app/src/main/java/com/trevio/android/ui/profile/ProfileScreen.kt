@@ -671,7 +671,8 @@ private fun EditProfileContent(
 
     val upiError = if (upiId.isNotEmpty() && !isValidUpiId(upiId)) "Invalid UPI ID format (e.g. name@bank)" else null
     val phoneError = if (!isValidPhoneNumber(phoneNumber, countryCode)) "Invalid phone number for selected country" else null
-    val hasErrors = upiError != null || phoneError != null
+    val nameError = if (displayName.isBlank()) "Display name cannot be empty" else null
+    val hasErrors = upiError != null || phoneError != null || nameError != null
 
     Column(
         modifier = Modifier
@@ -683,7 +684,9 @@ private fun EditProfileContent(
             onValueChange = { displayName = it },
             label = { Text("Display Name") },
             modifier = Modifier.fillMaxWidth(),
-            singleLine = true
+            singleLine = true,
+            isError = nameError != null,
+            supportingText = { if (nameError != null) Text(nameError) }
         )
         Spacer(modifier = Modifier.height(12.dp))
 

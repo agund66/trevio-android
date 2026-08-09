@@ -137,6 +137,7 @@ fun AddExpenseScreen(
     var saveAndAddAnother by remember { mutableStateOf(false) }
     var note by remember { mutableStateOf("") }
     var isRecurring by remember { mutableStateOf(false) }
+    var recurringFrequency by remember { mutableStateOf(com.trevio.android.domain.model.RecurringFrequency.MONTHLY) }
     var itemizedData by remember { mutableStateOf(ItemizedSplitData()) }
 
     val dateFormatter = remember { SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()) }
@@ -555,14 +556,28 @@ fun AddExpenseScreen(
                 tonalElevation = 1.dp,
                 modifier = Modifier.fillMaxWidth()
             ) {
-                Row(
-                    modifier = Modifier.padding(12.dp).fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Checkbox(checked = isRecurring, onCheckedChange = { isRecurring = it })
-                    Icon(Icons.Default.Repeat, contentDescription = null, modifier = Modifier.size(18.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text("Make this a recurring expense", style = MaterialTheme.typography.bodyMedium)
+                Column(modifier = Modifier.padding(12.dp).fillMaxWidth()) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Checkbox(checked = isRecurring, onCheckedChange = { isRecurring = it })
+                        Icon(Icons.Default.Repeat, contentDescription = null, modifier = Modifier.size(18.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("Make this a recurring expense", style = MaterialTheme.typography.bodyMedium)
+                    }
+                    if (isRecurring) {
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            FilterChip(
+                                selected = recurringFrequency == com.trevio.android.domain.model.RecurringFrequency.WEEKLY,
+                                onClick = { recurringFrequency = com.trevio.android.domain.model.RecurringFrequency.WEEKLY },
+                                label = { Text("Weekly") }
+                            )
+                            FilterChip(
+                                selected = recurringFrequency == com.trevio.android.domain.model.RecurringFrequency.MONTHLY,
+                                onClick = { recurringFrequency = com.trevio.android.domain.model.RecurringFrequency.MONTHLY },
+                                label = { Text("Monthly") }
+                            )
+                        }
+                    }
                 }
             }
 
@@ -586,7 +601,7 @@ fun AddExpenseScreen(
                                 category = category,
                                 date = expenseDateMillis,
                                 note = note,
-                                recurring = if (isRecurring) com.trevio.android.domain.model.RecurringConfig(frequency = com.trevio.android.domain.model.RecurringFrequency.MONTHLY) else null,
+                                recurring = if (isRecurring) com.trevio.android.domain.model.RecurringConfig(frequency = recurringFrequency) else null,
                                 itemizedData = if (splitType == SplitType.ITEMIZED) itemizedData else null
                             )
                         }
@@ -615,7 +630,7 @@ fun AddExpenseScreen(
                                 category = category,
                                 date = expenseDateMillis,
                                 note = note,
-                                recurring = if (isRecurring) com.trevio.android.domain.model.RecurringConfig(frequency = com.trevio.android.domain.model.RecurringFrequency.MONTHLY) else null,
+                                recurring = if (isRecurring) com.trevio.android.domain.model.RecurringConfig(frequency = recurringFrequency) else null,
                                 itemizedData = if (splitType == SplitType.ITEMIZED) itemizedData else null
                             )
                         }

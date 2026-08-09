@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -225,7 +226,10 @@ fun SupportScreen(
     val viewModel: SupportViewModel = hiltViewModel()
     val state by viewModel.state.collectAsState()
     var searchQuery by remember { mutableStateOf("") }
+    var activeCategory by remember { mutableStateOf("all") }
     var selectedArticle by remember { mutableStateOf<HelpArticle?>(null) }
+
+    val articleCategories = state.articles.map { it.category }.distinct()
 
     if (selectedArticle != null) {
         HelpArticleDetailScreen(
@@ -296,6 +300,31 @@ fun SupportScreen(
                 shape = RoundedCornerShape(12.dp)
             )
 
+            // Category filter chips
+            if (articleCategories.isNotEmpty()) {
+                LazyRow(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 4.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    item {
+                        FilterChip(
+                            selected = activeCategory == "all",
+                            onClick = { activeCategory = "all" },
+                            label = { Text("All") }
+                        )
+                    }
+                    items(articleCategories) { cat ->
+                        FilterChip(
+                            selected = activeCategory == cat,
+                            onClick = { activeCategory = cat },
+                            label = { Text(cat.replace("_", " ").replaceFirstChar { it.uppercase() }) }
+                        )
+                    }
+                }
+            }
+
             // Articles
             when {
                 state.isLoading -> LoadingIndicator()
@@ -306,10 +335,11 @@ fun SupportScreen(
                 }
                 else -> {
                     val filtered = state.articles.filter { a ->
-                        searchQuery.isBlank() ||
+                        (activeCategory == "all" || a.category == activeCategory) &&
+                        (searchQuery.isBlank() ||
                         a.title.contains(searchQuery, ignoreCase = true) ||
                         a.content.contains(searchQuery, ignoreCase = true) ||
-                        a.tags.any { it.contains(searchQuery, ignoreCase = true) }
+                        a.tags.any { it.contains(searchQuery, ignoreCase = true) })
                     }
                     if (filtered.isEmpty()) {
                         Box(Modifier.fillMaxSize().padding(32.dp), contentAlignment = Alignment.Center) {

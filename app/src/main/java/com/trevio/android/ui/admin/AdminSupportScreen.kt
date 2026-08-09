@@ -207,6 +207,27 @@ class AdminSupportViewModel @Inject constructor(
                 .onSuccess { loadArticles() }
         }
     }
+
+    fun updateArticle(
+        article: HelpArticle,
+        title: String,
+        content: String,
+        category: String,
+        tags: List<String>,
+        order: Int
+    ) {
+        viewModelScope.launch {
+            supportService.updateHelpArticle(
+                articleId = article.articleId,
+                title = title,
+                content = content,
+                category = category,
+                tags = tags,
+                order = order,
+                active = article.active
+            ).onSuccess { loadArticles() }
+        }
+    }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -261,6 +282,9 @@ fun AdminSupportScreen(
                 onDelete = { viewModel.deleteArticle(it) },
                 onCreate = { title, content, category, tags, order ->
                     viewModel.createArticle(title, content, category, tags, order)
+                },
+                onEdit = { article, title, content, category, tags, order ->
+                    viewModel.updateArticle(article, title, content, category, tags, order)
                 }
             )
         }
@@ -274,10 +298,24 @@ private fun AdminTicketsList(
     onSelectTicket: (SupportTicket) -> Unit,
     onLoadMore: () -> Unit = {}
 ) {
+    var searchQuery by remember { mutableStateOf("") }
+    var categoryFilter by remember { mutableStateOf<SupportCategory?>(null) }
+
     // Stats
     val total = state.tickets.size
     val open = state.tickets.count { it.status == SupportStatus.OPEN || it.status == SupportStatus.IN_PROGRESS }
     val unread = state.tickets.count { it.unreadByAdmin }
+
+    // Client-side filter by search + category
+    val filteredTickets = remember(state.tickets, searchQuery, categoryFilter) {
+        state.tickets.filter { t ->
+            (categoryFilter == null || t.category == categoryFilter) &&
+            (searchQuery.isBlank() ||
+                t.subject.contains(searchQuery, ignoreCase = true) ||
+                t.userEmail.contains(searchQuery, ignoreCase = true) ||
+                t.userDisplayName.contains(searchQuery, ignoreCase = true))
+        }
+    }
 
     Column(modifier = Modifier.fillMaxSize()) {
         Row(
@@ -289,6 +327,19 @@ private fun AdminTicketsList(
             StatChip("Unread", unread.toString())
         }
 
+        // Search bar
+        OutlinedTextField(
+            value = searchQuery,
+            onValueChange = { searchQuery = it },
+            placeholder = { Text("Search by subject, user, email...") },
+            leadingIcon = { Icon(Icons.Filled.Search, "Search") },
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 4.dp),
+            singleLine = true,
+            shape = RoundedCornerShape(12.dp)
+        )
+
         // Filter chips — FlowRow wraps them
         @OptIn(ExperimentalLayoutApi::class)
         FlowRow(
@@ -299,7 +350,7 @@ private fun AdminTicketsList(
             FilterChip(
                 selected = state.statusFilter == null,
                 onClick = { onFilterChange(null) },
-                label = { Text("All") }
+                label = { Text("All Status") }
             )
             SupportStatus.values().forEach { status ->
                 FilterChip(
@@ -310,13 +361,34 @@ private fun AdminTicketsList(
             }
         }
 
+        // Category filter chips
+        @OptIn(ExperimentalLayoutApi::class)
+        FlowRow(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
+            horizontalArrangement = Arrangement.spacedBy(4.dp),
+            verticalArrangement = Arrangement.spacedBy(4.dp)
+        ) {
+            FilterChip(
+                selected = categoryFilter == null,
+                onClick = { categoryFilter = null },
+                label = { Text("All Categories") }
+            )
+            SupportCategory.values().forEach { cat ->
+                FilterChip(
+                    selected = categoryFilter == cat,
+                    onClick = { categoryFilter = if (categoryFilter == cat) null else cat },
+                    label = { Text(cat.name.replace("_", " ")) }
+                )
+            }
+        }
+
         Spacer(Modifier.height(8.dp))
 
         if (state.isLoading) {
             Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 CircularProgressIndicator()
             }
-        } else if (state.tickets.isEmpty()) {
+        } else if (filteredTickets.isEmpty()) {
             Box(Modifier.fillMaxSize().padding(32.dp), contentAlignment = Alignment.Center) {
                 Text("No tickets found", color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
@@ -326,10 +398,10 @@ private fun AdminTicketsList(
                 contentPadding = PaddingValues(16.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                items(state.tickets) { ticket ->
+                items(filteredTickets) { ticket ->
                     AdminTicketItem(ticket = ticket) { onSelectTicket(it) }
                 }
-                if (state.ticketsHasMore) {
+                if (state.ticketsHasMore && searchQuery.isBlank() && categoryFilter == null) {
                     item {
                         LaunchedEffect(state.tickets.lastOrNull()?.ticketId) {
                             onLoadMore()
@@ -648,9 +720,11 @@ private fun AdminArticlesList(
     state: AdminSupportViewModel.State,
     onToggleActive: (HelpArticle) -> Unit,
     onDelete: (HelpArticle) -> Unit,
-    onCreate: (String, String, String, List<String>, Int) -> Unit
+    onCreate: (String, String, String, List<String>, Int) -> Unit,
+    onEdit: (HelpArticle, String, String, String, List<String>, Int) -> Unit
 ) {
     var showCreateDialog by remember { mutableStateOf(false) }
+    var editingArticle by remember { mutableStateOf<HelpArticle?>(null) }
 
     if (showCreateDialog) {
         CreateArticleDialog(
@@ -658,6 +732,17 @@ private fun AdminArticlesList(
             onCreate = { title, content, category, tags, order ->
                 onCreate(title, content, category, tags, order)
                 showCreateDialog = false
+            }
+        )
+    }
+
+    editingArticle?.let { article ->
+        EditArticleDialog(
+            article = article,
+            onDismiss = { editingArticle = null },
+            onSave = { title, content, category, tags, order ->
+                onEdit(article, title, content, category, tags, order)
+                editingArticle = null
             }
         )
     }
@@ -690,6 +775,7 @@ private fun AdminArticlesList(
                     AdminArticleItem(
                         article = article,
                         onToggleActive = { onToggleActive(it) },
+                        onEdit = { editingArticle = it },
                         onDelete = { onDelete(it) }
                     )
                 }
@@ -702,6 +788,7 @@ private fun AdminArticlesList(
 private fun AdminArticleItem(
     article: HelpArticle,
     onToggleActive: (HelpArticle) -> Unit,
+    onEdit: (HelpArticle) -> Unit,
     onDelete: (HelpArticle) -> Unit
 ) {
     TrevioCard {
@@ -733,6 +820,9 @@ private fun AdminArticleItem(
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
+            }
+            IconButton(onClick = { onEdit(article) }) {
+                Icon(Icons.Default.Edit, contentDescription = "Edit")
             }
             IconButton(onClick = { onToggleActive(article) }) {
                 Icon(
@@ -819,6 +909,86 @@ private fun CreateArticleDialog(
                 },
                 enabled = title.isNotBlank() && content.isNotBlank()
             ) { Text("Create") }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text("Cancel") }
+        }
+    )
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun EditArticleDialog(
+    article: HelpArticle,
+    onDismiss: () -> Unit,
+    onSave: (String, String, String, List<String>, Int) -> Unit
+) {
+    var title by remember { mutableStateOf(article.title) }
+    var content by remember { mutableStateOf(article.content) }
+    var category by remember { mutableStateOf(article.category) }
+    var tags by remember { mutableStateOf(article.tags.joinToString(", ")) }
+    var order by remember { mutableStateOf(article.order.toString()) }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Edit Help Article") },
+        text = {
+            Column(modifier = Modifier.fillMaxWidth()) {
+                OutlinedTextField(
+                    value = title,
+                    onValueChange = { title = it },
+                    label = { Text("Title") },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true
+                )
+                Spacer(Modifier.height(8.dp))
+                OutlinedTextField(
+                    value = content,
+                    onValueChange = { content = it },
+                    label = { Text("Content (HTML)") },
+                    modifier = Modifier.fillMaxWidth().heightIn(min = 100.dp)
+                )
+                Spacer(Modifier.height(8.dp))
+                OutlinedTextField(
+                    value = category,
+                    onValueChange = { category = it },
+                    label = { Text("Category") },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true
+                )
+                Spacer(Modifier.height(8.dp))
+                OutlinedTextField(
+                    value = tags,
+                    onValueChange = { tags = it },
+                    label = { Text("Tags (comma-separated)") },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true
+                )
+                Spacer(Modifier.height(8.dp))
+                OutlinedTextField(
+                    value = order,
+                    onValueChange = { order = it.filter { c -> c.isDigit() } },
+                    label = { Text("Display Order") },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true
+                )
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = {
+                    if (title.isNotBlank() && content.isNotBlank()) {
+                        onSave(
+                            title.trim(),
+                            content.trim(),
+                            category.trim(),
+                            tags.split(",").map { it.trim() }.filter { it.isNotEmpty() },
+                            order.toIntOrNull() ?: article.order
+                        )
+                    }
+                },
+                enabled = title.isNotBlank() && content.isNotBlank()
+            ) { Text("Save") }
         },
         dismissButton = {
             TextButton(onClick = onDismiss) { Text("Cancel") }

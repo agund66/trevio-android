@@ -22,8 +22,12 @@ class FirebaseAnalyticsService @Inject constructor(
 
     override suspend fun getGroupAnalytics(groupId: String): Result<GroupAnalytics> {
         return try {
-            auth.currentUser?.uid ?: return Result.failure(Exception("User not authenticated"))
+            val uid = auth.currentUser?.uid ?: return Result.failure(Exception("User not authenticated"))
             if (groupId.isBlank()) return Result.failure(Exception("Group ID is required"))
+
+            val memberDoc = db.collection("groups").document(groupId).collection("members").document(uid).get().await()
+            if (!memberDoc.exists()) return Result.failure(Exception("You are not a member of this group"))
+
             val expensesRef = db.collection("groups").document(groupId).collection("expenses")
                 .orderBy("date", Query.Direction.DESCENDING).limit(500)
             val expenseSnapshot = expensesRef.get().await()

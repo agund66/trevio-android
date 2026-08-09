@@ -62,6 +62,10 @@ class SplashViewModel @Inject constructor(
                 _state.value = SplashState.Blocked
             } else if (!user.acceptedTnC) {
                 _state.value = SplashState.NeedsTnC
+            } else if (user.username.isBlank()) {
+                // Auto-repair: generate missing username for existing users
+                userService.acceptTnC()
+                _state.value = SplashState.Authenticated
             } else {
                 _state.value = SplashState.Authenticated
             }

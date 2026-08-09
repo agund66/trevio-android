@@ -40,6 +40,9 @@ class FirebaseSettlementServiceImpl @Inject constructor(
                 return Result.failure(Exception("Missing required fields"))
             }
             if (fromUid == toUid) return Result.failure(Exception("Cannot settle with yourself"))
+            if (uid != fromUid && uid != toUid) {
+                return Result.failure(Exception("You can only record settlements involving yourself"))
+            }
 
             val groupRef = firestore.collection("groups").document(groupId)
             val groupDoc = groupRef.get().await()
@@ -47,6 +50,12 @@ class FirebaseSettlementServiceImpl @Inject constructor(
 
             val memberDoc = groupRef.collection("members").document(uid).get().await()
             if (!memberDoc.exists()) return Result.failure(Exception("You are not a member of this group"))
+
+            val fromMember = groupRef.collection("members").document(fromUid).get().await()
+            val toMember = groupRef.collection("members").document(toUid).get().await()
+            if (!fromMember.exists() || !toMember.exists()) {
+                return Result.failure(Exception("Both parties must be group members"))
+            }
 
             val rateToBase = exchangeRateService.getRateToBase(currency).getOrDefault(1.0)
             val amountInBase = kotlin.math.round(amount * rateToBase * 100) / 100

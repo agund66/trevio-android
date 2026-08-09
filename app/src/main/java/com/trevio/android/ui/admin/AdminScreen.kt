@@ -238,10 +238,20 @@ fun AdminScreen(
                 )
             }
         } else {
+            var searchQuery by remember { mutableStateOf("") }
             val totalUsers = state.users.size
             val blockedUsers = state.users.count { it.blocked }
             val adminUsers = state.users.count { it.role == "superadmin" }
             val currentUid = state.currentUid
+
+            val filteredUsers = remember(state.users, searchQuery) {
+                if (searchQuery.isBlank()) state.users
+                else state.users.filter {
+                    it.displayName.contains(searchQuery, ignoreCase = true) ||
+                    it.email.contains(searchQuery, ignoreCase = true) ||
+                    (it.username?.contains(searchQuery, ignoreCase = true) ?: false)
+                }
+            }
 
             LazyColumn(
                 modifier = Modifier.fillMaxSize(),
@@ -259,7 +269,19 @@ fun AdminScreen(
                     }
                 }
 
-                items(state.users) { user ->
+                item {
+                    OutlinedTextField(
+                        value = searchQuery,
+                        onValueChange = { searchQuery = it },
+                        placeholder = { Text("Search by name, email, username...") },
+                        leadingIcon = { Icon(Icons.Default.Search, "Search") },
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true,
+                        shape = RoundedCornerShape(12.dp)
+                    )
+                }
+
+                items(filteredUsers) { user ->
                     UserRow(
                         user = user,
                         isCurrentUser = user.uid == currentUid,
@@ -306,6 +328,37 @@ private fun UserRow(
     onPromote: () -> Unit,
     onDemote: () -> Unit
 ) {
+    var pendingAction by remember { mutableStateOf<String?>(null) }
+
+    pendingAction?.let { action ->
+        val (title, message) = when (action) {
+            "block" -> "Block User" to "Block ${user.displayName}? They will lose access to the app."
+            "unblock" -> "Unblock User" to "Unblock ${user.displayName}? They will regain access."
+            "promote" -> "Promote to Admin" to "Promote ${user.displayName} to superadmin? They will have full admin access."
+            "demote" -> "Demote to User" to "Demote ${user.displayName}? They will lose admin access."
+            else -> "" to ""
+        }
+        AlertDialog(
+            onDismissRequest = { pendingAction = null },
+            title = { Text(title) },
+            text = { Text(message) },
+            confirmButton = {
+                Button(onClick = {
+                    when (action) {
+                        "block" -> onBlock()
+                        "unblock" -> onUnblock()
+                        "promote" -> onPromote()
+                        "demote" -> onDemote()
+                    }
+                    pendingAction = null
+                }) { Text("Confirm") }
+            },
+            dismissButton = {
+                TextButton(onClick = { pendingAction = null }) { Text("Cancel") }
+            }
+        )
+    }
+
     TrevioCard {
         Column(modifier = Modifier.padding(12.dp)) {
             Row(
@@ -391,7 +444,7 @@ private fun UserRow(
             ) {
                 if (user.blocked) {
                     OutlinedButton(
-                        onClick = onUnblock,
+                        onClick = { pendingAction = "unblock" },
                         enabled = !actionLoading,
                         modifier = Modifier.weight(1f)
                     ) {
@@ -401,7 +454,7 @@ private fun UserRow(
                     }
                 } else {
                     OutlinedButton(
-                        onClick = onBlock,
+                        onClick = { pendingAction = "block" },
                         enabled = !actionLoading && !isCurrentUser,
                         modifier = Modifier.weight(1f)
                     ) {
@@ -412,7 +465,7 @@ private fun UserRow(
                 }
                 if (user.role == "superadmin") {
                     OutlinedButton(
-                        onClick = onDemote,
+                        onClick = { pendingAction = "demote" },
                         enabled = !actionLoading && !isCurrentUser,
                         modifier = Modifier.weight(1f)
                     ) {
@@ -422,7 +475,7 @@ private fun UserRow(
                     }
                 } else {
                     Button(
-                        onClick = onPromote,
+                        onClick = { pendingAction = "promote" },
                         enabled = !actionLoading,
                         modifier = Modifier.weight(1f)
                     ) {

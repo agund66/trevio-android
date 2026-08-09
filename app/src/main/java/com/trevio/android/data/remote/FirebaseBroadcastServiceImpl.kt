@@ -88,6 +88,7 @@ class FirebaseBroadcastServiceImpl @Inject constructor(
 
     override suspend fun getAllBroadcasts(): Result<List<BroadcastMessage>> {
         return try {
+            requireSuperadmin().onFailure { return Result.failure(it) }
             val snapshot = firestore.collection("broadcasts")
                 .orderBy("createdAt", Query.Direction.DESCENDING)
                 .limit(100)

@@ -82,12 +82,13 @@ class SettlementViewModel @Inject constructor(
 
     fun settleDebt(debt: SimplifiedDebt, method: com.trevio.android.domain.model.SettlementMethod = com.trevio.android.domain.model.SettlementMethod.CASH) {
         viewModelScope.launch {
+            val userCurrency = authService.getCurrentUser()?.defaultCurrency ?: "INR"
             settlementService.addSettlement(
                 groupId = groupId,
                 fromUid = debt.fromUid,
                 toUid = debt.toUid,
                 amount = debt.amount,
-                currency = "INR",
+                currency = userCurrency,
                 method = method,
                 upiRefId = null
             ).onSuccess {

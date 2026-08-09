@@ -68,7 +68,8 @@ class AdminViewModel @Inject constructor(
                 _state.value = _state.value.copy(isCheckingAdmin = false, isLoading = false, error = "Access denied: superadmin only")
                 return@launch
             }
-            _state.value = _state.value.copy(isCheckingAdmin = false, isSuperadmin = true, currentUid = authService.getCurrentUserId())
+            val currentUid = authService.getCurrentUserId()
+            _state.value = _state.value.copy(isCheckingAdmin = false, isSuperadmin = true, currentUid = currentUid)
             loadUsers()
         }
     }

@@ -17,6 +17,8 @@ import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Logout
+import androidx.compose.material.icons.filled.Info
+
 import androidx.compose.material.icons.filled.Mail
 import androidx.compose.material.icons.filled.Payments
 import androidx.compose.material.icons.filled.Person
@@ -44,6 +46,7 @@ import com.trevio.android.core.designsystem.theme.ThemeMode
 import com.trevio.android.core.designsystem.theme.ThemeViewModel
 import com.trevio.android.core.designsystem.theme.TrevioBorder
 import com.trevio.android.core.navigation.TrevioRoute
+import com.trevio.android.core.navigation.TrevioRouteSupport
 import com.trevio.android.domain.model.User
 import com.trevio.android.domain.repository.AuthService
 import com.trevio.android.domain.repository.UserService
@@ -304,7 +307,8 @@ fun ProfileScreen(
                 onEdit = { viewModel.startEditing() },
                 onDelete = { viewModel.deleteAccount() },
                 themeMode = themeMode,
-                onThemeModeChange = { themeViewModel.setThemeMode(it) }
+                onThemeModeChange = { themeViewModel.setThemeMode(it) },
+                onHelpSupport = { navController.navigate(TrevioRouteSupport.Support.route) }
             )
         }
     }
@@ -316,7 +320,8 @@ private fun ViewProfileContent(
     onEdit: () -> Unit,
     onDelete: () -> Unit,
     themeMode: ThemeMode,
-    onThemeModeChange: (ThemeMode) -> Unit
+    onThemeModeChange: (ThemeMode) -> Unit,
+    onHelpSupport: () -> Unit = {}
 ) {
     var showDeleteDialog by remember { mutableStateOf(false) }
     var showTermsDialog by remember { mutableStateOf(false) }
@@ -512,6 +517,18 @@ private fun ViewProfileContent(
             Icon(Icons.Default.Description, contentDescription = null, modifier = Modifier.size(18.dp))
             Spacer(modifier = Modifier.width(8.dp))
             Text("Terms & Conditions")
+        }
+
+        Spacer(modifier = Modifier.height(8.dp))
+
+        OutlinedButton(
+            onClick = onHelpSupport,
+            modifier = Modifier.fillMaxWidth(),
+            shape = MaterialTheme.shapes.medium
+        ) {
+            Icon(Icons.Default.Info, contentDescription = null, modifier = Modifier.size(18.dp))
+            Spacer(modifier = Modifier.width(8.dp))
+            Text("Help & Support")
         }
 
         OutlinedButton(

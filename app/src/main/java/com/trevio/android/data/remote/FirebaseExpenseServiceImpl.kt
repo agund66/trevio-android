@@ -7,6 +7,7 @@ import com.google.firebase.firestore.Query
 import com.trevio.android.domain.model.BillItem
 import com.trevio.android.domain.model.Expense
 import com.trevio.android.domain.model.ItemizedSplitData
+import com.trevio.android.domain.model.PaginatedResult
 import com.trevio.android.domain.model.RecurringConfig
 import com.trevio.android.domain.model.RecurringFrequency
 import com.trevio.android.domain.model.SplitEntry
@@ -323,7 +324,7 @@ class FirebaseExpenseServiceImpl @Inject constructor(
         }
     }
 
-    override suspend fun getGroupExpenses(groupId: String, pageSize: Int, lastExpenseId: String?): Result<List<Expense>> {
+    override suspend fun getGroupExpenses(groupId: String, pageSize: Int, lastExpenseId: String?): Result<PaginatedResult<Expense>> {
         return try {
             val uid = auth.currentUser?.uid ?: return Result.failure(Exception("User not authenticated"))
             val groupRef = firestore.collection("groups").document(groupId)
@@ -397,7 +398,11 @@ class FirebaseExpenseServiceImpl @Inject constructor(
                     }
                 )
             }
-            Result.success(expenses)
+            Result.success(PaginatedResult(
+                items = expenses,
+                hasMore = snapshot.size() == pageSize,
+                lastId = if (snapshot.size() > 0) snapshot.documents.last().id else null
+            ))
         } catch (e: Exception) {
             Result.failure(e)
         }

@@ -23,6 +23,7 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.trevio.android.core.designsystem.components.LoadingIndicator
 import com.trevio.android.core.designsystem.components.TrevioCard
 import com.trevio.android.core.designsystem.theme.TrevioBorder
 import com.trevio.android.domain.model.User
@@ -43,6 +44,8 @@ class AdminViewModel @Inject constructor(
     data class AdminState(
         val isLoading: Boolean = true,
         val users: List<User> = emptyList(),
+        val usersHasMore: Boolean = false,
+        val usersLoadingMore: Boolean = false,
         val error: String? = null,
         val actionLoading: String? = null,
         val currentUid: String? = null,
@@ -66,9 +69,28 @@ class AdminViewModel @Inject constructor(
     fun loadUsers() {
         _state.value = _state.value.copy(isLoading = true, error = null)
         viewModelScope.launch {
-            adminService.getAllUsers()
-                .onSuccess { users -> _state.value = _state.value.copy(isLoading = false, users = users) }
+            adminService.getAllUsers(50, null)
+                .onSuccess { result -> _state.value = _state.value.copy(isLoading = false, users = result.items, usersHasMore = result.hasMore) }
                 .onFailure { e -> _state.value = _state.value.copy(isLoading = false, error = e.message) }
+        }
+    }
+
+    fun loadMoreUsers() {
+        if (!_state.value.usersHasMore || _state.value.usersLoadingMore) return
+        _state.value = _state.value.copy(usersLoadingMore = true)
+        val lastId = _state.value.users.lastOrNull()?.uid
+        viewModelScope.launch {
+            adminService.getAllUsers(50, lastId)
+                .onSuccess { result ->
+                    _state.value = _state.value.copy(
+                        users = _state.value.users + result.items,
+                        usersLoadingMore = false,
+                        usersHasMore = result.hasMore
+                    )
+                }
+                .onFailure {
+                    _state.value = _state.value.copy(usersLoadingMore = false)
+                }
         }
     }
 
@@ -120,7 +142,7 @@ fun AdminScreen(
     viewModel: AdminViewModel = hiltViewModel()
 ) {
     val state by viewModel.state.collectAsState()
-    val tabs = listOf("Users" to Icons.Default.People, "Broadcasts" to Icons.Default.Campaign)
+    val tabs = listOf("Users" to Icons.Default.People, "Broadcasts" to Icons.Default.Campaign, "Support" to Icons.Default.Support)
 
     Column(
         modifier = Modifier
@@ -164,6 +186,8 @@ fun AdminScreen(
 
         if (state.selectedTab == 1) {
             BroadcastsScreen()
+        } else if (state.selectedTab == 2) {
+            AdminSupportScreen()
         } else if (state.isLoading) {
             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 CircularProgressIndicator()
@@ -208,6 +232,16 @@ fun AdminScreen(
                         onPromote = { viewModel.promoteUser(user.uid) },
                         onDemote = { viewModel.demoteUser(user.uid) }
                     )
+                }
+                if (state.usersHasMore) {
+                    item {
+                        LaunchedEffect(state.users.lastOrNull()?.uid) {
+                            viewModel.loadMoreUsers()
+                        }
+                        if (state.usersLoadingMore) {
+                            LoadingIndicator(modifier = Modifier.fillMaxWidth().padding(16.dp))
+                        }
+                    }
                 }
             }
         }

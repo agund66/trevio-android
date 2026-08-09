@@ -4,6 +4,7 @@ import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.Query
 import com.trevio.android.domain.model.Member
+import com.trevio.android.domain.model.PaginatedResult
 import com.trevio.android.domain.model.Settlement
 import com.trevio.android.domain.model.SettlementMethod
 import com.trevio.android.domain.model.SimplifiedDebt
@@ -284,17 +285,28 @@ class FirebaseSettlementServiceImpl @Inject constructor(
         }
     }
 
-    override suspend fun getSettlementHistory(groupId: String): Result<List<Settlement>> {
+    override suspend fun getSettlementHistory(groupId: String, pageSize: Int, lastSettlementId: String?): Result<PaginatedResult<Settlement>> {
         return try {
             val uid = auth.currentUser?.uid ?: return Result.failure(Exception("User not authenticated"))
             val groupRef = firestore.collection("groups").document(groupId)
             val memberDoc = groupRef.collection("members").document(uid).get().await()
             if (!memberDoc.exists()) return Result.failure(Exception("You are not a member of this group"))
 
-            val snapshot = groupRef.collection("settlements")
+            var query = groupRef.collection("settlements")
                 .orderBy("date", Query.Direction.DESCENDING)
-                .limit(50)
-                .get().await()
+                .limit(pageSize.toLong())
+
+            if (lastSettlementId != null) {
+                val lastDoc = groupRef.collection("settlements").document(lastSettlementId).get().await()
+                if (lastDoc.exists()) {
+                    query = groupRef.collection("settlements")
+                        .orderBy("date", Query.Direction.DESCENDING)
+                        .startAfter(lastDoc)
+                        .limit(pageSize.toLong())
+                }
+            }
+
+            val snapshot = query.get().await()
 
             val allUids = snapshot.documents.flatMap { doc ->
                 val data = doc.data ?: emptyMap()
@@ -349,7 +361,11 @@ class FirebaseSettlementServiceImpl @Inject constructor(
                     createdBy = data["createdBy"] as? String ?: ""
                 )
             }
-            Result.success(settlements)
+            Result.success(PaginatedResult(
+                items = settlements,
+                hasMore = snapshot.size() == pageSize,
+                lastId = if (snapshot.size() > 0) snapshot.documents.last().id else null
+            ))
         } catch (e: Exception) {
             Result.failure(e)
         }

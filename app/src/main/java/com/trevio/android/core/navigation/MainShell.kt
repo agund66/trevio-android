@@ -56,6 +56,10 @@ import com.trevio.android.ui.notifications.NotificationsScreen
 import com.trevio.android.ui.profile.ProfileScreen
 import com.trevio.android.ui.profile.PublicProfileScreen
 import com.trevio.android.ui.settlement.SettleUpScreen
+import com.trevio.android.ui.support.CreateTicketScreen
+import com.trevio.android.ui.support.MyTicketsScreen
+import com.trevio.android.ui.support.SupportScreen
+import com.trevio.android.ui.support.TicketDetailScreen
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -266,5 +270,41 @@ private fun NavGraphBuilder.detailGraph(navController: NavHostController) {
     ) {
         val uid = it.arguments?.getString("uid") ?: ""
         PublicProfileScreen(navController = navController, uid = uid)
+    }
+
+    // ─── Support routes ───────────────────────────────────────────
+    composable(TrevioRouteSupport.Support.route) {
+        SupportScreen(navController = navController)
+    }
+
+    composable(
+        route = TrevioRouteSupport.CreateTicket.route,
+        arguments = listOf(
+            navArgument("groupId") { type = NavType.StringType; defaultValue = "" },
+            navArgument("groupName") { type = NavType.StringType; defaultValue = "" },
+            navArgument("screen") { type = NavType.StringType; defaultValue = "" }
+        )
+    ) { entry ->
+        val groupId = entry.arguments?.getString("groupId")?.takeIf { it.isNotEmpty() }
+        val groupName = entry.arguments?.getString("groupName")?.takeIf { it.isNotEmpty() }
+        val screen = entry.arguments?.getString("screen")?.takeIf { it.isNotEmpty() }
+        CreateTicketScreen(
+            navController = navController,
+            contextGroupId = groupId,
+            contextGroupName = groupName,
+            contextScreen = screen
+        )
+    }
+
+    composable(TrevioRouteSupport.MyTickets.route) {
+        MyTicketsScreen(navController = navController)
+    }
+
+    composable(
+        route = TrevioRouteSupport.TicketDetail.route,
+        arguments = listOf(navArgument("ticketId") { type = NavType.StringType })
+    ) { entry ->
+        val ticketId = entry.arguments?.getString("ticketId") ?: ""
+        TicketDetailScreen(navController = navController, ticketId = ticketId)
     }
 }

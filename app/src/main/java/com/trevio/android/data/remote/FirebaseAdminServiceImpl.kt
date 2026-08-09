@@ -3,6 +3,7 @@ package com.trevio.android.data.remote
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.Query
+import com.trevio.android.domain.model.PaginatedResult
 import com.trevio.android.domain.model.User
 import com.trevio.android.domain.repository.AdminService
 import kotlinx.coroutines.tasks.await
@@ -15,17 +16,28 @@ class FirebaseAdminServiceImpl @Inject constructor(
     private val auth: FirebaseAuth
 ) : AdminService {
 
-    override suspend fun getAllUsers(): Result<List<User>> {
+    override suspend fun getAllUsers(pageSize: Int, lastUserUid: String?): Result<PaginatedResult<User>> {
         return try {
             val uid = auth.currentUser?.uid ?: return Result.failure(Exception("User not authenticated"))
             val currentUserDoc = firestore.collection("users").document(uid).get().await()
             val currentRole = currentUserDoc.data?.get("role") as? String ?: "user"
             if (currentRole != "superadmin") return Result.failure(Exception("Access denied"))
 
-            val snapshot = firestore.collection("users")
+            var query = firestore.collection("users")
                 .orderBy("createdAt", Query.Direction.DESCENDING)
-                .limit(500)
-                .get().await()
+                .limit(pageSize.toLong())
+
+            if (lastUserUid != null) {
+                val lastDoc = firestore.collection("users").document(lastUserUid).get().await()
+                if (lastDoc.exists()) {
+                    query = firestore.collection("users")
+                        .orderBy("createdAt", Query.Direction.DESCENDING)
+                        .startAfter(lastDoc)
+                        .limit(pageSize.toLong())
+                }
+            }
+
+            val snapshot = query.get().await()
 
             val users = snapshot.documents.mapNotNull { doc ->
                 val data = doc.data ?: return@mapNotNull null
@@ -46,7 +58,11 @@ class FirebaseAdminServiceImpl @Inject constructor(
                     countryCode = data["countryCode"] as? String ?: ""
                 )
             }
-            Result.success(users)
+            Result.success(PaginatedResult(
+                items = users,
+                hasMore = snapshot.size() == pageSize,
+                lastId = if (snapshot.size() > 0) snapshot.documents.last().id else null
+            ))
         } catch (e: Exception) {
             Result.failure(e)
         }

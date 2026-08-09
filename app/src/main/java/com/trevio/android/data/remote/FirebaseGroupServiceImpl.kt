@@ -7,6 +7,7 @@ import com.google.firebase.firestore.FirebaseFirestore
 import com.trevio.android.domain.model.Activity
 import com.trevio.android.domain.model.Group
 import com.trevio.android.domain.model.GroupTemplate
+import com.trevio.android.domain.model.PaginatedResult
 import com.trevio.android.domain.repository.GroupInfo
 import com.trevio.android.domain.repository.GroupService
 import com.trevio.android.domain.model.SplitEntry
@@ -433,17 +434,28 @@ class FirebaseGroupServiceImpl @Inject constructor(
         }
     }
 
-    override suspend fun getGroupActivities(groupId: String, pageSize: Int): Result<List<Activity>> {
+    override suspend fun getGroupActivities(groupId: String, pageSize: Int, lastActivityId: String?): Result<PaginatedResult<Activity>> {
         return try {
             val uid = auth.currentUser?.uid ?: return Result.failure(Exception("User not authenticated"))
             val groupRef = firestore.collection("groups").document(groupId)
             val memberDoc = groupRef.collection("members").document(uid).get().await()
             if (!memberDoc.exists()) return Result.failure(Exception("You are not a member of this group"))
 
-            val snapshot = groupRef.collection("activities")
+            var query = groupRef.collection("activities")
                 .orderBy("createdAt", com.google.firebase.firestore.Query.Direction.DESCENDING)
                 .limit(pageSize.toLong())
-                .get().await()
+
+            if (lastActivityId != null) {
+                val lastDoc = groupRef.collection("activities").document(lastActivityId).get().await()
+                if (lastDoc.exists()) {
+                    query = groupRef.collection("activities")
+                        .orderBy("createdAt", com.google.firebase.firestore.Query.Direction.DESCENDING)
+                        .startAfter(lastDoc)
+                        .limit(pageSize.toLong())
+                }
+            }
+
+            val snapshot = query.get().await()
 
             val activities = mutableListOf<Activity>()
 
@@ -472,7 +484,11 @@ class FirebaseGroupServiceImpl @Inject constructor(
                     )
                 )
             }
-            Result.success(activities)
+            Result.success(PaginatedResult(
+                items = activities,
+                hasMore = snapshot.size() == pageSize,
+                lastId = if (snapshot.size() > 0) snapshot.documents.last().id else null
+            ))
         } catch (e: Exception) {
             Result.failure(e)
         }

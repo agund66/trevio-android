@@ -5,6 +5,7 @@ import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.Query
 import com.trevio.android.domain.model.AppNotification
+import com.trevio.android.domain.model.PaginatedResult
 import com.trevio.android.domain.repository.NotificationService
 import kotlinx.coroutines.tasks.await
 import java.util.Date
@@ -32,7 +33,7 @@ class FirebaseNotificationServiceImpl @Inject constructor(
     private val auth: FirebaseAuth
 ) : NotificationService {
 
-    override suspend fun getNotifications(pageSize: Int, lastNotificationId: String?): Result<List<AppNotification>> {
+    override suspend fun getNotifications(pageSize: Int, lastNotificationId: String?): Result<PaginatedResult<AppNotification>> {
         return try {
             val uid = auth.currentUser?.uid ?: return Result.failure(Exception("User not authenticated"))
 
@@ -65,7 +66,11 @@ class FirebaseNotificationServiceImpl @Inject constructor(
                     data = (data["data"] as? Map<String, String>) ?: emptyMap()
                 )
             }
-            Result.success(notifications)
+            Result.success(PaginatedResult(
+                items = notifications,
+                hasMore = snapshot.size() == pageSize,
+                lastId = if (snapshot.size() > 0) snapshot.documents.last().id else null
+            ))
         } catch (e: Exception) {
             Result.failure(e)
         }

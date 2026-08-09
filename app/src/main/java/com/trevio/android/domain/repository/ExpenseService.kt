@@ -2,6 +2,7 @@ package com.trevio.android.domain.repository
 
 import com.trevio.android.domain.model.Expense
 import com.trevio.android.domain.model.ItemizedSplitData
+import com.trevio.android.domain.model.PaginatedResult
 import com.trevio.android.domain.model.RecurringConfig
 import com.trevio.android.domain.model.SplitEntry
 import com.trevio.android.domain.model.SplitType
@@ -40,5 +41,5 @@ interface ExpenseService {
     ): Result<Unit>
 
     suspend fun deleteExpense(groupId: String, expenseId: String): Result<Unit>
-    suspend fun getGroupExpenses(groupId: String, pageSize: Int, lastExpenseId: String?): Result<List<Expense>>
+    suspend fun getGroupExpenses(groupId: String, pageSize: Int, lastExpenseId: String?): Result<PaginatedResult<Expense>>
 }

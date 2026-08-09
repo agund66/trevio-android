@@ -74,7 +74,8 @@ class EditExpenseViewModel @Inject constructor(
         viewModelScope.launch {
             val uid = authService.getCurrentUserId()
             val members = settlementService.getGroupBalances(groupId).getOrDefault(emptyList())
-            val expenses = expenseService.getGroupExpenses(groupId, 50, null).getOrDefault(emptyList())
+            val expensesResult = expenseService.getGroupExpenses(groupId, 500, null).getOrNull()
+            val expenses = expensesResult?.items ?: emptyList()
             val expense = expenses.find { it.expenseId == expenseId }
 
             if (expense == null) {

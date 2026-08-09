@@ -6,6 +6,8 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
@@ -38,6 +40,7 @@ import com.trevio.android.core.navigation.TrevioRoute
 import com.trevio.android.domain.model.Activity
 import com.trevio.android.domain.model.Expense
 import com.trevio.android.domain.model.Member
+import com.trevio.android.domain.model.PaginatedResult
 import com.trevio.android.domain.model.Settlement
 import com.trevio.android.domain.model.UserSearchResult
 import com.trevio.android.domain.model.SimplifiedDebt
@@ -73,12 +76,16 @@ class GroupViewModel @Inject constructor(
         val isLoading: Boolean = true,
         val groupInfo: GroupInfo? = null,
         val expenses: List<Expense> = emptyList(),
+        val expensesHasMore: Boolean = false,
+        val expensesLoadingMore: Boolean = false,
         val members: List<Member> = emptyList(),
         val debts: List<SimplifiedDebt> = emptyList(),
         val currentUserId: String? = null,
         val activities: List<Activity> = emptyList(),
         val activitiesLoading: Boolean = false,
         val activitiesError: String? = null,
+        val activitiesHasMore: Boolean = false,
+        val activitiesLoadingMore: Boolean = false,
         val searchResults: List<UserSearchResult> = emptyList(),
         val inviteError: String? = null,
         val actionError: String? = null,
@@ -86,6 +93,8 @@ class GroupViewModel @Inject constructor(
         val settlements: List<Settlement> = emptyList(),
         val settlementsLoading: Boolean = false,
         val settlementsError: String? = null,
+        val settlementsHasMore: Boolean = false,
+        val settlementsLoadingMore: Boolean = false,
         val deleteExpenseId: String? = null,
         val deleteError: String? = null
     )
@@ -108,13 +117,14 @@ class GroupViewModel @Inject constructor(
         viewModelScope.launch {
             val currentUid = authService.getCurrentUserId()
             val info = groupService.getGroupInfo(groupId).getOrNull()
-            val expenses = expenseService.getGroupExpenses(groupId, 50, null).getOrDefault(emptyList())
+            val expensesResult = expenseService.getGroupExpenses(groupId, 20, null).getOrNull()
             val members = settlementService.getGroupBalances(groupId).getOrDefault(emptyList())
             val debts = settlementService.getSimplifiedDebts(groupId).getOrDefault(emptyList())
             _state.value = _state.value.copy(
                 isLoading = false,
                 groupInfo = info,
-                expenses = expenses,
+                expenses = expensesResult?.items ?: emptyList(),
+                expensesHasMore = expensesResult?.hasMore ?: false,
                 members = members,
                 debts = debts,
                 currentUserId = currentUid
@@ -126,12 +136,13 @@ class GroupViewModel @Inject constructor(
         viewModelScope.launch {
             val currentUid = authService.getCurrentUserId()
             val info = groupService.getGroupInfo(groupId).getOrNull()
-            val expenses = expenseService.getGroupExpenses(groupId, 50, null).getOrDefault(emptyList())
+            val expensesResult = expenseService.getGroupExpenses(groupId, 20, null).getOrNull()
             val members = settlementService.getGroupBalances(groupId).getOrDefault(emptyList())
             val debts = settlementService.getSimplifiedDebts(groupId).getOrDefault(emptyList())
             _state.value = _state.value.copy(
                 groupInfo = info,
-                expenses = expenses,
+                expenses = expensesResult?.items ?: emptyList(),
+                expensesHasMore = expensesResult?.hasMore ?: false,
                 members = members,
                 debts = debts,
                 currentUserId = currentUid
@@ -212,12 +223,31 @@ class GroupViewModel @Inject constructor(
     fun loadActivities() {
         _state.value = _state.value.copy(activitiesLoading = true, activitiesError = null)
         viewModelScope.launch {
-            groupService.getGroupActivities(groupId)
-                .onSuccess { activities ->
-                    _state.value = _state.value.copy(activities = activities, activitiesLoading = false)
+            groupService.getGroupActivities(groupId, 20, null)
+                .onSuccess { result ->
+                    _state.value = _state.value.copy(activities = result.items, activitiesLoading = false, activitiesHasMore = result.hasMore)
                 }
                 .onFailure { e ->
                     _state.value = _state.value.copy(activitiesLoading = false, activitiesError = e.message)
+                }
+        }
+    }
+
+    fun loadMoreActivities() {
+        if (!_state.value.activitiesHasMore || _state.value.activitiesLoadingMore) return
+        _state.value = _state.value.copy(activitiesLoadingMore = true)
+        val lastId = _state.value.activities.lastOrNull()?.activityId
+        viewModelScope.launch {
+            groupService.getGroupActivities(groupId, 20, lastId)
+                .onSuccess { result ->
+                    _state.value = _state.value.copy(
+                        activities = _state.value.activities + result.items,
+                        activitiesLoadingMore = false,
+                        activitiesHasMore = result.hasMore
+                    )
+                }
+                .onFailure {
+                    _state.value = _state.value.copy(activitiesLoadingMore = false)
                 }
         }
     }
@@ -244,12 +274,50 @@ class GroupViewModel @Inject constructor(
     fun loadSettlements() {
         _state.value = _state.value.copy(settlementsLoading = true, settlementsError = null)
         viewModelScope.launch {
-            settlementService.getSettlementHistory(groupId)
-                .onSuccess { settlements ->
-                    _state.value = _state.value.copy(settlements = settlements, settlementsLoading = false)
+            settlementService.getSettlementHistory(groupId, 20, null)
+                .onSuccess { result ->
+                    _state.value = _state.value.copy(settlements = result.items, settlementsLoading = false, settlementsHasMore = result.hasMore)
                 }
                 .onFailure { e ->
                     _state.value = _state.value.copy(settlementsLoading = false, settlementsError = e.message)
+                }
+        }
+    }
+
+    fun loadMoreSettlements() {
+        if (!_state.value.settlementsHasMore || _state.value.settlementsLoadingMore) return
+        _state.value = _state.value.copy(settlementsLoadingMore = true)
+        val lastId = _state.value.settlements.lastOrNull()?.settlementId
+        viewModelScope.launch {
+            settlementService.getSettlementHistory(groupId, 20, lastId)
+                .onSuccess { result ->
+                    _state.value = _state.value.copy(
+                        settlements = _state.value.settlements + result.items,
+                        settlementsLoadingMore = false,
+                        settlementsHasMore = result.hasMore
+                    )
+                }
+                .onFailure {
+                    _state.value = _state.value.copy(settlementsLoadingMore = false)
+                }
+        }
+    }
+
+    fun loadMoreExpenses() {
+        if (!_state.value.expensesHasMore || _state.value.expensesLoadingMore) return
+        _state.value = _state.value.copy(expensesLoadingMore = true)
+        val lastId = _state.value.expenses.lastOrNull()?.expenseId
+        viewModelScope.launch {
+            expenseService.getGroupExpenses(groupId, 20, lastId)
+                .onSuccess { result ->
+                    _state.value = _state.value.copy(
+                        expenses = _state.value.expenses + result.items,
+                        expensesLoadingMore = false,
+                        expensesHasMore = result.hasMore
+                    )
+                }
+                .onFailure {
+                    _state.value = _state.value.copy(expensesLoadingMore = false)
                 }
         }
     }
@@ -513,7 +581,10 @@ fun GroupDetailScreen(
                         },
                         onDeleteExpense = { expenseId ->
                             viewModel.setDeleteExpenseId(expenseId)
-                        }
+                        },
+                        hasMore = state.expensesHasMore && expenseSearch.isBlank() && categoryFilter == "all",
+                        loadingMore = state.expensesLoadingMore,
+                        onLoadMore = { viewModel.loadMoreExpenses() }
                     )
                 }
                 1 -> item {
@@ -570,7 +641,13 @@ fun GroupDetailScreen(
                         errorMessage = state.activitiesError,
                         formatBase = currencyFormatter.formatBase,
                         formatDate = currencyFormatter.formatDate,
-                        onLoadSettlements = { viewModel.loadSettlements() }
+                        onLoadSettlements = { viewModel.loadSettlements() },
+                        activitiesHasMore = state.activitiesHasMore,
+                        activitiesLoadingMore = state.activitiesLoadingMore,
+                        onLoadMoreActivities = { viewModel.loadMoreActivities() },
+                        settlementsHasMore = state.settlementsHasMore,
+                        settlementsLoadingMore = state.settlementsLoadingMore,
+                        onLoadMoreSettlements = { viewModel.loadMoreSettlements() }
                     )
                 }
             }
@@ -728,10 +805,25 @@ private fun ExpensesTab(
     categoryFilter: String = "all",
     onCategoryFilterChange: (String) -> Unit = {},
     onEditExpense: (String) -> Unit = {},
-    onDeleteExpense: (String) -> Unit = {}
+    onDeleteExpense: (String) -> Unit = {},
+    hasMore: Boolean = false,
+    loadingMore: Boolean = false,
+    onLoadMore: () -> Unit = {}
 ) {
     val categories = listOf("all", "food", "transport", "shopping", "turf", "accommodation", "other")
     val hasExpenses = expenses.isNotEmpty() || expenseSearch.isNotBlank() || categoryFilter != "all"
+
+    val scrollState = rememberScrollState()
+    val shouldLoadMore by remember {
+        derivedStateOf {
+            hasMore && !loadingMore && expenseSearch.isBlank() && categoryFilter == "all" &&
+            expenses.isNotEmpty() &&
+            scrollState.value >= scrollState.maxValue - 300
+        }
+    }
+    LaunchedEffect(shouldLoadMore) {
+        if (shouldLoadMore) onLoadMore()
+    }
 
     if (expenses.isEmpty() && expenseSearch.isBlank() && categoryFilter == "all") {
         Box(
@@ -750,7 +842,7 @@ private fun ExpensesTab(
         }
     } else {
         Column(
-            modifier = Modifier.fillMaxWidth().padding(16.dp),
+            modifier = Modifier.fillMaxWidth().padding(16.dp).verticalScroll(scrollState),
             verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
             if (hasExpenses) {
@@ -786,6 +878,9 @@ private fun ExpensesTab(
             } else {
                 expenses.forEach { expense ->
                     ExpenseCard(expense, members, currentUserId, formatOriginal, onEditExpense, onDeleteExpense)
+                }
+                if (loadingMore) {
+                    LoadingIndicator(modifier = Modifier.fillMaxWidth().padding(16.dp))
                 }
             }
         }
@@ -1214,13 +1309,37 @@ private fun ActivityTab(
     errorMessage: String? = null,
     formatBase: (Double) -> String,
     formatDate: (Long, Boolean) -> String,
-    onLoadSettlements: () -> Unit
+    onLoadSettlements: () -> Unit,
+    activitiesHasMore: Boolean = false,
+    activitiesLoadingMore: Boolean = false,
+    onLoadMoreActivities: () -> Unit = {},
+    settlementsHasMore: Boolean = false,
+    settlementsLoadingMore: Boolean = false,
+    onLoadMoreSettlements: () -> Unit = {}
 ) {
     var activityFilter by remember { mutableStateOf("all") }
+    val scrollState = rememberScrollState()
 
     LaunchedEffect(activityFilter) {
         if (activityFilter == "settlements" && settlements.isEmpty() && !settlementsLoading) {
             onLoadSettlements()
+        }
+    }
+
+    val shouldLoadMore by remember {
+        derivedStateOf {
+            scrollState.value >= scrollState.maxValue - 400 &&
+            if (activityFilter == "settlements") {
+                settlementsHasMore && !settlementsLoadingMore && settlements.isNotEmpty()
+            } else {
+                activitiesHasMore && !activitiesLoadingMore && activities.isNotEmpty()
+            }
+        }
+    }
+    LaunchedEffect(shouldLoadMore) {
+        if (shouldLoadMore) {
+            if (activityFilter == "settlements") onLoadMoreSettlements()
+            else onLoadMoreActivities()
         }
     }
 
@@ -1263,7 +1382,10 @@ private fun ActivityTab(
             } else {
                 val isDark = isSystemInDarkTheme()
                 val settlementColor = if (isDark) Color(0xFF4ADE80) else Color(0xFF22C55E)
-                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Column(
+                    modifier = Modifier.verticalScroll(scrollState),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
                     settlements.forEach { s ->
                         val isFromMe = currentUserId == s.fromUid
                         val isToMe = currentUserId == s.toUid
@@ -1302,6 +1424,9 @@ private fun ActivityTab(
                             }
                         }
                     }
+                    if (settlementsLoadingMore) {
+                        LoadingIndicator(modifier = Modifier.fillMaxWidth().padding(16.dp))
+                    }
                 }
             }
         } else {
@@ -1332,7 +1457,10 @@ private fun ActivityTab(
                     }
                 }
             } else {
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Column(
+                    modifier = Modifier.verticalScroll(scrollState),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
                     activities.forEach { activity ->
                         val (icon, iconColor) = activityIcon(activity.type)
                         Card(
@@ -1371,6 +1499,9 @@ private fun ActivityTab(
                                 }
                             }
                         }
+                    }
+                    if (activitiesLoadingMore) {
+                        LoadingIndicator(modifier = Modifier.fillMaxWidth().padding(16.dp))
                     }
                 }
             }

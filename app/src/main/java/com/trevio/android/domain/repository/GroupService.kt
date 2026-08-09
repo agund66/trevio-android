@@ -3,6 +3,7 @@ package com.trevio.android.domain.repository
 import com.trevio.android.domain.model.Activity
 import com.trevio.android.domain.model.Group
 import com.trevio.android.domain.model.GroupTemplate
+import com.trevio.android.domain.model.PaginatedResult
 
 data class GroupInfo(
     val groupId: String = "",
@@ -37,7 +38,7 @@ interface GroupService {
     suspend fun transferAdminRole(groupId: String, newAdminUid: String): Result<Unit>
     suspend fun getUserGroups(): Result<List<Group>>
     suspend fun getGroupInfo(groupId: String): Result<GroupInfo>
-    suspend fun getGroupActivities(groupId: String, pageSize: Int = 50): Result<List<Activity>>
+    suspend fun getGroupActivities(groupId: String, pageSize: Int = 50, lastActivityId: String? = null): Result<PaginatedResult<Activity>>
     suspend fun addOfflineMember(groupId: String, displayName: String): Result<String>
     suspend fun claimOfflineMember(groupId: String, memberDocId: String): Result<Unit>
     suspend fun linkOfflineMember(groupId: String, memberDocId: String, realUid: String): Result<Unit>

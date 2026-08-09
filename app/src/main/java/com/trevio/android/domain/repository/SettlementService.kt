@@ -1,6 +1,7 @@
 package com.trevio.android.domain.repository
 
 import com.trevio.android.domain.model.Member
+import com.trevio.android.domain.model.PaginatedResult
 import com.trevio.android.domain.model.Settlement
 import com.trevio.android.domain.model.SimplifiedDebt
 import com.trevio.android.domain.model.SettlementMethod
@@ -18,5 +19,5 @@ interface SettlementService {
 
     suspend fun getSimplifiedDebts(groupId: String): Result<List<SimplifiedDebt>>
     suspend fun getGroupBalances(groupId: String): Result<List<Member>>
-    suspend fun getSettlementHistory(groupId: String): Result<List<Settlement>>
+    suspend fun getSettlementHistory(groupId: String, pageSize: Int = 50, lastSettlementId: String? = null): Result<PaginatedResult<Settlement>>
 }

@@ -30,6 +30,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 
+import com.trevio.android.core.designsystem.components.LoadingIndicator
 import com.trevio.android.core.designsystem.components.TrevioCard
 import com.trevio.android.core.designsystem.components.TrevioHeader
 import com.trevio.android.core.designsystem.theme.TrevioBorder
@@ -59,6 +60,8 @@ class NotificationsViewModel @Inject constructor(
     data class NotificationsState(
         val isLoading: Boolean = true,
         val notifications: List<AppNotification> = emptyList(),
+        val hasMore: Boolean = false,
+        val loadingMore: Boolean = false,
         val broadcasts: List<BroadcastMessage> = emptyList(),
         val error: String? = null,
         val invitationLoading: String? = null,
@@ -73,9 +76,9 @@ class NotificationsViewModel @Inject constructor(
     fun loadNotifications() {
         _state.value = _state.value.copy(isLoading = true)
         viewModelScope.launch {
-            notificationService.getNotifications(50, null)
-                .onSuccess { notifications ->
-                    _state.value = _state.value.copy(isLoading = false, notifications = notifications)
+            notificationService.getNotifications(20, null)
+                .onSuccess { result ->
+                    _state.value = _state.value.copy(isLoading = false, notifications = result.items, hasMore = result.hasMore)
                 }
                 .onFailure { e ->
                     _state.value = NotificationsState(isLoading = false, error = e.message)
@@ -88,6 +91,25 @@ class NotificationsViewModel @Inject constructor(
                         _state.value = _state.value.copy(broadcasts = broadcasts)
                     }
             }
+        }
+    }
+
+    fun loadMoreNotifications() {
+        if (!_state.value.hasMore || _state.value.loadingMore) return
+        _state.value = _state.value.copy(loadingMore = true)
+        val lastId = _state.value.notifications.lastOrNull()?.notificationId
+        viewModelScope.launch {
+            notificationService.getNotifications(20, lastId)
+                .onSuccess { result ->
+                    _state.value = _state.value.copy(
+                        notifications = _state.value.notifications + result.items,
+                        loadingMore = false,
+                        hasMore = result.hasMore
+                    )
+                }
+                .onFailure {
+                    _state.value = _state.value.copy(loadingMore = false)
+                }
         }
     }
 
@@ -237,6 +259,16 @@ fun NotificationsScreen(
                         onAccept = { notificationId, invitationId -> viewModel.acceptInvitation(notificationId, invitationId) },
                         onDecline = { notificationId, invitationId -> viewModel.declineInvitation(notificationId, invitationId) }
                     )
+                }
+                if (state.hasMore) {
+                    item {
+                        LaunchedEffect(state.notifications.lastOrNull()?.notificationId) {
+                            viewModel.loadMoreNotifications()
+                        }
+                        if (state.loadingMore) {
+                            LoadingIndicator(modifier = Modifier.fillMaxWidth().padding(16.dp))
+                        }
+                    }
                 }
             }
         }

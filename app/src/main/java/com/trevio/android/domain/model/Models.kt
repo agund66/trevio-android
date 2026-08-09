@@ -285,3 +285,71 @@ data class TripData(
     val itinerary: List<TripItineraryItem> = emptyList(),
     val locations: List<TripLocation> = emptyList()
 )
+
+// ─── Support System ──────────────────────────────────────────────
+
+enum class SupportCategory {
+    CALCULATION, SETTLEMENT, EXPENSE, GROUP_ACCESS, PAYMENT_INFO, ACCOUNT, BUG, OTHER;
+
+    companion object {
+        fun fromString(value: String?): SupportCategory =
+            entries.find { it.name.equals(value, ignoreCase = true) } ?: OTHER
+    }
+}
+
+enum class SupportPriority { LOW, MEDIUM, HIGH, URGENT }
+
+enum class SupportStatus { OPEN, IN_PROGRESS, WAITING_USER, RESOLVED, CLOSED }
+
+enum class SupportMessageRole { USER, SUPERADMIN }
+
+data class SupportTicketContext(
+    val groupId: String = "",
+    val groupName: String = "",
+    val expenseId: String = "",
+    val screen: String = ""
+)
+
+data class SupportTicket(
+    val ticketId: String = "",
+    val userId: String = "",
+    val userEmail: String = "",
+    val userDisplayName: String = "",
+    val userUsername: String = "",
+    val subject: String = "",
+    val description: String = "",
+    val category: SupportCategory = SupportCategory.OTHER,
+    val priority: SupportPriority = SupportPriority.LOW,
+    val status: SupportStatus = SupportStatus.OPEN,
+    val context: SupportTicketContext = SupportTicketContext(),
+    val createdAt: Long = 0,
+    val updatedAt: Long = 0,
+    val resolvedAt: Long? = null,
+    val resolvedBy: String? = null,
+    val lastMessageAt: Long = 0,
+    val lastMessageBy: String? = null,
+    val unreadByUser: Boolean = false,
+    val unreadByAdmin: Boolean = false
+)
+
+data class SupportMessage(
+    val messageId: String = "",
+    val fromUid: String = "",
+    val fromName: String = "",
+    val fromRole: SupportMessageRole = SupportMessageRole.USER,
+    val body: String = "",
+    val createdAt: Long = 0
+)
+
+data class HelpArticle(
+    val articleId: String = "",
+    val title: String = "",
+    val content: String = "",
+    val category: String = "general",
+    val tags: List<String> = emptyList(),
+    val order: Int = 0,
+    val active: Boolean = true,
+    val createdAt: Long = 0,
+    val updatedAt: Long = 0,
+    val createdBy: String = ""
+)

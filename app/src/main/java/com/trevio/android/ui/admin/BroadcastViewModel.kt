@@ -91,9 +91,9 @@ class BroadcastViewModel @Inject constructor(
 
     fun showForm() {
         viewModelScope.launch {
-            adminService.getAllUsers()
-                .onSuccess { users ->
-                    _state.value = _state.value.copy(showForm = true, allUsers = users)
+            adminService.getAllUsers(500, null)
+                .onSuccess { result ->
+                    _state.value = _state.value.copy(showForm = true, allUsers = result.items)
                 }
                 .onFailure { e ->
                     _state.value = _state.value.copy(error = e.message)
@@ -108,19 +108,19 @@ class BroadcastViewModel @Inject constructor(
     fun showDetail(broadcast: BroadcastMessage) {
         _state.value = _state.value.copy(selectedBroadcast = broadcast, detailLoading = true)
         viewModelScope.launch {
-            adminService.getAllUsers()
-                .onSuccess { users ->
+            adminService.getAllUsers(500, null)
+                .onSuccess { result ->
                     broadcastService.getBroadcastReads(broadcast.id)
                         .onSuccess { reads ->
                             _state.value = _state.value.copy(
-                                detailAllUsers = users,
+                                detailAllUsers = result.items,
                                 detailReads = reads,
                                 detailLoading = false
                             )
                         }
                         .onFailure {
                             _state.value = _state.value.copy(
-                                detailAllUsers = users,
+                                detailAllUsers = result.items,
                                 detailLoading = false
                             )
                         }

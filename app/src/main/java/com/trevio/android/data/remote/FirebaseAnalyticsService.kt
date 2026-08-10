@@ -9,6 +9,7 @@ import com.trevio.android.domain.model.Member
 import com.trevio.android.domain.model.UserAnalytics
 import com.trevio.android.domain.repository.AnalyticsService
 import com.trevio.android.util.computeGroupAnalytics
+import com.trevio.android.util.friendlyNetworkMessage
 import kotlinx.coroutines.tasks.await
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -80,7 +81,7 @@ class FirebaseAnalyticsService @Inject constructor(
 
             Result.success(computeGroupAnalytics(groupId, groupName, expenses, members))
         } catch (e: Exception) {
-            Result.failure(e)
+            Result.failure(Exception(friendlyNetworkMessage(e) ?: e.message, e))
         }
     }
 

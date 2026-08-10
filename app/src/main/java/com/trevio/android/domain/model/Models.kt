@@ -1,7 +1,8 @@
 package com.trevio.android.domain.model
 
 enum class SplitType { EQUAL, EXACT, PERCENT, SHARES, ITEMIZED }
-enum class GroupTemplate { TRIP, TURF, CASUAL }
+enum class GroupTemplate { TRIP, TURF, CASUAL, HOUSEHOLD }
+enum class TransactionType { EXPENSE, INCOME }
 enum class MemberRole { ADMIN, MEMBER }
 enum class MemberStatus { ACTIVE, LEFT }
 enum class InvitationStatus { PENDING, ACCEPTED, DECLINED, EXPIRED }
@@ -44,7 +45,9 @@ data class Group(
     val totalExpenses: Double = 0.0,
     val yourBalance: Double = 0.0,
     val yourRole: String = "member",
-    val archived: Boolean = false
+    val archived: Boolean = false,
+    val monthlyBudget: Double? = null,
+    val budgetCategories: Map<String, Double>? = null
 )
 
 data class Member(
@@ -93,7 +96,8 @@ data class Expense(
     val exchangeRateToBase: Double = 1.0,
     val note: String = "",
     val recurring: RecurringConfig? = null,
-    val itemizedData: ItemizedSplitData? = null
+    val itemizedData: ItemizedSplitData? = null,
+    val transactionType: TransactionType = TransactionType.EXPENSE
 )
 
 data class Settlement(
@@ -352,4 +356,69 @@ data class HelpArticle(
     val createdAt: Long = 0,
     val updatedAt: Long = 0,
     val createdBy: String = ""
+)
+
+// ─── Household Analytics ─────────────────────────────────────────
+
+data class DailySummary(
+    val date: Long = 0,
+    val dateLabel: String = "",
+    val totalSpent: Double = 0.0,
+    val totalReceived: Double = 0.0,
+    val netAmount: Double = 0.0,
+    val entryCount: Int = 0,
+    val entries: List<Expense> = emptyList()
+)
+
+data class MemberContribution(
+    val uid: String = "",
+    val displayName: String = "",
+    val photoURL: String = "",
+    val totalSpent: Double = 0.0,
+    val totalReceived: Double = 0.0,
+    val entryCount: Int = 0,
+    val spentPercentage: Double = 0.0,
+    val rank: Int = 0
+)
+
+data class DailyTrend(
+    val day: Int = 0,
+    val date: Long = 0,
+    val totalSpent: Double = 0.0,
+    val totalReceived: Double = 0.0
+)
+
+data class MonthComparison(
+    val lastMonthSpent: Double = 0.0,
+    val spentChange: Double = 0.0,
+    val spentChangePercent: Double = 0.0,
+    val lastMonthReceived: Double = 0.0,
+    val receivedChange: Double = 0.0
+)
+
+data class MonthlyReport(
+    val month: String = "",
+    val monthLabel: String = "",
+    val totalSpent: Double = 0.0,
+    val totalReceived: Double = 0.0,
+    val netAmount: Double = 0.0,
+    val entryCount: Int = 0,
+    val spentByCategory: List<CategoryBreakdown> = emptyList(),
+    val receivedByCategory: List<CategoryBreakdown> = emptyList(),
+    val memberContributions: List<MemberContribution> = emptyList(),
+    val dailyTrend: List<DailyTrend> = emptyList(),
+    val budget: Double? = null,
+    val budgetProgress: Double = 0.0,
+    val budgetRemaining: Double = 0.0,
+    val comparisonWithLastMonth: MonthComparison? = null
+)
+
+data class HouseholdGamification(
+    val loggingStreak: Int = 0,
+    val streakStartDate: Long? = null,
+    val monthlyBadge: String? = null,
+    val participationToday: Double = 0.0,
+    val membersLoggedToday: Int = 0,
+    val totalMembers: Int = 0,
+    val insightMessage: String? = null
 )

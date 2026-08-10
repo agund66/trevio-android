@@ -87,9 +87,20 @@ object CurrencyConverter {
         "KES" to "KSh"
     )
 
+    fun convertCurrency(amount: Double, fromCurrency: String, toCurrency: String, rates: Map<String, Double>): Double {
+        if (fromCurrency == toCurrency) return amount
+        val fromRate = rates[fromCurrency] ?: return amount
+        val toRate = rates[toCurrency] ?: return amount
+        return Math.round(amount * (toRate / fromRate) * 100) / 100.0
+    }
+
+    fun getCurrencySymbol(currency: String): String {
+        return currencySymbols[currency] ?: currency
+    }
+
     fun formatCurrency(amount: Double, currency: String): String {
         val symbol = currencySymbols[currency] ?: ""
-        val formatted = String.format("%,.2f", amount)
+        val formatted = String.format(Locale.getDefault(), "%,.2f", amount)
         return "$symbol$formatted"
     }
 

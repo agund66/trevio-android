@@ -14,7 +14,6 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.runBlocking
 import javax.inject.Inject
 
 @HiltViewModel
@@ -23,8 +22,6 @@ class BroadcastViewModel @Inject constructor(
     private val adminService: AdminService,
     private val authService: AuthService
 ) : ViewModel() {
-
-    val currentUserId: String? get() = runBlocking { authService.getCurrentUserId() }
 
     data class BroadcastState(
         val isLoading: Boolean = true,
@@ -46,14 +43,22 @@ class BroadcastViewModel @Inject constructor(
         val selectedBroadcast: BroadcastMessage? = null,
         val detailReads: List<BroadcastRead> = emptyList(),
         val detailAllUsers: List<User> = emptyList(),
-        val detailLoading: Boolean = false
+        val detailLoading: Boolean = false,
+        val currentUserId: String? = null
     )
 
     private val _state = MutableStateFlow(BroadcastState())
     val state: StateFlow<BroadcastState> = _state
 
     init {
+        loadCurrentUserId()
         loadBroadcasts()
+    }
+
+    private fun loadCurrentUserId() {
+        viewModelScope.launch {
+            _state.value = _state.value.copy(currentUserId = authService.getCurrentUserId())
+        }
     }
 
     fun loadBroadcasts() {

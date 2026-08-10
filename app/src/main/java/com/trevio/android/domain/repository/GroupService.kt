@@ -15,7 +15,9 @@ data class GroupInfo(
     val createdBy: String = "",
     val memberCount: Int = 0,
     val totalExpenses: Double = 0.0,
-    val archived: Boolean = false
+    val archived: Boolean = false,
+    val monthlyBudget: Double? = null,
+    val budgetCategories: Map<String, Double>? = null
 )
 
 interface GroupService {
@@ -23,7 +25,8 @@ interface GroupService {
         name: String,
         description: String,
         template: GroupTemplate,
-        memberUids: List<String>
+        memberUids: List<String>,
+        monthlyBudget: Double? = null
     ): Result<Pair<String, String>>
 
     suspend fun joinGroupViaCode(inviteCode: String): Result<Pair<String, String>>
@@ -35,6 +38,7 @@ interface GroupService {
     suspend fun unarchiveGroup(groupId: String): Result<Unit>
     suspend fun deleteGroup(groupId: String): Result<Unit>
     suspend fun updateGroup(groupId: String, name: String, description: String): Result<Unit>
+    suspend fun updateGroupBudget(groupId: String, monthlyBudget: Double?, budgetCategories: Map<String, Double>?): Result<Unit>
     suspend fun transferAdminRole(groupId: String, newAdminUid: String): Result<Unit>
     suspend fun getUserGroups(): Result<List<Group>>
     suspend fun getGroupInfo(groupId: String): Result<GroupInfo>
@@ -42,4 +46,5 @@ interface GroupService {
     suspend fun addOfflineMember(groupId: String, displayName: String): Result<String>
     suspend fun claimOfflineMember(groupId: String, memberDocId: String): Result<Unit>
     suspend fun linkOfflineMember(groupId: String, memberDocId: String, realUid: String): Result<Unit>
+    suspend fun removeMember(groupId: String, memberUid: String): Result<Unit>
 }

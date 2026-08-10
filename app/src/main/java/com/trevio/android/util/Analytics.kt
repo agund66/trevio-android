@@ -11,8 +11,6 @@ import com.trevio.android.domain.model.TopGroupSpending
 import com.trevio.android.domain.model.UserAnalytics
 import java.util.Calendar
 
-private val MONTH_LABELS = listOf("Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec")
-
 fun computeCategoryBreakdown(expenses: List<Expense>): List<CategoryBreakdown> {
     val map = mutableMapOf<String, Pair<Double, Int>>()
     for (e in expenses) {
@@ -43,7 +41,7 @@ fun computeMonthlyTrends(expenses: List<Expense>, months: Int = 6): List<Monthly
         val key = "${cal.get(Calendar.YEAR)}-${String.format("%02d", cal.get(Calendar.MONTH) + 1)}"
         trends.add(MonthlyTrend(
             month = key,
-            label = "${MONTH_LABELS[cal.get(Calendar.MONTH)]} ${cal.get(Calendar.YEAR).toString().takeLast(2)}",
+            label = "${DateUtils.MONTH_LABELS[cal.get(Calendar.MONTH)]} ${cal.get(Calendar.YEAR).toString().takeLast(2)}",
             totalAmount = 0.0,
             expenseCount = 0
         ))
@@ -117,12 +115,14 @@ fun computeGroupAnalytics(
     val avgExpenseAmount = if (expenseCount > 0) Math.round((totalExpenses / expenseCount) * 100) / 100.0 else 0.0
 
     val highestExpense = if (expenses.isNotEmpty()) {
-        val highest = expenses.maxByOrNull { it.amount }!!
-        HighestExpense(
-            description = highest.description,
-            amount = highest.amount,
-            date = highest.date
-        )
+        val highest = expenses.maxByOrNull { it.amount }
+        if (highest != null) {
+            HighestExpense(
+                description = highest.description,
+                amount = highest.amount,
+                date = highest.date
+            )
+        } else null
     } else null
 
     val now = System.currentTimeMillis()

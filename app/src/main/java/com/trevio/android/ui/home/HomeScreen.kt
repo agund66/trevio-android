@@ -14,6 +14,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.filled.Flight
 import androidx.compose.material.icons.filled.Group
 import androidx.compose.material.icons.filled.GroupAdd
+import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.LocalCafe
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.SportsSoccer
@@ -74,9 +75,8 @@ class HomeViewModel @Inject constructor(
     private val _state = MutableStateFlow(HomeData())
     val state: StateFlow<HomeData> = _state
 
-    init { loadGroups() }
-
     init {
+        loadGroups()
         viewModelScope.launch {
             userRefreshNotifier.userRefreshed.collect {
                 refreshGroups()
@@ -162,7 +162,7 @@ fun HomeScreen(
 
     val needsRefresh by navController.currentBackStackEntry
         ?.savedStateHandle?.getStateFlow<Boolean>("needsRefresh", false)
-        ?.collectAsState() ?: mutableStateOf(false)
+        ?.collectAsState() ?: remember { mutableStateOf(false) }
 
     LaunchedEffect(needsRefresh) {
         if (needsRefresh) {
@@ -486,6 +486,7 @@ private fun templateIcon(template: GroupTemplate): ImageVector = when (template)
     GroupTemplate.TRIP -> Icons.Default.Flight
     GroupTemplate.TURF -> Icons.Default.SportsSoccer
     GroupTemplate.CASUAL -> Icons.Default.LocalCafe
+    GroupTemplate.HOUSEHOLD -> Icons.Default.Home
 }
 
 @Composable
@@ -495,6 +496,7 @@ private fun templateColorAdaptive(template: GroupTemplate): Color {
         GroupTemplate.TRIP -> if (isDark) Color(0xFF818CF8) else Color(0xFF6366F1)
         GroupTemplate.TURF -> if (isDark) Color(0xFF4ADE80) else Color(0xFF22C55E)
         GroupTemplate.CASUAL -> if (isDark) Color(0xFFFBBF24) else Color(0xFFF59E0B)
+        GroupTemplate.HOUSEHOLD -> if (isDark) Color(0xFF2DD4BF) else Color(0xFF0D9488)
     }
 }
 
@@ -512,6 +514,9 @@ private fun GroupCardItem(
         else -> MaterialTheme.colorScheme.onSurfaceVariant
     }
     val balanceText = when {
+        group.template == GroupTemplate.HOUSEHOLD -> {
+            if (group.totalExpenses > 0) "${formatBase(group.totalExpenses)} spent" else "No entries yet"
+        }
         group.yourBalance > 0.01 -> "you'll get ${formatBase(group.yourBalance)}"
         group.yourBalance < -0.01 -> "you'll pay ${formatBase(-group.yourBalance)}"
         else -> "settled up"
@@ -566,12 +571,14 @@ private fun GroupCardItem(
                     fontWeight = FontWeight.SemiBold
                 )
             }
-            Text(
-                text = formatBase(group.totalExpenses),
-                style = MaterialTheme.typography.titleSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                fontWeight = FontWeight.Medium
-            )
+            if (group.template != GroupTemplate.HOUSEHOLD) {
+                Text(
+                    text = formatBase(group.totalExpenses),
+                    style = MaterialTheme.typography.titleSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    fontWeight = FontWeight.Medium
+                )
+            }
         }
     }
 }

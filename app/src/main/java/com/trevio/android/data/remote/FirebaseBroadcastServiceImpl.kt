@@ -1,6 +1,5 @@
 package com.trevio.android.data.remote
 
-import com.google.firebase.Timestamp
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.Query
@@ -9,27 +8,14 @@ import com.trevio.android.domain.model.BroadcastPriority
 import com.trevio.android.domain.model.BroadcastRead
 import com.trevio.android.domain.model.BroadcastTargetType
 import com.trevio.android.domain.repository.BroadcastService
+import com.trevio.android.util.DateUtils
+import com.trevio.android.util.ErrorMessages
+import com.trevio.android.util.friendlyNetworkMessage
 import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
-import java.util.Date
 import javax.inject.Inject
 import javax.inject.Singleton
-
-private fun toMillis(value: Any?): Long {
-    if (value == null) return 0L
-    if (value is Timestamp) return value.toDate().time
-    if (value is Date) return value.time
-    if (value is Number) return value.toLong()
-    if (value is Map<*, *>) {
-        val seconds = (value["_seconds"] as? Number ?: value["seconds"] as? Number)?.toLong()
-        if (seconds != null) {
-            val nanos = (value["_nanoseconds"] as? Number ?: value["nanoseconds"] as? Number)?.toLong() ?: 0L
-            return seconds * 1000 + nanos / 1_000_000
-        }
-    }
-    return 0L
-}
 
 @Singleton
 class FirebaseBroadcastServiceImpl @Inject constructor(
@@ -39,13 +25,13 @@ class FirebaseBroadcastServiceImpl @Inject constructor(
 
     private suspend fun requireSuperadmin(): Result<Unit> {
         return try {
-            val uid = auth.currentUser?.uid ?: return Result.failure(Exception("User not authenticated"))
+            val uid = auth.currentUser?.uid ?: return Result.failure(Exception(ErrorMessages.USER_NOT_AUTHENTICATED))
             val currentUserDoc = firestore.collection("users").document(uid).get().await()
             val currentRole = currentUserDoc.data?.get("role") as? String ?: "user"
-            if (currentRole != "superadmin") return Result.failure(Exception("Access denied: superadmin only"))
+            if (currentRole != "superadmin") return Result.failure(Exception(ErrorMessages.ACCESS_DENIED_SUPERADMIN))
             Result.success(Unit)
         } catch (e: Exception) {
-            Result.failure(e)
+            Result.failure(Exception(friendlyNetworkMessage(e) ?: e.message, e))
         }
     }
 
@@ -82,7 +68,7 @@ class FirebaseBroadcastServiceImpl @Inject constructor(
             val ref = firestore.collection("broadcasts").add(data).await()
             Result.success(ref.id)
         } catch (e: Exception) {
-            Result.failure(e)
+            Result.failure(Exception(friendlyNetworkMessage(e) ?: e.message, e))
         }
     }
 
@@ -103,18 +89,18 @@ class FirebaseBroadcastServiceImpl @Inject constructor(
                     priority = parsePriority(data["priority"] as? String ?: "info"),
                     targetType = parseTargetType(data["targetType"] as? String ?: "all"),
                     targetUids = (data["targetUids"] as? List<*>)?.filterIsInstance<String>() ?: emptyList(),
-                    startAt = toMillis(data["startAt"]),
+                    startAt = DateUtils.toMillis(data["startAt"]) ?: 0L,
                     endAt = data["endAt"] as? Long,
                     active = data["active"] as? Boolean ?: true,
                     createdBy = data["createdBy"] as? String ?: "",
                     createdByName = data["createdByName"] as? String ?: "",
-                    createdAt = toMillis(data["createdAt"]),
+                    createdAt = DateUtils.toMillis(data["createdAt"]) ?: 0L,
                     stoppedAt = data["stoppedAt"] as? Long
                 )
             }
             Result.success(broadcasts)
         } catch (e: Exception) {
-            Result.failure(e)
+            Result.failure(Exception(friendlyNetworkMessage(e) ?: e.message, e))
         }
     }
 
@@ -126,7 +112,7 @@ class FirebaseBroadcastServiceImpl @Inject constructor(
                 .await()
             Result.success(Unit)
         } catch (e: Exception) {
-            Result.failure(e)
+            Result.failure(Exception(friendlyNetworkMessage(e) ?: e.message, e))
         }
     }
 
@@ -139,7 +125,7 @@ class FirebaseBroadcastServiceImpl @Inject constructor(
                 .get().await()
             Result.success(snapshot.size())
         } catch (e: Exception) {
-            Result.failure(e)
+            Result.failure(Exception(friendlyNetworkMessage(e) ?: e.message, e))
         }
     }
 
@@ -154,12 +140,12 @@ class FirebaseBroadcastServiceImpl @Inject constructor(
                 val data = doc.data ?: emptyMap()
                 BroadcastRead(
                     uid = (data["uid"] as? String) ?: doc.id,
-                    readAt = toMillis(data["readAt"])
+                    readAt = DateUtils.toMillis(data["readAt"]) ?: 0L
                 )
             }
             Result.success(reads)
         } catch (e: Exception) {
-            Result.failure(e)
+            Result.failure(Exception(friendlyNetworkMessage(e) ?: e.message, e))
         }
     }
 
@@ -187,12 +173,12 @@ class FirebaseBroadcastServiceImpl @Inject constructor(
                     priority = parsePriority(data["priority"] as? String ?: "info"),
                     targetType = parseTargetType(data["targetType"] as? String ?: "all"),
                     targetUids = (data["targetUids"] as? List<*>)?.filterIsInstance<String>() ?: emptyList(),
-                    startAt = toMillis(data["startAt"]),
+                    startAt = DateUtils.toMillis(data["startAt"]) ?: 0L,
                     endAt = endAt,
                     active = data["active"] as? Boolean ?: true,
                     createdBy = data["createdBy"] as? String ?: "",
                     createdByName = data["createdByName"] as? String ?: "",
-                    createdAt = toMillis(data["createdAt"]),
+                    createdAt = DateUtils.toMillis(data["createdAt"]) ?: 0L,
                     stoppedAt = data["stoppedAt"] as? Long
                 )
             }
@@ -207,7 +193,7 @@ class FirebaseBroadcastServiceImpl @Inject constructor(
             }
             Result.success(filtered)
         } catch (e: Exception) {
-            Result.failure(e)
+            Result.failure(Exception(friendlyNetworkMessage(e) ?: e.message, e))
         }
     }
 
@@ -238,7 +224,7 @@ class FirebaseBroadcastServiceImpl @Inject constructor(
             }
             Result.success(unread)
         } catch (e: Exception) {
-            Result.failure(e)
+            Result.failure(Exception(friendlyNetworkMessage(e) ?: e.message, e))
         }
     }
 
@@ -256,7 +242,7 @@ class FirebaseBroadcastServiceImpl @Inject constructor(
                 .await()
             Result.success(Unit)
         } catch (e: Exception) {
-            Result.failure(e)
+            Result.failure(Exception(friendlyNetworkMessage(e) ?: e.message, e))
         }
     }
 

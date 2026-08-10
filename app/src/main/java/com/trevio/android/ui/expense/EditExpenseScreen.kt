@@ -22,10 +22,14 @@ import com.trevio.android.core.designsystem.components.TrevioHeader
 import com.trevio.android.domain.model.ItemizedSplitData
 import com.trevio.android.domain.model.SplitEntry
 import com.trevio.android.domain.model.SplitType
+import com.trevio.android.domain.model.TransactionType
 import com.trevio.android.domain.repository.AuthService
 import com.trevio.android.domain.repository.ExpenseService
 import com.trevio.android.domain.repository.SettlementService
 import com.trevio.android.domain.model.Member
+import com.trevio.android.util.CurrencyConverter
+import com.trevio.android.util.MemberRole
+import com.trevio.android.util.MemberStatus
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -58,6 +62,7 @@ class EditExpenseViewModel @Inject constructor(
         val note: String = "",
         val splitValues: Map<String, String> = emptyMap(),
         val itemizedData: ItemizedSplitData = ItemizedSplitData(),
+        val transactionType: TransactionType = TransactionType.EXPENSE,
         val isSaving: Boolean = false,
         val isDeleting: Boolean = false,
         val error: String? = null,
@@ -84,7 +89,7 @@ class EditExpenseViewModel @Inject constructor(
             }
 
             val member = members.find { it.uid == uid }
-            val canEdit = expense.createdBy == uid || member?.role == "admin"
+            val canEdit = expense.createdBy == uid || member?.role == MemberRole.ADMIN
 
             val splitVals = mutableMapOf<String, String>()
             if (expense.splitType != SplitType.EQUAL && expense.splitType != SplitType.ITEMIZED) {
@@ -107,17 +112,18 @@ class EditExpenseViewModel @Inject constructor(
                 note = expense.note,
                 splitValues = splitVals,
                 itemizedData = expense.itemizedData ?: ItemizedSplitData(),
+                transactionType = expense.transactionType,
                 loaded = true
             )
         }
     }
 
-    fun updateDescription(v: String) { _state.value = _state.value.copy(description = v) }
+    fun updateDescription(v: String) { if (v.length <= 500) _state.value = _state.value.copy(description = v) }
     fun updateAmount(v: String) { _state.value = _state.value.copy(amount = v.filter { it.isDigit() || it == '.' }) }
     fun updateCategory(v: String) { _state.value = _state.value.copy(category = v) }
     fun updateSplitType(v: SplitType) { _state.value = _state.value.copy(splitType = v) }
     fun updatePaidBy(v: String) { _state.value = _state.value.copy(paidByUid = v) }
-    fun updateNote(v: String) { _state.value = _state.value.copy(note = v) }
+    fun updateNote(v: String) { if (v.length <= 500) _state.value = _state.value.copy(note = v) }
     fun updateSplitValue(uid: String, v: String) { _state.value = _state.value.copy(splitValues = _state.value.splitValues + (uid to v.filter { it.isDigit() || it == '.' })) }
     fun updateItemizedData(v: ItemizedSplitData) { _state.value = _state.value.copy(itemizedData = v) }
 
@@ -136,7 +142,7 @@ class EditExpenseViewModel @Inject constructor(
         }
         _state.value = s.copy(isSaving = true, error = null)
         viewModelScope.launch {
-            val activeMembers = s.members.filter { it.status == "active" }
+            val activeMembers = s.members.filter { it.status == MemberStatus.ACTIVE }
             val splits = mutableMapOf<String, SplitEntry>()
             if (s.splitType != SplitType.EQUAL && s.splitType != SplitType.ITEMIZED) {
                 for (m in activeMembers) {
@@ -160,7 +166,8 @@ class EditExpenseViewModel @Inject constructor(
                 category = s.category,
                 date = 0,
                 note = s.note,
-                itemizedData = if (s.splitType == SplitType.ITEMIZED) s.itemizedData else null
+                itemizedData = if (s.splitType == SplitType.ITEMIZED) s.itemizedData else null,
+                transactionType = s.transactionType
             ).onSuccess {
                 _state.value = s.copy(isSaving = false)
                 onDone()
@@ -233,7 +240,7 @@ fun EditExpenseScreen(
                     }
                 }
 
-                val activeMembers = state.members.filter { it.status == "active" }
+                val activeMembers = state.members.filter { it.status == MemberStatus.ACTIVE }
 
                 val isSplitValid = when (state.splitType) {
                     SplitType.EQUAL -> activeMembers.isNotEmpty()
@@ -279,6 +286,7 @@ fun EditExpenseScreen(
                     label = { Text("Note (optional)") },
                     modifier = Modifier.fillMaxWidth(),
                     minLines = 2,
+                    maxLines = 3,
                     shape = RoundedCornerShape(12.dp)
                 )
 
@@ -306,8 +314,7 @@ fun EditExpenseScreen(
 
                 if (state.splitType == SplitType.ITEMIZED && activeMembers.isNotEmpty()) {
                     val currencySymbol = remember(state.currency) {
-                        val symbols = mapOf("INR" to "\u20B9", "USD" to "$", "EUR" to "\u20AC", "GBP" to "\u00A3", "JPY" to "\u00A5", "AUD" to "A$", "CAD" to "C$", "SGD" to "S$", "AED" to "\u062F.\u0625")
-                        symbols[state.currency] ?: state.currency
+                        CurrencyConverter.getCurrencySymbol(state.currency)
                     }
                     ItemizedSplitEditor(
                         members = activeMembers,

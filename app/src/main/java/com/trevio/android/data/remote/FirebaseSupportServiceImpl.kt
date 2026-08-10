@@ -1,6 +1,5 @@
 package com.trevio.android.data.remote
 
-import com.google.firebase.Timestamp
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.Query
@@ -14,25 +13,12 @@ import com.trevio.android.domain.model.SupportStatus
 import com.trevio.android.domain.model.SupportTicket
 import com.trevio.android.domain.model.SupportTicketContext
 import com.trevio.android.domain.repository.SupportService
+import com.trevio.android.util.DateUtils
+import com.trevio.android.util.ErrorMessages
+import com.trevio.android.util.friendlyNetworkMessage
 import kotlinx.coroutines.tasks.await
-import java.util.Date
 import javax.inject.Inject
 import javax.inject.Singleton
-
-private fun toMillis(value: Any?): Long {
-    if (value == null) return 0L
-    if (value is Timestamp) return value.toDate().time
-    if (value is Date) return value.time
-    if (value is Number) return value.toLong()
-    if (value is Map<*, *>) {
-        val seconds = (value["_seconds"] as? Number ?: value["seconds"] as? Number)?.toLong()
-        if (seconds != null) {
-            val nanos = (value["_nanoseconds"] as? Number ?: value["nanoseconds"] as? Number)?.toLong() ?: 0L
-            return seconds * 1000 + nanos / 1_000_000
-        }
-    }
-    return 0L
-}
 
 private val DEFAULT_PRIORITY = mapOf(
     SupportCategory.BUG to SupportPriority.URGENT,
@@ -53,13 +39,13 @@ class FirebaseSupportServiceImpl @Inject constructor(
 
     private suspend fun requireSuperadmin(): Result<Unit> {
         return try {
-            val uid = auth.currentUser?.uid ?: return Result.failure(Exception("User not authenticated"))
+            val uid = auth.currentUser?.uid ?: return Result.failure(Exception(ErrorMessages.USER_NOT_AUTHENTICATED))
             val userDoc = firestore.collection("users").document(uid).get().await()
             val role = (userDoc.data?.get("role") as? String) ?: "user"
-            if (role != "superadmin") return Result.failure(Exception("Access denied: superadmin only"))
+            if (role != "superadmin") return Result.failure(Exception(ErrorMessages.ACCESS_DENIED_SUPERADMIN))
             Result.success(Unit)
         } catch (e: Exception) {
-            Result.failure(e)
+            Result.failure(Exception(friendlyNetworkMessage(e) ?: e.message, e))
         }
     }
 
@@ -72,7 +58,7 @@ class FirebaseSupportServiceImpl @Inject constructor(
         context: SupportTicketContext?
     ): Result<String> {
         return try {
-            val user = auth.currentUser ?: return Result.failure(Exception("User not authenticated"))
+            val user = auth.currentUser ?: return Result.failure(Exception(ErrorMessages.USER_NOT_AUTHENTICATED))
             val userDoc = firestore.collection("users").document(user.uid).get().await()
             val userData = userDoc.data ?: return Result.failure(Exception("User profile not found"))
 
@@ -120,13 +106,13 @@ class FirebaseSupportServiceImpl @Inject constructor(
 
             Result.success(ticketRef.id)
         } catch (e: Exception) {
-            Result.failure(e)
+            Result.failure(Exception(friendlyNetworkMessage(e) ?: e.message, e))
         }
     }
 
     override suspend fun getMyTickets(pageSize: Int, lastTicketId: String?): Result<PaginatedResult<SupportTicket>> {
         return try {
-            val uid = auth.currentUser?.uid ?: return Result.failure(Exception("User not authenticated"))
+            val uid = auth.currentUser?.uid ?: return Result.failure(Exception(ErrorMessages.USER_NOT_AUTHENTICATED))
             var query = firestore.collection("supportTickets")
                 .whereEqualTo("userId", uid)
                 .orderBy("updatedAt", Query.Direction.DESCENDING)
@@ -154,39 +140,39 @@ class FirebaseSupportServiceImpl @Inject constructor(
                 lastId = if (snapshot.size() > 0) snapshot.documents.last().id else null
             ))
         } catch (e: Exception) {
-            Result.failure(e)
+            Result.failure(Exception(friendlyNetworkMessage(e) ?: e.message, e))
         }
     }
 
     override suspend fun getTicket(ticketId: String): Result<SupportTicket?> {
         return try {
-            val uid = auth.currentUser?.uid ?: return Result.failure(Exception("User not authenticated"))
+            val uid = auth.currentUser?.uid ?: return Result.failure(Exception(ErrorMessages.USER_NOT_AUTHENTICATED))
             val ticketDoc = firestore.collection("supportTickets").document(ticketId).get().await()
             if (!ticketDoc.exists()) return Result.success(null)
 
-            val data = ticketDoc.data!!
+            val data = ticketDoc.data ?: return Result.success(null)
             if ((data["userId"] as? String) != uid) {
                 requireSuperadmin().onFailure { return Result.failure(it) }
             }
             Result.success(mapTicket(ticketDoc.id, data))
         } catch (e: Exception) {
-            Result.failure(e)
+            Result.failure(Exception(friendlyNetworkMessage(e) ?: e.message, e))
         }
     }
 
     override suspend fun markTicketReadByUser(ticketId: String): Result<Unit> {
         return try {
-            val uid = auth.currentUser?.uid ?: return Result.failure(Exception("User not authenticated"))
+            val uid = auth.currentUser?.uid ?: return Result.failure(Exception(ErrorMessages.USER_NOT_AUTHENTICATED))
             val ticketDoc = firestore.collection("supportTickets").document(ticketId).get().await()
             if (!ticketDoc.exists()) return Result.failure(Exception("Ticket not found"))
             if ((ticketDoc.data?.get("userId") as? String) != uid) {
-                return Result.failure(Exception("Access denied"))
+                return Result.failure(Exception(ErrorMessages.ACCESS_DENIED))
             }
             firestore.collection("supportTickets").document(ticketId)
                 .update("unreadByUser", false).await()
             Result.success(Unit)
         } catch (e: Exception) {
-            Result.failure(e)
+            Result.failure(Exception(friendlyNetworkMessage(e) ?: e.message, e))
         }
     }
 
@@ -194,7 +180,7 @@ class FirebaseSupportServiceImpl @Inject constructor(
 
     override suspend fun getMessages(ticketId: String): Result<List<SupportMessage>> {
         return try {
-            val uid = auth.currentUser?.uid ?: return Result.failure(Exception("User not authenticated"))
+            val uid = auth.currentUser?.uid ?: return Result.failure(Exception(ErrorMessages.USER_NOT_AUTHENTICATED))
             val ticketDoc = firestore.collection("supportTickets").document(ticketId).get().await()
             if (!ticketDoc.exists()) return Result.failure(Exception("Ticket not found"))
             if ((ticketDoc.data?.get("userId") as? String) != uid) {
@@ -215,18 +201,18 @@ class FirebaseSupportServiceImpl @Inject constructor(
                     fromName = data["fromName"] as? String ?: "",
                     fromRole = if (data["fromRole"] as? String == "superadmin") SupportMessageRole.SUPERADMIN else SupportMessageRole.USER,
                     body = data["body"] as? String ?: "",
-                    createdAt = toMillis(data["createdAt"])
+                    createdAt = DateUtils.toMillis(data["createdAt"]) ?: 0L
                 )
             }
             Result.success(messages)
         } catch (e: Exception) {
-            Result.failure(e)
+            Result.failure(Exception(friendlyNetworkMessage(e) ?: e.message, e))
         }
     }
 
     override suspend fun sendMessage(ticketId: String, body: String): Result<Unit> {
         return try {
-            val user = auth.currentUser ?: return Result.failure(Exception("User not authenticated"))
+            val user = auth.currentUser ?: return Result.failure(Exception(ErrorMessages.USER_NOT_AUTHENTICATED))
             val userDoc = firestore.collection("users").document(user.uid).get().await()
             val displayName = (userDoc.data?.get("displayName") as? String) ?: ""
 
@@ -237,7 +223,7 @@ class FirebaseSupportServiceImpl @Inject constructor(
             }
 
             val now = System.currentTimeMillis()
-            val ticketData = ticketDoc.data!!
+            val ticketData = ticketDoc.data ?: return Result.failure(Exception("Ticket data not found"))
             val currentStatus = (ticketData["status"] as? String) ?: "open"
 
             val msgData = mapOf(
@@ -267,7 +253,7 @@ class FirebaseSupportServiceImpl @Inject constructor(
             firestore.collection("supportTickets").document(ticketId).update(update).await()
             Result.success(Unit)
         } catch (e: Exception) {
-            Result.failure(e)
+            Result.failure(Exception(friendlyNetworkMessage(e) ?: e.message, e))
         }
     }
 
@@ -330,7 +316,7 @@ class FirebaseSupportServiceImpl @Inject constructor(
                 lastId = if (snapshot.size() > 0) snapshot.documents.last().id else null
             ))
         } catch (e: Exception) {
-            Result.failure(e)
+            Result.failure(Exception(friendlyNetworkMessage(e) ?: e.message, e))
         }
     }
 
@@ -352,7 +338,7 @@ class FirebaseSupportServiceImpl @Inject constructor(
             firestore.collection("supportTickets").document(ticketId).update(update).await()
             Result.success(Unit)
         } catch (e: Exception) {
-            Result.failure(e)
+            Result.failure(Exception(friendlyNetworkMessage(e) ?: e.message, e))
         }
     }
 
@@ -366,7 +352,7 @@ class FirebaseSupportServiceImpl @Inject constructor(
                 )).await()
             Result.success(Unit)
         } catch (e: Exception) {
-            Result.failure(e)
+            Result.failure(Exception(friendlyNetworkMessage(e) ?: e.message, e))
         }
     }
 
@@ -377,7 +363,7 @@ class FirebaseSupportServiceImpl @Inject constructor(
                 .update("unreadByAdmin", false).await()
             Result.success(Unit)
         } catch (e: Exception) {
-            Result.failure(e)
+            Result.failure(Exception(friendlyNetworkMessage(e) ?: e.message, e))
         }
     }
 
@@ -385,7 +371,7 @@ class FirebaseSupportServiceImpl @Inject constructor(
 
     override suspend fun sendAdminMessage(ticketId: String, body: String): Result<Unit> {
         return try {
-            val user = auth.currentUser ?: return Result.failure(Exception("User not authenticated"))
+            val user = auth.currentUser ?: return Result.failure(Exception(ErrorMessages.USER_NOT_AUTHENTICATED))
             val userDoc = firestore.collection("users").document(user.uid).get().await()
             val displayName = (userDoc.data?.get("displayName") as? String) ?: "Admin"
             requireSuperadmin().onFailure { return Result.failure(it) }
@@ -394,7 +380,7 @@ class FirebaseSupportServiceImpl @Inject constructor(
             if (!ticketDoc.exists()) return Result.failure(Exception("Ticket not found"))
 
             val now = System.currentTimeMillis()
-            val ticketData = ticketDoc.data!!
+            val ticketData = ticketDoc.data ?: return Result.failure(Exception("Ticket data not found"))
             val currentStatus = (ticketData["status"] as? String) ?: "open"
             val targetUid = (ticketData["userId"] as? String) ?: ""
 
@@ -442,7 +428,7 @@ class FirebaseSupportServiceImpl @Inject constructor(
 
             Result.success(Unit)
         } catch (e: Exception) {
-            Result.failure(e)
+            Result.failure(Exception(friendlyNetworkMessage(e) ?: e.message, e))
         }
     }
 
@@ -461,7 +447,7 @@ class FirebaseSupportServiceImpl @Inject constructor(
             }
             Result.success(articles)
         } catch (e: Exception) {
-            Result.failure(e)
+            Result.failure(Exception(friendlyNetworkMessage(e) ?: e.message, e))
         }
     }
 
@@ -478,7 +464,7 @@ class FirebaseSupportServiceImpl @Inject constructor(
             }
             Result.success(articles)
         } catch (e: Exception) {
-            Result.failure(e)
+            Result.failure(Exception(friendlyNetworkMessage(e) ?: e.message, e))
         }
     }
 
@@ -506,7 +492,7 @@ class FirebaseSupportServiceImpl @Inject constructor(
             val ref = firestore.collection("helpArticles").add(data).await()
             Result.success(ref.id)
         } catch (e: Exception) {
-            Result.failure(e)
+            Result.failure(Exception(friendlyNetworkMessage(e) ?: e.message, e))
         }
     }
 
@@ -531,7 +517,7 @@ class FirebaseSupportServiceImpl @Inject constructor(
             firestore.collection("helpArticles").document(articleId).update(update).await()
             Result.success(Unit)
         } catch (e: Exception) {
-            Result.failure(e)
+            Result.failure(Exception(friendlyNetworkMessage(e) ?: e.message, e))
         }
     }
 
@@ -541,7 +527,7 @@ class FirebaseSupportServiceImpl @Inject constructor(
             firestore.collection("helpArticles").document(articleId).delete().await()
             Result.success(Unit)
         } catch (e: Exception) {
-            Result.failure(e)
+            Result.failure(Exception(friendlyNetworkMessage(e) ?: e.message, e))
         }
     }
 
@@ -573,11 +559,11 @@ class FirebaseSupportServiceImpl @Inject constructor(
                 expenseId = ctx["expenseId"] as? String ?: "",
                 screen = ctx["screen"] as? String ?: ""
             ),
-            createdAt = toMillis(data["createdAt"]),
-            updatedAt = toMillis(data["updatedAt"]),
+            createdAt = DateUtils.toMillis(data["createdAt"]) ?: 0L,
+            updatedAt = DateUtils.toMillis(data["updatedAt"]) ?: 0L,
             resolvedAt = (data["resolvedAt"] as? Number)?.toLong(),
             resolvedBy = data["resolvedBy"] as? String,
-            lastMessageAt = toMillis(data["lastMessageAt"]),
+            lastMessageAt = DateUtils.toMillis(data["lastMessageAt"]) ?: 0L,
             lastMessageBy = data["lastMessageBy"] as? String,
             unreadByUser = data["unreadByUser"] as? Boolean ?: false,
             unreadByAdmin = data["unreadByAdmin"] as? Boolean ?: false
@@ -594,8 +580,8 @@ class FirebaseSupportServiceImpl @Inject constructor(
             tags = (data["tags"] as? List<String>) ?: emptyList(),
             order = (data["order"] as? Number)?.toInt() ?: 0,
             active = data["active"] as? Boolean ?: true,
-            createdAt = toMillis(data["createdAt"]),
-            updatedAt = toMillis(data["updatedAt"]),
+            createdAt = DateUtils.toMillis(data["createdAt"]) ?: 0L,
+            updatedAt = DateUtils.toMillis(data["updatedAt"]) ?: 0L,
             createdBy = data["createdBy"] as? String ?: ""
         )
     }

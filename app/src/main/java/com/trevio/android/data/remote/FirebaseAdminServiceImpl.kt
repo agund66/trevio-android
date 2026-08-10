@@ -6,6 +6,8 @@ import com.google.firebase.firestore.Query
 import com.trevio.android.domain.model.PaginatedResult
 import com.trevio.android.domain.model.User
 import com.trevio.android.domain.repository.AdminService
+import com.trevio.android.util.ErrorMessages
+import com.trevio.android.util.friendlyNetworkMessage
 import kotlinx.coroutines.tasks.await
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -18,10 +20,10 @@ class FirebaseAdminServiceImpl @Inject constructor(
 
     override suspend fun getAllUsers(pageSize: Int, lastUserUid: String?): Result<PaginatedResult<User>> {
         return try {
-            val uid = auth.currentUser?.uid ?: return Result.failure(Exception("User not authenticated"))
+            val uid = auth.currentUser?.uid ?: return Result.failure(Exception(ErrorMessages.USER_NOT_AUTHENTICATED))
             val currentUserDoc = firestore.collection("users").document(uid).get().await()
             val currentRole = currentUserDoc.data?.get("role") as? String ?: "user"
-            if (currentRole != "superadmin") return Result.failure(Exception("Access denied"))
+            if (currentRole != "superadmin") return Result.failure(Exception(ErrorMessages.ACCESS_DENIED))
 
             var query = firestore.collection("users")
                 .orderBy("createdAt", Query.Direction.DESCENDING)
@@ -64,32 +66,32 @@ class FirebaseAdminServiceImpl @Inject constructor(
                 lastId = if (snapshot.size() > 0) snapshot.documents.last().id else null
             ))
         } catch (e: Exception) {
-            Result.failure(e)
+            Result.failure(Exception(friendlyNetworkMessage(e) ?: e.message, e))
         }
     }
 
     private suspend fun requireSuperadmin(): Result<Unit> {
         return try {
-            val uid = auth.currentUser?.uid ?: return Result.failure(Exception("User not authenticated"))
+            val uid = auth.currentUser?.uid ?: return Result.failure(Exception(ErrorMessages.USER_NOT_AUTHENTICATED))
             val currentUserDoc = firestore.collection("users").document(uid).get().await()
             val currentRole = currentUserDoc.data?.get("role") as? String ?: "user"
-            if (currentRole != "superadmin") return Result.failure(Exception("Access denied: superadmin only"))
+            if (currentRole != "superadmin") return Result.failure(Exception(ErrorMessages.ACCESS_DENIED_SUPERADMIN))
             Result.success(Unit)
         } catch (e: Exception) {
-            Result.failure(e)
+            Result.failure(Exception(friendlyNetworkMessage(e) ?: e.message, e))
         }
     }
 
     override suspend fun blockUser(uid: String): Result<Unit> {
         return try {
-            val currentUid = auth.currentUser?.uid ?: return Result.failure(Exception("User not authenticated"))
+            val currentUid = auth.currentUser?.uid ?: return Result.failure(Exception(ErrorMessages.USER_NOT_AUTHENTICATED))
             if (uid == currentUid) return Result.failure(Exception("Cannot block yourself"))
             requireSuperadmin().onFailure { return Result.failure(it) }
             firestore.collection("users").document(uid)
                 .update(mapOf("blocked" to true, "updatedAt" to System.currentTimeMillis())).await()
             Result.success(Unit)
         } catch (e: Exception) {
-            Result.failure(e)
+            Result.failure(Exception(friendlyNetworkMessage(e) ?: e.message, e))
         }
     }
 
@@ -100,7 +102,7 @@ class FirebaseAdminServiceImpl @Inject constructor(
                 .update(mapOf("blocked" to false, "updatedAt" to System.currentTimeMillis())).await()
             Result.success(Unit)
         } catch (e: Exception) {
-            Result.failure(e)
+            Result.failure(Exception(friendlyNetworkMessage(e) ?: e.message, e))
         }
     }
 
@@ -111,20 +113,20 @@ class FirebaseAdminServiceImpl @Inject constructor(
                 .update(mapOf("role" to "superadmin", "updatedAt" to System.currentTimeMillis())).await()
             Result.success(Unit)
         } catch (e: Exception) {
-            Result.failure(e)
+            Result.failure(Exception(friendlyNetworkMessage(e) ?: e.message, e))
         }
     }
 
     override suspend fun demoteToUser(uid: String): Result<Unit> {
         return try {
-            val currentUid = auth.currentUser?.uid ?: return Result.failure(Exception("User not authenticated"))
+            val currentUid = auth.currentUser?.uid ?: return Result.failure(Exception(ErrorMessages.USER_NOT_AUTHENTICATED))
             if (uid == currentUid) return Result.failure(Exception("Cannot demote yourself"))
             requireSuperadmin().onFailure { return Result.failure(it) }
             firestore.collection("users").document(uid)
                 .update(mapOf("role" to "user", "updatedAt" to System.currentTimeMillis())).await()
             Result.success(Unit)
         } catch (e: Exception) {
-            Result.failure(e)
+            Result.failure(Exception(friendlyNetworkMessage(e) ?: e.message, e))
         }
     }
 }

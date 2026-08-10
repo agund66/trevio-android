@@ -6,6 +6,7 @@ import com.trevio.android.domain.model.PaginatedResult
 import com.trevio.android.domain.model.RecurringConfig
 import com.trevio.android.domain.model.SplitEntry
 import com.trevio.android.domain.model.SplitType
+import com.trevio.android.domain.model.TransactionType
 
 interface ExpenseService {
     suspend fun addExpense(
@@ -21,7 +22,8 @@ interface ExpenseService {
         date: Long,
         note: String = "",
         recurring: RecurringConfig? = null,
-        itemizedData: ItemizedSplitData? = null
+        itemizedData: ItemizedSplitData? = null,
+        transactionType: TransactionType = TransactionType.EXPENSE
     ): Result<String>
 
     suspend fun updateExpense(
@@ -37,7 +39,8 @@ interface ExpenseService {
         category: String,
         date: Long,
         note: String = "",
-        itemizedData: ItemizedSplitData? = null
+        itemizedData: ItemizedSplitData? = null,
+        transactionType: TransactionType = TransactionType.EXPENSE
     ): Result<Unit>
 
     suspend fun deleteExpense(groupId: String, expenseId: String): Result<Unit>

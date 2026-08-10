@@ -11,6 +11,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Group
 import androidx.compose.material.icons.filled.GroupAdd
+import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.LocalCafe
 import androidx.compose.material.icons.filled.Flight
 import androidx.compose.material.icons.filled.SportsSoccer
@@ -59,9 +60,8 @@ class GroupsListViewModel @Inject constructor(
     private val _state = MutableStateFlow(GroupsListState())
     val state: StateFlow<GroupsListState> = _state
 
-    init { loadGroups() }
-
     init {
+        loadGroups()
         viewModelScope.launch {
             userRefreshNotifier.userRefreshed.collect {
                 refreshGroups()
@@ -107,7 +107,7 @@ fun GroupsListScreen(
 
     val needsRefresh by navController.currentBackStackEntry
         ?.savedStateHandle?.getStateFlow<Boolean>("needsRefresh", false)
-        ?.collectAsState() ?: mutableStateOf(false)
+        ?.collectAsState() ?: remember { mutableStateOf(false) }
 
     LaunchedEffect(needsRefresh) {
         if (needsRefresh) {
@@ -240,8 +240,21 @@ private fun GroupsListItem(
 ) {
     val balance = group.yourBalance
     val isDark = isSystemInDarkTheme()
+    val accentColor = when (group.template) {
+        GroupTemplate.TRIP -> if (isDark) Color(0xFF818CF8) else Color(0xFF6366F1)
+        GroupTemplate.TURF -> if (isDark) Color(0xFF4ADE80) else Color(0xFF22C55E)
+        GroupTemplate.CASUAL -> if (isDark) Color(0xFFFBBF24) else Color(0xFFF59E0B)
+        GroupTemplate.HOUSEHOLD -> if (isDark) Color(0xFF2DD4BF) else Color(0xFF0D9488)
+    }
     val balanceColor = if (balance > 0) if (isDark) Color(0xFF4ADE80) else Color(0xFF22C55E) else if (balance < 0) if (isDark) Color(0xFFF87171) else Color(0xFFEF4444) else MaterialTheme.colorScheme.onSurfaceVariant
-    val balanceText = if (balance > 0) "owes you ${formatBase(balance)}" else if (balance < 0) "you owe ${formatBase(-balance)}" else "settled up"
+    val balanceText = when {
+        group.template == GroupTemplate.HOUSEHOLD -> {
+            if (group.totalExpenses > 0) "${formatBase(group.totalExpenses)} spent" else "No entries yet"
+        }
+        balance > 0 -> "owes you ${formatBase(balance)}"
+        balance < 0 -> "you owe ${formatBase(-balance)}"
+        else -> "settled up"
+    }
 
     TrevioCard(
         modifier = Modifier
@@ -257,13 +270,13 @@ private fun GroupsListItem(
                 modifier = Modifier
                     .size(48.dp)
                     .clip(RoundedCornerShape(12.dp))
-                    .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.1f)),
+                    .background(accentColor.copy(alpha = 0.1f)),
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
                     imageVector = templateIcon(group.template),
                     contentDescription = null,
-                    tint = MaterialTheme.colorScheme.primary,
+                    tint = accentColor,
                     modifier = Modifier.size(24.dp)
                 )
             }
@@ -311,4 +324,5 @@ private fun templateIcon(template: GroupTemplate): ImageVector = when (template)
     GroupTemplate.TRIP -> Icons.Default.Flight
     GroupTemplate.TURF -> Icons.Default.SportsSoccer
     GroupTemplate.CASUAL -> Icons.Default.LocalCafe
+    GroupTemplate.HOUSEHOLD -> Icons.Default.Home
 }

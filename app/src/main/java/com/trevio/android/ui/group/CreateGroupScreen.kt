@@ -17,6 +17,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.outlined.AttachMoney
 import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.Description
 import androidx.compose.material.icons.outlined.Group
@@ -47,11 +48,13 @@ import com.trevio.android.domain.model.UserSearchResult
 import com.trevio.android.domain.repository.AuthService
 import com.trevio.android.domain.repository.GroupService
 import com.trevio.android.domain.repository.UserService
+import com.trevio.android.util.CurrencyConverter
+import com.trevio.android.util.rememberCurrencyFormatter
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.runBlocking
 import javax.inject.Inject
 
 @HiltViewModel
@@ -60,8 +63,6 @@ class CreateGroupViewModel @Inject constructor(
     private val userService: UserService,
     private val authService: AuthService
 ) : ViewModel() {
-
-    val currentUserId: String? get() = runBlocking { authService.getCurrentUserId() }
 
     data class OfflineMember(
         val name: String
@@ -74,25 +75,39 @@ class CreateGroupViewModel @Inject constructor(
         val selectedMembers: List<UserSearchResult> = emptyList(),
         val offlineMembers: List<OfflineMember> = emptyList(),
         val inviteCode: String? = null,
-        val createdGroupId: String? = null
+        val createdGroupId: String? = null,
+        val currentUserId: String? = null,
+        val isSearching: Boolean = false
     )
 
     private val _state = MutableStateFlow(CreateState())
     val state: StateFlow<CreateState> = _state
 
+    init {
+        viewModelScope.launch {
+            val uid = authService.getCurrentUserId()
+            _state.value = _state.value.copy(currentUserId = uid)
+        }
+    }
+
     fun searchUsers(query: String) {
         if (query.isBlank()) {
-            _state.value = _state.value.copy(searchResults = emptyList())
+            _state.value = _state.value.copy(searchResults = emptyList(), isSearching = false)
             return
         }
+        _state.value = _state.value.copy(isSearching = true)
         viewModelScope.launch {
             userService.searchUsers(query)
                 .onSuccess { results ->
                     _state.value = _state.value.copy(
                         searchResults = results.filter { r ->
                             _state.value.selectedMembers.none { it.uid == r.uid }
-                        }
+                        },
+                        isSearching = false
                     )
+                }
+                .onFailure {
+                    _state.value = _state.value.copy(isSearching = false)
                 }
         }
     }
@@ -123,14 +138,15 @@ class CreateGroupViewModel @Inject constructor(
         )
     }
 
-    fun createGroup(name: String, description: String, template: GroupTemplate) {
+    fun createGroup(name: String, description: String, template: GroupTemplate, monthlyBudget: Double? = null) {
         _state.value = _state.value.copy(isLoading = true, error = null)
         viewModelScope.launch {
             groupService.createGroup(
                 name = name,
                 description = description,
                 template = template,
-                memberUids = _state.value.selectedMembers.map { it.uid }
+                memberUids = _state.value.selectedMembers.map { it.uid },
+                monthlyBudget = monthlyBudget
             ).onSuccess { (groupId, inviteCode) ->
                 for (offline in _state.value.offlineMembers) {
                     groupService.addOfflineMember(groupId, offline.name)
@@ -155,11 +171,15 @@ fun CreateGroupScreen(
 ) {
     var name by remember { mutableStateOf("") }
     var description by remember { mutableStateOf("") }
+    var monthlyBudget by remember { mutableStateOf("") }
     var selectedTemplate by remember { mutableStateOf(GroupTemplate.CASUAL) }
     var searchQuery by remember { mutableStateOf("") }
+    var debouncedQuery by remember { mutableStateOf("") }
     var offlineName by remember { mutableStateOf("") }
     val state by viewModel.state.collectAsState()
-    val currentUserId = remember { viewModel.currentUserId }
+    val currencyFormatter = rememberCurrencyFormatter()
+    val currencySymbol = CurrencyConverter.getCurrencySymbol(currencyFormatter.userCurrency)
+    val currentUserId = state.currentUserId
     val isDark = isSystemInDarkTheme()
 
     LaunchedEffect(state.createdGroupId) {
@@ -167,6 +187,17 @@ fun CreateGroupScreen(
             navController.getBackStackEntry(TrevioRoute.Home.route)
                 .savedStateHandle["needsRefresh"] = true
             navController.popBackStack(TrevioRoute.Home.route, inclusive = false)
+        }
+    }
+
+    LaunchedEffect(searchQuery) {
+        if (searchQuery.isNotBlank()) {
+            delay(300)
+            debouncedQuery = searchQuery
+            viewModel.searchUsers(debouncedQuery)
+        } else {
+            debouncedQuery = ""
+            viewModel.searchUsers("")
         }
     }
 
@@ -220,6 +251,26 @@ fun CreateGroupScreen(
                     modifier = Modifier.weight(1f)
                 )
             }
+            Spacer(modifier = Modifier.height(10.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                TemplateCard(
+                    icon = Icons.Default.Home,
+                    title = "Household",
+                    subtitle = "Daily family expenses",
+                    iconColor = if (isDark) Color(0xFF2DD4BF) else Color(0xFF0D9488),
+                    selected = selectedTemplate == GroupTemplate.HOUSEHOLD,
+                    onClick = { selectedTemplate = GroupTemplate.HOUSEHOLD },
+                    modifier = Modifier.weight(1f)
+                )
+                Spacer(modifier = Modifier.weight(1f))
+            }
+            if (selectedTemplate == GroupTemplate.HOUSEHOLD) {
+                Spacer(modifier = Modifier.height(8.dp))
+                SectionHint("Track daily family spending and income. No splitting — just log who paid what and see monthly reports.")
+            }
 
             Spacer(modifier = Modifier.height(28.dp))
 
@@ -244,6 +295,22 @@ fun CreateGroupScreen(
                 icon = Icons.Outlined.Description,
                 minLines = 2
             )
+            if (selectedTemplate == GroupTemplate.HOUSEHOLD) {
+                Spacer(modifier = Modifier.height(12.dp))
+                OutlinedTextField(
+                    value = monthlyBudget,
+                    onValueChange = { monthlyBudget = it.filter { c -> c.isDigit() || c == '.' } },
+                    label = { Text("Monthly budget (optional)") },
+                    prefix = { Text(currencySymbol) },
+                    singleLine = true,
+                    shape = RoundedCornerShape(14.dp),
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = MaterialTheme.colorScheme.primary,
+                        unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant
+                    )
+                )
+            }
 
             Spacer(modifier = Modifier.height(28.dp))
 
@@ -255,12 +322,12 @@ fun CreateGroupScreen(
 
             OutlinedTextField(
                 value = searchQuery,
-                onValueChange = { searchQuery = it; viewModel.searchUsers(it) },
+                onValueChange = { searchQuery = it },
                 placeholder = { Text("Search by username", color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)) },
                 leadingIcon = { Icon(Icons.Outlined.Search, contentDescription = null, modifier = Modifier.size(20.dp)) },
                 trailingIcon = {
                     if (searchQuery.isNotEmpty()) {
-                        IconButton(onClick = { searchQuery = ""; viewModel.searchUsers("") }, modifier = Modifier.size(20.dp)) {
+                        IconButton(onClick = { searchQuery = ""; debouncedQuery = "" }, modifier = Modifier.size(20.dp)) {
                             Icon(Icons.Outlined.Close, contentDescription = "Clear", modifier = Modifier.size(16.dp))
                         }
                     }
@@ -273,6 +340,16 @@ fun CreateGroupScreen(
                     unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant
                 )
             )
+
+            // Loading indicator for search
+            if (state.isSearching) {
+                Box(
+                    modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    CircularProgressIndicator(modifier = Modifier.size(24.dp))
+                }
+            }
 
             // Search Results
             AnimatedVisibility(
@@ -348,7 +425,7 @@ fun CreateGroupScreen(
                             .clickable {
                                 viewModel.addOfflineMember(searchQuery)
                                 searchQuery = ""
-                                viewModel.searchUsers("")
+                                debouncedQuery = ""
                             }
                             .padding(14.dp),
                         verticalAlignment = Alignment.CenterVertically
@@ -477,7 +554,16 @@ fun CreateGroupScreen(
 
             // Create Button
             Button(
-                onClick = { viewModel.createGroup(name, description, selectedTemplate) },
+                onClick = {
+                    val budgetInUserCurrency = monthlyBudget.toDoubleOrNull()
+                    if (budgetInUserCurrency != null && budgetInUserCurrency < 0) {
+                        return@Button
+                    }
+                    val budgetInBase = if (budgetInUserCurrency != null && budgetInUserCurrency > 0) {
+                        CurrencyConverter.convertToBase(budgetInUserCurrency, currencyFormatter.userCurrency, currencyFormatter.rates)
+                    } else null
+                    viewModel.createGroup(name, description, selectedTemplate, budgetInBase)
+                },
                 enabled = name.isNotBlank() && !state.isLoading,
                 modifier = Modifier.fillMaxWidth().height(54.dp),
                 shape = RoundedCornerShape(16.dp),

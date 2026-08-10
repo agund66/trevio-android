@@ -1,6 +1,7 @@
 package com.trevio.android.data.remote
 
 import com.google.firebase.auth.FirebaseAuth
+import com.trevio.android.util.friendlyNetworkMessage
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.SetOptions
 import com.trevio.android.domain.model.TripData
@@ -73,7 +74,7 @@ class FirebaseTripServiceImpl @Inject constructor(
                 locations = locations
             ))
         } catch (e: Exception) {
-            Result.failure(e)
+            Result.failure(Exception(friendlyNetworkMessage(e) ?: e.message, e))
         }
     }
 
@@ -117,7 +118,7 @@ class FirebaseTripServiceImpl @Inject constructor(
             tripDocRef(groupId).set(data, SetOptions.merge()).await()
             Result.success(Unit)
         } catch (e: Exception) {
-            Result.failure(e)
+            Result.failure(Exception(friendlyNetworkMessage(e) ?: e.message, e))
         }
     }
 
@@ -132,7 +133,7 @@ class FirebaseTripServiceImpl @Inject constructor(
             updateTripData(groupId, updated)
             Result.success(itemId)
         } catch (e: Exception) {
-            Result.failure(e)
+            Result.failure(Exception(friendlyNetworkMessage(e) ?: e.message, e))
         }
     }
 
@@ -158,7 +159,7 @@ class FirebaseTripServiceImpl @Inject constructor(
             updateTripData(groupId, tripData.copy(itinerary = itinerary))
             Result.success(Unit)
         } catch (e: Exception) {
-            Result.failure(e)
+            Result.failure(Exception(friendlyNetworkMessage(e) ?: e.message, e))
         }
     }
 
@@ -171,7 +172,7 @@ class FirebaseTripServiceImpl @Inject constructor(
             updateTripData(groupId, tripData.copy(itinerary = itinerary))
             Result.success(Unit)
         } catch (e: Exception) {
-            Result.failure(e)
+            Result.failure(Exception(friendlyNetworkMessage(e) ?: e.message, e))
         }
     }
 
@@ -186,7 +187,7 @@ class FirebaseTripServiceImpl @Inject constructor(
             updateTripData(groupId, updated)
             Result.success(locationId)
         } catch (e: Exception) {
-            Result.failure(e)
+            Result.failure(Exception(friendlyNetworkMessage(e) ?: e.message, e))
         }
     }
 
@@ -199,7 +200,7 @@ class FirebaseTripServiceImpl @Inject constructor(
             updateTripData(groupId, tripData.copy(locations = locations))
             Result.success(Unit)
         } catch (e: Exception) {
-            Result.failure(e)
+            Result.failure(Exception(friendlyNetworkMessage(e) ?: e.message, e))
         }
     }
 }

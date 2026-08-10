@@ -1,5 +1,10 @@
 package com.trevio.android.ui.notifications
 
+import android.Manifest
+import android.content.pm.PackageManager
+import android.os.Build
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
@@ -26,6 +31,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.core.content.ContextCompat
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -42,6 +48,7 @@ import com.trevio.android.domain.repository.BroadcastService
 import com.trevio.android.domain.repository.GroupService
 import com.trevio.android.domain.repository.NotificationService
 import com.trevio.android.core.navigation.TrevioRoute
+import com.trevio.android.util.DateUtils
 import com.trevio.android.util.rememberCurrencyFormatter
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -169,6 +176,28 @@ fun NotificationsScreen(
     val state by viewModel.state.collectAsState()
     val currencyFormatter = rememberCurrencyFormatter()
     val unreadCount = state.notifications.count { !it.read }
+    val context = androidx.compose.ui.platform.LocalContext.current
+
+    // Lazily request POST_NOTIFICATIONS when the user opens the Notifications screen
+    // for the first time (not at app launch). Only needed on Android 13+ (TIRAMISU).
+    val notificationPermissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission()
+    ) { _ ->
+        // Result is intentionally ignored — in-app notifications still work from Firestore.
+        // The permission only governs system-level push notification display.
+    }
+
+    LaunchedEffect(Unit) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            val granted = ContextCompat.checkSelfPermission(
+                context,
+                Manifest.permission.POST_NOTIFICATIONS
+            ) == PackageManager.PERMISSION_GRANTED
+            if (!granted) {
+                notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+            }
+        }
+    }
 
     if (state.isLoading) {
         Column(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
@@ -335,7 +364,7 @@ private fun NotificationCard(
                     if (notification.createdAt > 0) {
                         Spacer(modifier = Modifier.height(4.dp))
                         Text(
-                            formatRelativeTime(notification.createdAt, formatDate),
+                            DateUtils.formatRelativeTime(notification.createdAt),
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
                         )
@@ -534,18 +563,3 @@ private fun BroadcastNotificationCard(broadcast: BroadcastMessage) {
     }
 }
 
-private fun formatRelativeTime(timestamp: Long, formatDate: (Long, Boolean) -> String): String {
-    if (timestamp == 0L) return ""
-    val now = System.currentTimeMillis()
-    val diff = now - timestamp
-    val minutes = diff / 60000
-    val hours = diff / 3600000
-    val days = diff / 86400000
-    return when {
-        minutes < 1 -> "just now"
-        minutes < 60 -> "${minutes}m ago"
-        hours < 24 -> "${hours}h ago"
-        days < 7 -> "${days}d ago"
-        else -> formatDate(timestamp, false)
-    }
-}

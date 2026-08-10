@@ -12,6 +12,10 @@ import com.trevio.android.domain.model.SplitEntry
 import com.trevio.android.domain.repository.SettlementService
 import com.trevio.android.domain.repository.ExchangeRateService
 import com.trevio.android.util.Calculations
+import com.trevio.android.util.ErrorMessages
+import com.trevio.android.util.Logger
+import com.trevio.android.util.friendlyNetworkMessage
+import com.trevio.android.util.toStorageString
 import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
@@ -35,7 +39,7 @@ class FirebaseSettlementServiceImpl @Inject constructor(
         upiRefId: String?
     ): Result<String> {
         return try {
-            val uid = auth.currentUser?.uid ?: return Result.failure(Exception("User not authenticated"))
+            val uid = auth.currentUser?.uid ?: return Result.failure(Exception(ErrorMessages.USER_NOT_AUTHENTICATED))
             if (groupId.isBlank() || fromUid.isBlank() || toUid.isBlank() || amount <= 0.0) {
                 return Result.failure(Exception("Missing required fields"))
             }
@@ -46,7 +50,7 @@ class FirebaseSettlementServiceImpl @Inject constructor(
 
             val groupRef = firestore.collection("groups").document(groupId)
             val groupDoc = groupRef.get().await()
-            if (!groupDoc.exists()) return Result.failure(Exception("Group not found"))
+            if (!groupDoc.exists()) return Result.failure(Exception(ErrorMessages.GROUP_NOT_FOUND))
 
             val memberDoc = groupRef.collection("members").document(uid).get().await()
             if (!memberDoc.exists()) return Result.failure(Exception("You are not a member of this group"))
@@ -70,7 +74,7 @@ class FirebaseSettlementServiceImpl @Inject constructor(
                 "currency" to "INR",
                 "originalAmount" to amount,
                 "originalCurrency" to currency,
-                "method" to method.name.lowercase(),
+                "method" to method.toStorageString(),
                 "date" to now,
                 "createdBy" to uid,
                 "createdAt" to now
@@ -144,18 +148,18 @@ class FirebaseSettlementServiceImpl @Inject constructor(
                         )).await()
                 }
             } catch (notifError: Exception) {
-                android.util.Log.w("FirebaseSettlementService", "Failed to send settlement notification", notifError)
+                Logger.w("FirebaseSettlementService", "Failed to send settlement notification", notifError)
             }
 
             Result.success(settlementRef.id)
         } catch (e: Exception) {
-            Result.failure(e)
+            Result.failure(Exception(friendlyNetworkMessage(e) ?: e.message, e))
         }
     }
 
     override suspend fun getSimplifiedDebts(groupId: String): Result<List<SimplifiedDebt>> {
         return try {
-            val uid = auth.currentUser?.uid ?: return Result.failure(Exception("User not authenticated"))
+            val uid = auth.currentUser?.uid ?: return Result.failure(Exception(ErrorMessages.USER_NOT_AUTHENTICATED))
             val groupRef = firestore.collection("groups").document(groupId)
             val memberDoc = groupRef.collection("members").document(uid).get().await()
             if (!memberDoc.exists()) return Result.failure(Exception("You are not a member of this group"))
@@ -233,13 +237,13 @@ class FirebaseSettlementServiceImpl @Inject constructor(
             }
             Result.success(enrichedDebts)
         } catch (e: Exception) {
-            Result.failure(e)
+            Result.failure(Exception(friendlyNetworkMessage(e) ?: e.message, e))
         }
     }
 
     override suspend fun getGroupBalances(groupId: String): Result<List<Member>> {
         return try {
-            val uid = auth.currentUser?.uid ?: return Result.failure(Exception("User not authenticated"))
+            val uid = auth.currentUser?.uid ?: return Result.failure(Exception(ErrorMessages.USER_NOT_AUTHENTICATED))
             val groupRef = firestore.collection("groups").document(groupId)
             val memberDoc = groupRef.collection("members").document(uid).get().await()
             if (!memberDoc.exists()) return Result.failure(Exception("You are not a member of this group"))
@@ -290,13 +294,13 @@ class FirebaseSettlementServiceImpl @Inject constructor(
             }
             Result.success(members)
         } catch (e: Exception) {
-            Result.failure(e)
+            Result.failure(Exception(friendlyNetworkMessage(e) ?: e.message, e))
         }
     }
 
     override suspend fun getSettlementHistory(groupId: String, pageSize: Int, lastSettlementId: String?): Result<PaginatedResult<Settlement>> {
         return try {
-            val uid = auth.currentUser?.uid ?: return Result.failure(Exception("User not authenticated"))
+            val uid = auth.currentUser?.uid ?: return Result.failure(Exception(ErrorMessages.USER_NOT_AUTHENTICATED))
             val groupRef = firestore.collection("groups").document(groupId)
             val memberDoc = groupRef.collection("members").document(uid).get().await()
             if (!memberDoc.exists()) return Result.failure(Exception("You are not a member of this group"))
@@ -376,7 +380,7 @@ class FirebaseSettlementServiceImpl @Inject constructor(
                 lastId = if (snapshot.size() > 0) snapshot.documents.last().id else null
             ))
         } catch (e: Exception) {
-            Result.failure(e)
+            Result.failure(Exception(friendlyNetworkMessage(e) ?: e.message, e))
         }
     }
 

@@ -38,7 +38,6 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.runBlocking
 import javax.inject.Inject
 
 private fun getUpiVpa(debt: SimplifiedDebt): String {
@@ -56,27 +55,35 @@ class SettlementViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle
 ) : ViewModel() {
 
-    val currentUserId: String? get() = runBlocking { authService.getCurrentUserId() }
-
     private val groupId: String = savedStateHandle.get<String>("groupId") ?: ""
 
     data class SettlementState(
         val isLoading: Boolean = true,
         val debts: List<SimplifiedDebt> = emptyList(),
-        val error: String? = null
+        val error: String? = null,
+        val currentUserId: String? = null
     )
 
     private val _state = MutableStateFlow(SettlementState())
     val state: StateFlow<SettlementState> = _state
 
-    init { loadDebts() }
+    init {
+        loadCurrentUserId()
+        loadDebts()
+    }
+
+    private fun loadCurrentUserId() {
+        viewModelScope.launch {
+            _state.value = _state.value.copy(currentUserId = authService.getCurrentUserId())
+        }
+    }
 
     fun loadDebts() {
         _state.value = _state.value.copy(isLoading = true)
         viewModelScope.launch {
             settlementService.getSimplifiedDebts(groupId)
-                .onSuccess { debts -> _state.value = SettlementState(isLoading = false, debts = debts) }
-                .onFailure { e -> _state.value = SettlementState(isLoading = false, error = e.message) }
+                .onSuccess { debts -> _state.value = _state.value.copy(isLoading = false, debts = debts) }
+                .onFailure { e -> _state.value = _state.value.copy(isLoading = false, error = e.message) }
         }
     }
 
@@ -108,7 +115,7 @@ fun SettleUpScreen(
     viewModel: SettlementViewModel = hiltViewModel()
 ) {
     val state by viewModel.state.collectAsState()
-    val currentUserId = remember { viewModel.currentUserId }
+    val currentUserId = state.currentUserId
     val currencyFormatter = rememberCurrencyFormatter()
     val context = LocalContext.current
 

@@ -1,31 +1,16 @@
 package com.trevio.android.data.remote
 
-import com.google.firebase.Timestamp
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.Query
 import com.trevio.android.domain.model.AppNotification
 import com.trevio.android.domain.model.PaginatedResult
 import com.trevio.android.domain.repository.NotificationService
+import com.trevio.android.util.DateUtils
+import com.trevio.android.util.friendlyNetworkMessage
 import kotlinx.coroutines.tasks.await
-import java.util.Date
 import javax.inject.Inject
 import javax.inject.Singleton
-
-private fun toMillis(value: Any?): Long {
-    if (value == null) return 0L
-    if (value is Timestamp) return value.toDate().time
-    if (value is Date) return value.time
-    if (value is Number) return value.toLong()
-    if (value is Map<*, *>) {
-        val seconds = (value["_seconds"] as? Number ?: value["seconds"] as? Number)?.toLong()
-        if (seconds != null) {
-            val nanos = (value["_nanoseconds"] as? Number ?: value["nanoseconds"] as? Number)?.toLong() ?: 0L
-            return seconds * 1000 + nanos / 1_000_000
-        }
-    }
-    return 0L
-}
 
 @Singleton
 class FirebaseNotificationServiceImpl @Inject constructor(
@@ -62,7 +47,7 @@ class FirebaseNotificationServiceImpl @Inject constructor(
                     title = data["title"] as? String ?: "",
                     body = data["body"] as? String ?: "",
                     read = data["read"] as? Boolean ?: false,
-                    createdAt = toMillis(data["createdAt"]),
+                    createdAt = DateUtils.toMillis(data["createdAt"]) ?: 0L,
                     data = (data["data"] as? Map<String, String>) ?: emptyMap()
                 )
             }
@@ -72,7 +57,7 @@ class FirebaseNotificationServiceImpl @Inject constructor(
                 lastId = if (snapshot.size() > 0) snapshot.documents.last().id else null
             ))
         } catch (e: Exception) {
-            Result.failure(e)
+            Result.failure(Exception(friendlyNetworkMessage(e) ?: e.message, e))
         }
     }
 
@@ -85,7 +70,7 @@ class FirebaseNotificationServiceImpl @Inject constructor(
                 .document(notificationId).update("read", true).await()
             Result.success(Unit)
         } catch (e: Exception) {
-            Result.failure(e)
+            Result.failure(Exception(friendlyNetworkMessage(e) ?: e.message, e))
         }
     }
 
@@ -105,7 +90,7 @@ class FirebaseNotificationServiceImpl @Inject constructor(
                 ).await()
             Result.success(Unit)
         } catch (e: Exception) {
-            Result.failure(e)
+            Result.failure(Exception(friendlyNetworkMessage(e) ?: e.message, e))
         }
     }
 
@@ -136,7 +121,7 @@ class FirebaseNotificationServiceImpl @Inject constructor(
 
             Result.success(Unit)
         } catch (e: Exception) {
-            Result.failure(e)
+            Result.failure(Exception(friendlyNetworkMessage(e) ?: e.message, e))
         }
     }
 }

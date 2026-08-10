@@ -40,7 +40,7 @@ fun BroadcastsScreen(
 ) {
     val state by viewModel.state.collectAsState()
     val currencyFormatter = rememberCurrencyFormatter()
-    val currentUserId = remember { viewModel.currentUserId }
+    val currentUserId = state.currentUserId
 
     if (state.showForm) {
         BroadcastCreateScreen(

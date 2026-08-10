@@ -35,6 +35,7 @@ import com.trevio.android.domain.model.SupportPriority
 import com.trevio.android.domain.model.SupportStatus
 import com.trevio.android.domain.model.SupportTicket
 import com.trevio.android.domain.repository.SupportService
+import com.trevio.android.util.DateUtils
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -483,7 +484,7 @@ private fun AdminTicketItem(ticket: SupportTicket, onClick: (SupportTicket) -> U
                         color = priorityColor
                     )
                     Text(
-                        "• ${formatAdminRelativeTime(ticket.updatedAt)}",
+                        "• ${DateUtils.formatRelativeTime(ticket.updatedAt)}",
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -690,23 +691,6 @@ private fun AdminMessageBubble(message: SupportMessage) {
     }
 }
 
-private fun formatAdminRelativeTime(ts: Long): String {
-    if (ts == 0L) return ""
-    val diffMs = System.currentTimeMillis() - ts
-    val diffMins = diffMs / 60000
-    val diffHours = diffMs / 3600000
-    val diffDays = diffMs / 86400000
-    return when {
-        diffMins < 1 -> "just now"
-        diffMins < 60 -> "${diffMins}m ago"
-        diffHours < 24 -> "${diffHours}h ago"
-        diffDays < 7 -> "${diffDays}d ago"
-        else -> {
-            val sdf = java.text.SimpleDateFormat("MMM d", java.util.Locale.getDefault())
-            sdf.format(java.util.Date(ts))
-        }
-    }
-}
 
 private fun formatAdminMessageTime(ts: Long): String {
     if (ts == 0L) return ""

@@ -5,6 +5,7 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -41,8 +42,10 @@ import androidx.navigation.navArgument
 import androidx.navigation.compose.rememberNavController
 import com.trevio.android.core.designsystem.theme.TrevioBorder
 import com.trevio.android.core.designsystem.theme.TrevioBorderDark
+import com.trevio.android.core.designsystem.components.OfflineBanner
 import com.trevio.android.domain.repository.AuthService
 import com.trevio.android.ui.admin.AdminScreen
+import com.trevio.android.util.NetworkMonitor
 import com.trevio.android.ui.broadcast.BroadcastPopup
 import com.trevio.android.ui.expense.AddExpenseScreen
 import com.trevio.android.ui.expense.EditExpenseScreen
@@ -70,10 +73,13 @@ import javax.inject.Inject
 
 @HiltViewModel
 class MainShellViewModel @Inject constructor(
-    private val authService: AuthService
+    private val authService: AuthService,
+    networkMonitor: NetworkMonitor
 ) : ViewModel() {
     private val _isSuperadmin = MutableStateFlow(false)
     val isSuperadmin: StateFlow<Boolean> = _isSuperadmin
+
+    val isOnline: StateFlow<Boolean> = networkMonitor.isOnline
 
     init {
         viewModelScope.launch {
@@ -108,8 +114,9 @@ fun MainShell(
     val currentRoute = navBackStackEntry?.destination?.route
 
     val scope = androidx.compose.runtime.rememberCoroutineScope()
-    val authService = androidx.hilt.navigation.compose.hiltViewModel<MainShellViewModel>()
-    val isSuperadmin by authService.isSuperadmin.collectAsState()
+    val viewModel = androidx.hilt.navigation.compose.hiltViewModel<MainShellViewModel>()
+    val isSuperadmin by viewModel.isSuperadmin.collectAsState()
+    val isOnline by viewModel.isOnline.collectAsState()
 
     val bottomNavItems = if (isSuperadmin) baseBottomNavItems + adminNavItem else baseBottomNavItems
     val showBottomBar = currentRoute in bottomNavItems.map { it.route }
@@ -172,23 +179,28 @@ fun MainShell(
             }
         }
     ) { innerPadding ->
-        Box(modifier = Modifier.fillMaxSize()) {
-            NavHost(
-                navController = innerNavController,
-                startDestination = TrevioRoute.Home.route,
-                modifier = Modifier.fillMaxSize().padding(innerPadding)
-            ) {
-                mainTabGraph(
-                    innerNavController = innerNavController,
-                    onSignOut = {
-                        navController.navigate(TrevioRoute.Login.route) {
-                            popUpTo(navController.graph.id) { inclusive = true }
-                        }
-                    }
-                )
-                detailGraph(innerNavController)
+        Column(modifier = Modifier.fillMaxSize().padding(innerPadding)) {
+            if (!isOnline) {
+                OfflineBanner()
             }
-            BroadcastPopup()
+            Box(modifier = Modifier.fillMaxSize().weight(1f)) {
+                NavHost(
+                    navController = innerNavController,
+                    startDestination = TrevioRoute.Home.route,
+                    modifier = Modifier.fillMaxSize()
+                ) {
+                    mainTabGraph(
+                        innerNavController = innerNavController,
+                        onSignOut = {
+                            navController.navigate(TrevioRoute.Login.route) {
+                                popUpTo(navController.graph.id) { inclusive = true }
+                            }
+                        }
+                    )
+                    detailGraph(innerNavController)
+                }
+                BroadcastPopup()
+            }
         }
     }
 }

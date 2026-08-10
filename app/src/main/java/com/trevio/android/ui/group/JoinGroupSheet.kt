@@ -1,6 +1,8 @@
 package com.trevio.android.ui.group
 
 import android.widget.Toast
+import com.google.android.gms.common.ConnectionResult
+import com.google.android.gms.common.GoogleApiAvailability
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
@@ -294,6 +296,18 @@ fun JoinGroupSheet(
 
                 OutlinedButton(
                     onClick = {
+                        // Check Google Play Services availability before launching the scanner.
+                        val playServicesStatus = GoogleApiAvailability.getInstance()
+                            .isGooglePlayServicesAvailable(context)
+                        if (playServicesStatus != ConnectionResult.SUCCESS) {
+                            Toast.makeText(
+                                context,
+                                "QR scanning requires Google Play Services. Please update it and try again.",
+                                Toast.LENGTH_LONG
+                            ).show()
+                            return@OutlinedButton
+                        }
+
                         val scanner = GmsBarcodeScanning.getClient(context)
                         scanner.startScan()
                             .addOnSuccessListener { barcode ->
@@ -304,8 +318,16 @@ fun JoinGroupSheet(
                                     viewModel.join(code)
                                 }
                             }
-                            .addOnFailureListener {
-                                Toast.makeText(context, "Scan failed: ${it.message}", Toast.LENGTH_SHORT).show()
+                            .addOnFailureListener { exception ->
+                                // User cancellation is not an error — only show real failures.
+                                if (exception is com.google.android.gms.common.api.ApiException &&
+                                    exception.statusCode == com.google.android.gms.common.api.CommonStatusCodes.CANCELED
+                                ) return@addOnFailureListener
+                                Toast.makeText(
+                                    context,
+                                    "Scan failed. Try entering the code manually.",
+                                    Toast.LENGTH_SHORT
+                                ).show()
                             }
                 },
                 modifier = Modifier.fillMaxWidth().height(52.dp),

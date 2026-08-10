@@ -1,6 +1,7 @@
 package com.trevio.android.ui.expense
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.rememberScrollState
@@ -17,6 +18,8 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
@@ -29,15 +32,19 @@ import com.trevio.android.domain.model.BillItem
 import com.trevio.android.domain.model.ItemizedSplitData
 import com.trevio.android.domain.model.SplitEntry
 import com.trevio.android.domain.model.SplitType
+import com.trevio.android.domain.model.TransactionType
 import com.trevio.android.domain.repository.AuthService
 import com.trevio.android.domain.repository.ExpenseService
+import com.trevio.android.domain.repository.GroupService
 import com.trevio.android.domain.repository.SettlementService
+import com.trevio.android.util.CurrencyConverter
+import com.trevio.android.util.HouseholdCategories
+import com.trevio.android.util.MemberStatus
 import com.trevio.android.util.rememberCurrencyFormatter
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.runBlocking
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -47,30 +54,54 @@ import javax.inject.Inject
 class ExpenseViewModel @Inject constructor(
     private val expenseService: ExpenseService,
     private val settlementService: SettlementService,
+    private val groupService: GroupService,
     private val authService: AuthService,
     savedStateHandle: SavedStateHandle
 ) : ViewModel() {
 
     private val groupId: String = savedStateHandle.get<String>("groupId") ?: ""
-    val currentUserId: String? get() = runBlocking { authService.getCurrentUserId() }
 
     data class ExpenseFormState(
         val isLoading: Boolean = false,
         val error: String? = null,
         val saved: Boolean = false,
-        val members: List<com.trevio.android.domain.model.Member> = emptyList()
+        val members: List<com.trevio.android.domain.model.Member> = emptyList(),
+        val isHousehold: Boolean = false,
+        val currentUserId: String? = null
     )
 
     private val _state = MutableStateFlow(ExpenseFormState())
     val state: StateFlow<ExpenseFormState> = _state
 
-    init { loadMembers() }
+    init {
+        loadMembers()
+        loadGroupInfo()
+        loadCurrentUserId()
+    }
+
+    private fun loadCurrentUserId() {
+        viewModelScope.launch {
+            val uid = authService.getCurrentUserId()
+            _state.value = _state.value.copy(currentUserId = uid)
+        }
+    }
 
     private fun loadMembers() {
         viewModelScope.launch {
             settlementService.getGroupBalances(groupId)
                 .onSuccess { members -> _state.value = _state.value.copy(members = members) }
                 .onFailure { e -> _state.value = _state.value.copy(error = e.message) }
+        }
+    }
+
+    private fun loadGroupInfo() {
+        viewModelScope.launch {
+            groupService.getGroupInfo(groupId)
+                .onSuccess { info ->
+                    _state.value = _state.value.copy(
+                        isHousehold = info.template == com.trevio.android.domain.model.GroupTemplate.HOUSEHOLD
+                    )
+                }
         }
     }
 
@@ -85,11 +116,12 @@ class ExpenseViewModel @Inject constructor(
         date: Long = System.currentTimeMillis(),
         note: String = "",
         recurring: com.trevio.android.domain.model.RecurringConfig? = null,
-        itemizedData: ItemizedSplitData? = null
+        itemizedData: ItemizedSplitData? = null,
+        transactionType: TransactionType = TransactionType.EXPENSE
     ) {
         _state.value = _state.value.copy(isLoading = true, error = null)
         viewModelScope.launch {
-            val memberUids = _state.value.members.filter { it.status == "active" }.map { it.uid }
+            val memberUids = _state.value.members.filter { it.status == MemberStatus.ACTIVE }.map { it.uid }
             expenseService.addExpense(
                 groupId = groupId,
                 description = description,
@@ -103,7 +135,8 @@ class ExpenseViewModel @Inject constructor(
                 date = date,
                 note = note,
                 recurring = recurring,
-                itemizedData = itemizedData
+                itemizedData = itemizedData,
+                transactionType = transactionType
             ).onSuccess {
                 _state.value = _state.value.copy(isLoading = false, saved = true)
             }.onFailure { e ->
@@ -131,9 +164,11 @@ fun AddExpenseScreen(
     val currencyFormatter = rememberCurrencyFormatter()
     var currency by remember { mutableStateOf(currencyFormatter.userCurrency) }
     val members = state.members
+    val isHousehold = state.isHousehold
+    var isIncome by remember { mutableStateOf(false) }
     var paidByUid by remember { mutableStateOf("") }
     val splitValues = remember { mutableStateMapOf<String, String>() }
-    val currentUserId = remember { viewModel.currentUserId }
+    val currentUserId = state.currentUserId
     var saveAndAddAnother by remember { mutableStateOf(false) }
     var note by remember { mutableStateOf("") }
     var isRecurring by remember { mutableStateOf(false) }
@@ -147,18 +182,7 @@ fun AddExpenseScreen(
     val excludedMembers = remember { mutableStateMapOf<String, Boolean>() }
 
     val currencySymbol = remember(currency) {
-        when (currency) {
-            "INR" -> "₹"
-            "USD" -> "$"
-            "EUR" -> "€"
-            "GBP" -> "£"
-            "JPY" -> "¥"
-            "AUD" -> "A$"
-            "CAD" -> "C$"
-            "SGD" -> "S$"
-            "AED" -> "د.إ"
-            else -> currency
-        }
+        CurrencyConverter.getCurrencySymbol(currency)
     }
 
     LaunchedEffect(state.saved) {
@@ -175,6 +199,7 @@ fun AddExpenseScreen(
                 expenseDateStr = todayStr
                 note = ""
                 isRecurring = false
+                isIncome = false
                 itemizedData = ItemizedSplitData()
                 saveAndAddAnother = false
             } else {
@@ -203,7 +228,7 @@ fun AddExpenseScreen(
             }
         }
     }
-    val activeMembers = members.filter { it.status == "active" }
+    val activeMembers = members.filter { it.status == MemberStatus.ACTIVE }
     val includedMembers = activeMembers.filter { excludedMembers[it.uid] != true }
     val equalPerPerson = if (splitType == SplitType.EQUAL && amount > 0.0 && includedMembers.isNotEmpty()) amount / includedMembers.size else 0.0
 
@@ -269,7 +294,7 @@ fun AddExpenseScreen(
 
     Column(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
         TrevioHeader(
-            title = "Add Expense",
+            title = if (isHousehold) "Add Entry" else "Add Expense",
             onBack = { navController.popBackStack() }
         )
         Column(
@@ -289,7 +314,7 @@ fun AddExpenseScreen(
             )
             if (amount > 0.0 && amountStr.any { it == '+' || it == '-' || it == '*' || it == '/' }) {
                 Spacer(modifier = Modifier.height(4.dp))
-                Text("= $currencySymbol${String.format("%,.2f", amount)}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary)
+                Text("= $currencySymbol${String.format(Locale.getDefault(), "%,.2f", amount)}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary)
             }
             Spacer(modifier = Modifier.height(8.dp))
             Row(
@@ -321,7 +346,7 @@ fun AddExpenseScreen(
 
             OutlinedTextField(
                 value = description,
-                onValueChange = { description = it },
+                onValueChange = { if (it.length <= 500) description = it },
                 label = { Text("Description") },
                 modifier = Modifier.fillMaxWidth(),
                 singleLine = true,
@@ -345,26 +370,91 @@ fun AddExpenseScreen(
             )
             Spacer(modifier = Modifier.height(16.dp))
 
+            // Spent/Received toggle for household groups
+            if (isHousehold) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(10.dp))
+                        .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
+                        .padding(3.dp)
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(if (!isIncome) MaterialTheme.colorScheme.error else Color.Transparent)
+                            .clickable { isIncome = false }
+                            .padding(vertical = 6.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            "Spent",
+                            color = if (!isIncome) Color.White else MaterialTheme.colorScheme.onSurfaceVariant,
+                            fontWeight = if (!isIncome) FontWeight.SemiBold else FontWeight.Normal
+                        )
+                    }
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(if (isIncome) MaterialTheme.colorScheme.primary else Color.Transparent)
+                            .clickable { isIncome = true }
+                            .padding(vertical = 6.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            "Received",
+                            color = if (isIncome) Color.White else MaterialTheme.colorScheme.onSurfaceVariant,
+                            fontWeight = if (isIncome) FontWeight.SemiBold else FontWeight.Normal
+                        )
+                    }
+                }
+                Spacer(modifier = Modifier.height(12.dp))
+            }
+
             SectionLabel("Category")
             Spacer(modifier = Modifier.height(8.dp))
-            val categories = listOf("food", "transport", "shopping", "turf", "accommodation", "other")
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                categories.take(3).forEach { cat ->
-                    FilterChip(
-                        selected = category == cat,
-                        onClick = { category = cat },
-                        label = { Text(cat.replaceFirstChar { it.uppercase() }) }
-                    )
+            if (isHousehold) {
+                // Household categories with icons
+                val householdCats = if (isIncome) HouseholdCategories.INCOME_CATEGORIES else HouseholdCategories.EXPENSE_CATEGORIES
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    householdCats.forEach { cat ->
+                        FilterChip(
+                            selected = category == cat.key,
+                            onClick = { category = cat.key },
+                            label = { Text(cat.label) },
+                            leadingIcon = {
+                                Icon(
+                                    imageVector = cat.icon,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(16.dp),
+                                    tint = cat.color
+                                )
+                            }
+                        )
+                    }
                 }
-            }
-            Spacer(modifier = Modifier.height(8.dp))
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                categories.drop(3).forEach { cat ->
-                    FilterChip(
-                        selected = category == cat,
-                        onClick = { category = cat },
-                        label = { Text(cat.replaceFirstChar { it.uppercase() }) }
-                    )
+            } else {
+                val categories = listOf("food", "transport", "shopping", "turf", "accommodation", "other")
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    categories.take(3).forEach { cat ->
+                        FilterChip(
+                            selected = category == cat,
+                            onClick = { category = cat },
+                            label = { Text(cat.replaceFirstChar { it.uppercase() }) }
+                        )
+                    }
+                }
+                Spacer(modifier = Modifier.height(8.dp))
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    categories.drop(3).forEach { cat ->
+                        FilterChip(
+                            selected = category == cat,
+                            onClick = { category = cat },
+                            label = { Text(cat.replaceFirstChar { it.uppercase() }) }
+                        )
+                    }
                 }
             }
 
@@ -388,6 +478,8 @@ fun AddExpenseScreen(
                 }
             }
 
+            // Split section — hidden for household groups
+            if (!isHousehold) {
             Spacer(modifier = Modifier.height(16.dp))
             SectionLabel("Split method")
             Spacer(modifier = Modifier.height(8.dp))
@@ -414,7 +506,7 @@ fun AddExpenseScreen(
                             horizontalArrangement = Arrangement.SpaceBetween
                         ) {
                             Text(
-                                "$currencySymbol${String.format("%,.2f", equalPerPerson)} per person",
+                                "$currencySymbol${String.format(Locale.getDefault(), "%,.2f", equalPerPerson)} per person",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.primary
                             )
@@ -488,8 +580,8 @@ fun AddExpenseScreen(
                             val value = splitValues[member.uid] ?: ""
                             val totalShares = splitValues.values.sumOf { it.toDoubleOrNull() ?: 0.0 }
                             val displayAmount = when (splitType) {
-                                SplitType.PERCENT -> if (value.isNotEmpty()) " = $currencySymbol${String.format("%,.2f", (value.toDoubleOrNull() ?: 0.0) / 100 * amount)}" else ""
-                                SplitType.SHARES -> if (value.isNotEmpty() && totalShares > 0) " = $currencySymbol${String.format("%,.2f", (value.toDoubleOrNull() ?: 0.0) / totalShares * amount)}" else ""
+                                SplitType.PERCENT -> if (value.isNotEmpty()) " = $currencySymbol${String.format(Locale.getDefault(), "%,.2f", (value.toDoubleOrNull() ?: 0.0) / 100 * amount)}" else ""
+                                SplitType.SHARES -> if (value.isNotEmpty() && totalShares > 0) " = $currencySymbol${String.format(Locale.getDefault(), "%,.2f", (value.toDoubleOrNull() ?: 0.0) / totalShares * amount)}" else ""
                                 else -> ""
                             }
                             Row(
@@ -537,16 +629,18 @@ fun AddExpenseScreen(
                     }
                 }
             }
+            } // end if (!isHousehold)
 
             Spacer(modifier = Modifier.height(16.dp))
 
             // Note field
             OutlinedTextField(
                 value = note,
-                onValueChange = { note = it },
+                onValueChange = { if (it.length <= 500) note = it },
                 label = { Text("Note (optional)") },
                 modifier = Modifier.fillMaxWidth(),
                 minLines = 2,
+                maxLines = 3,
                 shape = RoundedCornerShape(12.dp)
             )
 
@@ -602,11 +696,12 @@ fun AddExpenseScreen(
                                 date = expenseDateMillis,
                                 note = note,
                                 recurring = if (isRecurring) com.trevio.android.domain.model.RecurringConfig(frequency = recurringFrequency) else null,
-                                itemizedData = if (splitType == SplitType.ITEMIZED) itemizedData else null
+                                itemizedData = if (splitType == SplitType.ITEMIZED) itemizedData else null,
+                                transactionType = if (isIncome) TransactionType.INCOME else TransactionType.EXPENSE
                             )
                         }
                     },
-                    enabled = description.isNotBlank() && amountStr.isNotBlank() && isSplitValid && !state.isLoading,
+                    enabled = description.isNotBlank() && amountStr.isNotBlank() && (isHousehold || isSplitValid) && !state.isLoading,
                     modifier = Modifier.weight(1f).height(56.dp),
                     shape = RoundedCornerShape(16.dp)
                 ) {
@@ -631,11 +726,12 @@ fun AddExpenseScreen(
                                 date = expenseDateMillis,
                                 note = note,
                                 recurring = if (isRecurring) com.trevio.android.domain.model.RecurringConfig(frequency = recurringFrequency) else null,
-                                itemizedData = if (splitType == SplitType.ITEMIZED) itemizedData else null
+                                itemizedData = if (splitType == SplitType.ITEMIZED) itemizedData else null,
+                                transactionType = if (isIncome) TransactionType.INCOME else TransactionType.EXPENSE
                             )
                         }
                     },
-                    enabled = description.isNotBlank() && amountStr.isNotBlank() && isSplitValid && !state.isLoading,
+                    enabled = description.isNotBlank() && amountStr.isNotBlank() && (isHousehold || isSplitValid) && !state.isLoading,
                     modifier = Modifier.weight(1f).height(56.dp),
                     shape = RoundedCornerShape(16.dp)
                 ) {
@@ -710,7 +806,7 @@ private fun evaluateExpression(expr: String): Double {
     while (i < tokens.size) {
         val t = tokens[i]
         if (t == "*" || t == "/") {
-            val prev = parsed.removeLast() as Double
+            val prev = parsed.removeAt(parsed.lastIndex) as Double
             val next = tokens[++i].toDoubleOrNull() ?: 0.0
             parsed.add(if (t == "*") prev * next else if (next != 0.0) prev / next else 0.0)
         } else if (t == "+" || t == "-") {

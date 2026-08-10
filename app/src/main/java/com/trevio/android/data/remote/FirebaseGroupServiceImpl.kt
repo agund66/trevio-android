@@ -1,6 +1,5 @@
 package com.trevio.android.data.remote
 
-import com.google.firebase.Timestamp
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
@@ -12,36 +11,18 @@ import com.trevio.android.domain.repository.GroupInfo
 import com.trevio.android.domain.repository.GroupService
 import com.trevio.android.domain.model.SplitEntry
 import com.trevio.android.util.Calculations
+import com.trevio.android.util.DateUtils
+import com.trevio.android.util.ErrorMessages
+import com.trevio.android.util.friendlyNetworkMessage
+import com.trevio.android.util.Logger
+import com.trevio.android.util.MemberRole
+import com.trevio.android.util.MemberStatus
+import com.trevio.android.util.toStorageString
 import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
-import java.util.Date
 import javax.inject.Inject
 import javax.inject.Singleton
-
-private fun toMillis(value: Any?): Long {
-    if (value == null) return 0L
-    if (value is Timestamp) return value.toDate().time
-    if (value is Date) return value.time
-    if (value is Number) return value.toLong()
-    if (value is String) {
-        val parsed = value.toLongOrNull()
-        if (parsed != null) return parsed
-        return try {
-            Date(value).time
-        } catch (e: Exception) {
-            0L
-        }
-    }
-    if (value is Map<*, *>) {
-        val seconds = (value["_seconds"] as? Number ?: value["seconds"] as? Number)?.toLong()
-        if (seconds != null) {
-            val nanos = (value["_nanoseconds"] as? Number ?: value["nanoseconds"] as? Number)?.toLong() ?: 0L
-            return seconds * 1000 + nanos / 1_000_000
-        }
-    }
-    return 0L
-}
 
 @Singleton
 class FirebaseGroupServiceImpl @Inject constructor(
@@ -53,11 +34,12 @@ class FirebaseGroupServiceImpl @Inject constructor(
         name: String,
         description: String,
         template: GroupTemplate,
-        memberUids: List<String>
+        memberUids: List<String>,
+        monthlyBudget: Double?
     ): Result<Pair<String, String>> {
         return try {
-            val uid = auth.currentUser?.uid ?: return Result.failure(Exception("User not authenticated"))
-            if (name.isBlank()) return Result.failure(Exception("Group name is required"))
+            val uid = auth.currentUser?.uid ?: return Result.failure(Exception(ErrorMessages.USER_NOT_AUTHENTICATED))
+            if (name.isBlank()) return Result.failure(Exception(ErrorMessages.GROUP_NAME_REQUIRED))
 
             val userDoc = firestore.collection("users").document(uid).get().await()
             val userCurrency = userDoc.getString("defaultCurrency") ?: "INR"
@@ -67,11 +49,10 @@ class FirebaseGroupServiceImpl @Inject constructor(
             val groupRef = firestore.collection("groups").document()
             val groupId = groupRef.id
 
-            val batch = firestore.batch()
-            batch.set(groupRef, mapOf(
+            val groupData = mutableMapOf(
                 "name" to name.trim(),
                 "description" to description.trim(),
-                "template" to template.name.lowercase(),
+                "template" to template.toStorageString(),
                 "currency" to userCurrency,
                 "createdBy" to uid,
                 "inviteCode" to inviteCode,
@@ -79,13 +60,19 @@ class FirebaseGroupServiceImpl @Inject constructor(
                 "totalExpenses" to 0.0,
                 "createdAt" to now,
                 "updatedAt" to now
-            ))
+            )
+            if (template == GroupTemplate.HOUSEHOLD && monthlyBudget != null && monthlyBudget > 0) {
+                groupData["monthlyBudget"] = monthlyBudget
+            }
+
+            val batch = firestore.batch()
+            batch.set(groupRef, groupData)
             batch.set(groupRef.collection("members").document(uid), mapOf(
                 "uid" to uid,
-                "role" to "admin",
+                "role" to MemberRole.ADMIN,
                 "joinedAt" to now,
                 "balance" to 0.0,
-                "status" to "active"
+                "status" to MemberStatus.ACTIVE
             ))
             batch.set(groupRef.collection("activities").document(), mapOf(
                 "type" to "group_created",
@@ -104,13 +91,13 @@ class FirebaseGroupServiceImpl @Inject constructor(
 
             Result.success(Pair(groupId, inviteCode))
         } catch (e: Exception) {
-            Result.failure(e)
+            Result.failure(Exception(friendlyNetworkMessage(e) ?: e.message, e))
         }
     }
 
     override suspend fun joinGroupViaCode(inviteCode: String): Result<Pair<String, String>> {
         return try {
-            val uid = auth.currentUser?.uid ?: return Result.failure(Exception("User not authenticated"))
+            val uid = auth.currentUser?.uid ?: return Result.failure(Exception(ErrorMessages.USER_NOT_AUTHENTICATED))
             if (inviteCode.isBlank()) return Result.failure(Exception("Invite code is required"))
 
             val snapshot = firestore.collection("groups")
@@ -124,7 +111,7 @@ class FirebaseGroupServiceImpl @Inject constructor(
             val groupData = groupDoc.data ?: return Result.failure(Exception("Invalid group data"))
 
             val memberDoc = groupDoc.reference.collection("members").document(uid).get().await()
-            if (memberDoc.exists() && memberDoc.data?.get("status") == "active" && memberDoc.data?.get("isOffline") != true) {
+            if (memberDoc.exists() && memberDoc.data?.get("status") == MemberStatus.ACTIVE && memberDoc.data?.get("isOffline") != true) {
                 return Result.failure(Exception("You are already a member of this group"))
             }
 
@@ -132,14 +119,14 @@ class FirebaseGroupServiceImpl @Inject constructor(
             val batch = firestore.batch()
 
             if (memberDoc.exists() && memberDoc.data?.get("status") == "pending") {
-                batch.update(memberDoc.reference, mapOf("status" to "active", "joinedAt" to now))
+                batch.update(memberDoc.reference, mapOf("status" to MemberStatus.ACTIVE, "joinedAt" to now))
             } else {
                 batch.set(groupDoc.reference.collection("members").document(uid), mapOf(
                     "uid" to uid,
                     "role" to "member",
                     "joinedAt" to now,
                     "balance" to 0.0,
-                    "status" to "active"
+                    "status" to MemberStatus.ACTIVE
                 ))
                 batch.update(groupDoc.reference, mapOf(
                     "memberCount" to FieldValue.increment(1),
@@ -157,23 +144,23 @@ class FirebaseGroupServiceImpl @Inject constructor(
 
             Result.success(Pair(groupId, groupData["name"] as? String ?: ""))
         } catch (e: Exception) {
-            Result.failure(e)
+            Result.failure(Exception(friendlyNetworkMessage(e) ?: e.message, e))
         }
     }
 
     override suspend fun sendGroupInvitation(groupId: String, username: String): Result<Unit> {
         return try {
-            val uid = auth.currentUser?.uid ?: return Result.failure(Exception("User not authenticated"))
+            val uid = auth.currentUser?.uid ?: return Result.failure(Exception(ErrorMessages.USER_NOT_AUTHENTICATED))
             if (groupId.isBlank() || username.isBlank()) return Result.failure(Exception("Group ID and username are required"))
 
             val normalized = username.lowercase().replace(Regex("[^a-z0-9._]"), "")
             val usernameDoc = firestore.collection("usernames").document(normalized).get().await()
-            if (!usernameDoc.exists()) return Result.failure(Exception("User not found"))
+            if (!usernameDoc.exists()) return Result.failure(Exception(ErrorMessages.USER_NOT_FOUND))
 
             val toUid = usernameDoc.data?.get("uid") as? String ?: return Result.failure(Exception("Invalid user"))
             if (toUid == uid) return Result.failure(Exception("You cannot invite yourself"))
             val groupDoc = firestore.collection("groups").document(groupId).get().await()
-            if (!groupDoc.exists()) return Result.failure(Exception("Group not found"))
+            if (!groupDoc.exists()) return Result.failure(Exception(ErrorMessages.GROUP_NOT_FOUND))
 
             val groupData = groupDoc.data ?: return Result.failure(Exception("Invalid group data"))
             val existingMember = groupDoc.reference.collection("members").document(toUid).get().await()
@@ -182,7 +169,7 @@ class FirebaseGroupServiceImpl @Inject constructor(
             sendInvitationInternal(uid, toUid, groupId, groupData["name"] as? String ?: "", groupData["inviteCode"] as? String ?: "")
             Result.success(Unit)
         } catch (e: Exception) {
-            Result.failure(e)
+            Result.failure(Exception(friendlyNetworkMessage(e) ?: e.message, e))
         }
     }
 
@@ -233,13 +220,13 @@ class FirebaseGroupServiceImpl @Inject constructor(
                     "createdAt" to now
                 )).await()
         } catch (notifError: Exception) {
-            android.util.Log.w("FirebaseGroupService", "Failed to send invitation notification", notifError)
+            Logger.w("FirebaseGroupService", "Failed to send invitation notification", notifError)
         }
     }
 
     override suspend fun acceptInvitation(invitationId: String): Result<Pair<String, String>> {
         return try {
-            val uid = auth.currentUser?.uid ?: return Result.failure(Exception("User not authenticated"))
+            val uid = auth.currentUser?.uid ?: return Result.failure(Exception(ErrorMessages.USER_NOT_AUTHENTICATED))
             if (invitationId.isBlank()) return Result.failure(Exception("Invitation ID is required"))
 
             val inviteDoc = firestore.collection("invitations").document(invitationId).get().await()
@@ -251,7 +238,7 @@ class FirebaseGroupServiceImpl @Inject constructor(
 
             val groupId = inviteData["groupId"] as? String ?: return Result.failure(Exception("Invalid group ID"))
             val groupDoc = firestore.collection("groups").document(groupId).get().await()
-            if (!groupDoc.exists()) return Result.failure(Exception("Group not found"))
+            if (!groupDoc.exists()) return Result.failure(Exception(ErrorMessages.GROUP_NOT_FOUND))
 
             val groupData = groupDoc.data ?: return Result.failure(Exception("Invalid group data"))
             val now = System.currentTimeMillis()
@@ -261,10 +248,10 @@ class FirebaseGroupServiceImpl @Inject constructor(
             batch.update(inviteDoc.reference, mapOf("status" to "accepted"))
 
             if (existingMemberDoc.exists() && existingMemberDoc.data?.get("status") == "pending") {
-                batch.update(groupDoc.reference.collection("members").document(uid), mapOf("status" to "active", "joinedAt" to now))
+                batch.update(groupDoc.reference.collection("members").document(uid), mapOf("status" to MemberStatus.ACTIVE, "joinedAt" to now))
             } else {
                 batch.set(groupDoc.reference.collection("members").document(uid), mapOf(
-                    "uid" to uid, "role" to "member", "joinedAt" to now, "balance" to 0.0, "status" to "active"
+                    "uid" to uid, "role" to "member", "joinedAt" to now, "balance" to 0.0, "status" to MemberStatus.ACTIVE
                 ))
                 batch.update(groupDoc.reference, mapOf(
                     "memberCount" to FieldValue.increment(1),
@@ -282,13 +269,13 @@ class FirebaseGroupServiceImpl @Inject constructor(
 
             Result.success(Pair(groupId, groupData["name"] as? String ?: ""))
         } catch (e: Exception) {
-            Result.failure(e)
+            Result.failure(Exception(friendlyNetworkMessage(e) ?: e.message, e))
         }
     }
 
     override suspend fun declineInvitation(invitationId: String): Result<Unit> {
         return try {
-            val uid = auth.currentUser?.uid ?: return Result.failure(Exception("User not authenticated"))
+            val uid = auth.currentUser?.uid ?: return Result.failure(Exception(ErrorMessages.USER_NOT_AUTHENTICATED))
             val inviteDoc = firestore.collection("invitations").document(invitationId).get().await()
             if (!inviteDoc.exists()) return Result.failure(Exception("Invitation not found"))
 
@@ -311,23 +298,23 @@ class FirebaseGroupServiceImpl @Inject constructor(
             batch.commit().await()
             Result.success(Unit)
         } catch (e: Exception) {
-            Result.failure(e)
+            Result.failure(Exception(friendlyNetworkMessage(e) ?: e.message, e))
         }
     }
 
     override suspend fun leaveGroup(groupId: String): Result<Unit> {
         return try {
-            val uid = auth.currentUser?.uid ?: return Result.failure(Exception("User not authenticated"))
+            val uid = auth.currentUser?.uid ?: return Result.failure(Exception(ErrorMessages.USER_NOT_AUTHENTICATED))
             val groupDoc = firestore.collection("groups").document(groupId).get().await()
-            if (!groupDoc.exists()) return Result.failure(Exception("Group not found"))
+            if (!groupDoc.exists()) return Result.failure(Exception(ErrorMessages.GROUP_NOT_FOUND))
 
             val memberDoc = groupDoc.reference.collection("members").document(uid).get().await()
             if (!memberDoc.exists()) return Result.failure(Exception("You are not a member of this group"))
 
             val memberData = memberDoc.data
-            if (memberData?.get("role") == "admin") {
+            if (memberData?.get("role") == MemberRole.ADMIN) {
                 val activeMembers = groupDoc.reference.collection("members")
-                    .whereEqualTo("status", "active").get().await()
+                    .whereEqualTo("status", MemberStatus.ACTIVE).get().await()
                 if (activeMembers.size() <= 1) {
                     return Result.failure(Exception("Admin cannot leave. Transfer admin role or delete the group."))
                 }
@@ -351,17 +338,17 @@ class FirebaseGroupServiceImpl @Inject constructor(
 
             Result.success(Unit)
         } catch (e: Exception) {
-            Result.failure(e)
+            Result.failure(Exception(friendlyNetworkMessage(e) ?: e.message, e))
         }
     }
 
     override suspend fun getUserGroups(): Result<List<Group>> {
         return try {
-            val uid = auth.currentUser?.uid ?: return Result.failure(Exception("User not authenticated"))
+            val uid = auth.currentUser?.uid ?: return Result.failure(Exception(ErrorMessages.USER_NOT_AUTHENTICATED))
 
             val membersSnapshot = firestore.collectionGroup("members")
                 .whereEqualTo("uid", uid)
-                .whereEqualTo("status", "active")
+                .whereEqualTo("status", MemberStatus.ACTIVE)
                 .get().await()
 
             if (membersSnapshot.isEmpty) return Result.success(emptyList())
@@ -396,25 +383,31 @@ class FirebaseGroupServiceImpl @Inject constructor(
                     totalExpenses = (data["totalExpenses"] as? Number)?.toDouble() ?: 0.0,
                     yourBalance = (memberData["balance"] as? Number)?.toDouble() ?: 0.0,
                     yourRole = memberData["role"] as? String ?: "member",
-                    archived = data["archived"] as? Boolean ?: false
+                    archived = data["archived"] as? Boolean ?: false,
+                    monthlyBudget = (data["monthlyBudget"] as? Number)?.toDouble(),
+                    budgetCategories = (data["budgetCategories"] as? Map<String, Any>)?.mapValues { (_, v) ->
+                        (v as? Number)?.toDouble() ?: 0.0
+                    }
                 )
             }
             Result.success(groups)
         } catch (e: Exception) {
-            Result.failure(e)
+            Result.failure(Exception(friendlyNetworkMessage(e) ?: e.message, e))
         }
     }
 
     override suspend fun getGroupInfo(groupId: String): Result<GroupInfo> {
         return try {
-            val uid = auth.currentUser?.uid ?: return Result.failure(Exception("User not authenticated"))
+            val uid = auth.currentUser?.uid ?: return Result.failure(Exception(ErrorMessages.USER_NOT_AUTHENTICATED))
             val groupDoc = firestore.collection("groups").document(groupId).get().await()
-            if (!groupDoc.exists()) return Result.failure(Exception("Group not found"))
+            if (!groupDoc.exists()) return Result.failure(Exception(ErrorMessages.GROUP_NOT_FOUND))
 
             val memberDoc = groupDoc.reference.collection("members").document(uid).get().await()
             if (!memberDoc.exists()) return Result.failure(Exception("You are not a member of this group"))
 
             val data = groupDoc.data ?: return Result.failure(Exception("Invalid group data"))
+            @Suppress("UNCHECKED_CAST")
+            val budgetCategoriesRaw = data["budgetCategories"] as? Map<String, Any>
             Result.success(
                 GroupInfo(
                     groupId = groupId,
@@ -426,17 +419,21 @@ class FirebaseGroupServiceImpl @Inject constructor(
                     createdBy = data["createdBy"] as? String ?: "",
                     memberCount = (data["memberCount"] as? Number)?.toInt() ?: 0,
                     totalExpenses = (data["totalExpenses"] as? Number)?.toDouble() ?: 0.0,
-                    archived = data["archived"] as? Boolean ?: false
+                    archived = data["archived"] as? Boolean ?: false,
+                    monthlyBudget = (data["monthlyBudget"] as? Number)?.toDouble(),
+                    budgetCategories = budgetCategoriesRaw?.mapValues { (_, v) ->
+                        (v as? Number)?.toDouble() ?: 0.0
+                    }
                 )
             )
         } catch (e: Exception) {
-            Result.failure(e)
+            Result.failure(Exception(friendlyNetworkMessage(e) ?: e.message, e))
         }
     }
 
     override suspend fun getGroupActivities(groupId: String, pageSize: Int, lastActivityId: String?): Result<PaginatedResult<Activity>> {
         return try {
-            val uid = auth.currentUser?.uid ?: return Result.failure(Exception("User not authenticated"))
+            val uid = auth.currentUser?.uid ?: return Result.failure(Exception(ErrorMessages.USER_NOT_AUTHENTICATED))
             val groupRef = firestore.collection("groups").document(groupId)
             val memberDoc = groupRef.collection("members").document(uid).get().await()
             if (!memberDoc.exists()) return Result.failure(Exception("You are not a member of this group"))
@@ -480,7 +477,7 @@ class FirebaseGroupServiceImpl @Inject constructor(
                         userId = userId,
                         userName = userData?.get("displayName") as? String ?: "Someone",
                         userPhotoURL = userData?.get("photoURL") as? String ?: "",
-                        createdAt = toMillis(data["createdAt"])
+                        createdAt = DateUtils.toMillis(data["createdAt"]) ?: 0
                     )
                 )
             }
@@ -490,53 +487,53 @@ class FirebaseGroupServiceImpl @Inject constructor(
                 lastId = if (snapshot.size() > 0) snapshot.documents.last().id else null
             ))
         } catch (e: Exception) {
-            Result.failure(e)
+            Result.failure(Exception(friendlyNetworkMessage(e) ?: e.message, e))
         }
     }
 
     override suspend fun archiveGroup(groupId: String): Result<Unit> {
         return try {
-            val uid = auth.currentUser?.uid ?: return Result.failure(Exception("User not authenticated"))
+            val uid = auth.currentUser?.uid ?: return Result.failure(Exception(ErrorMessages.USER_NOT_AUTHENTICATED))
             val groupRef = firestore.collection("groups").document(groupId)
             val memberDoc = groupRef.collection("members").document(uid).get().await()
             if (!memberDoc.exists()) return Result.failure(Exception("You are not a member of this group"))
-            if (memberDoc.data?.get("role") != "admin") return Result.failure(Exception("Only group admin can archive the group"))
+            if (memberDoc.data?.get("role") != MemberRole.ADMIN) return Result.failure(Exception("Only group admin can archive the group"))
 
             groupRef.update(mapOf("archived" to true, "updatedAt" to System.currentTimeMillis())).await()
             Result.success(Unit)
         } catch (e: Exception) {
-            Result.failure(e)
+            Result.failure(Exception(friendlyNetworkMessage(e) ?: e.message, e))
         }
     }
 
     override suspend fun unarchiveGroup(groupId: String): Result<Unit> {
         return try {
-            val uid = auth.currentUser?.uid ?: return Result.failure(Exception("User not authenticated"))
+            val uid = auth.currentUser?.uid ?: return Result.failure(Exception(ErrorMessages.USER_NOT_AUTHENTICATED))
             val groupRef = firestore.collection("groups").document(groupId)
             val memberDoc = groupRef.collection("members").document(uid).get().await()
             if (!memberDoc.exists()) return Result.failure(Exception("You are not a member of this group"))
-            if (memberDoc.data?.get("role") != "admin") return Result.failure(Exception("Only group admin can unarchive the group"))
+            if (memberDoc.data?.get("role") != MemberRole.ADMIN) return Result.failure(Exception("Only group admin can unarchive the group"))
 
             groupRef.update(mapOf("archived" to false, "updatedAt" to System.currentTimeMillis())).await()
             Result.success(Unit)
         } catch (e: Exception) {
-            Result.failure(e)
+            Result.failure(Exception(friendlyNetworkMessage(e) ?: e.message, e))
         }
     }
 
     override suspend fun deleteGroup(groupId: String): Result<Unit> {
         return try {
-            val uid = auth.currentUser?.uid ?: return Result.failure(Exception("User not authenticated"))
+            val uid = auth.currentUser?.uid ?: return Result.failure(Exception(ErrorMessages.USER_NOT_AUTHENTICATED))
             val groupRef = firestore.collection("groups").document(groupId)
             val groupDoc = groupRef.get().await()
-            if (!groupDoc.exists()) return Result.failure(Exception("Group not found"))
+            if (!groupDoc.exists()) return Result.failure(Exception(ErrorMessages.GROUP_NOT_FOUND))
 
             val memberDoc = groupRef.collection("members").document(uid).get().await()
             if (!memberDoc.exists()) return Result.failure(Exception("You are not a member of this group"))
-            if (memberDoc.data?.get("role") != "admin") return Result.failure(Exception("Only group admin can delete the group"))
+            if (memberDoc.data?.get("role") != MemberRole.ADMIN) return Result.failure(Exception("Only group admin can delete the group"))
 
             val membersSnapshot = groupRef.collection("members").get().await()
-            val activeCount = membersSnapshot.documents.count { it.data?.get("status") == "active" }
+            val activeCount = membersSnapshot.documents.count { it.data?.get("status") == MemberStatus.ACTIVE }
             if (activeCount > 1) return Result.failure(Exception("Cannot delete group with other active members. Remove all members first."))
 
             val expensesSnapshot = groupRef.collection("expenses").get().await()
@@ -559,19 +556,19 @@ class FirebaseGroupServiceImpl @Inject constructor(
 
             Result.success(Unit)
         } catch (e: Exception) {
-            Result.failure(e)
+            Result.failure(Exception(friendlyNetworkMessage(e) ?: e.message, e))
         }
     }
 
     override suspend fun updateGroup(groupId: String, name: String, description: String): Result<Unit> {
         return try {
-            val uid = auth.currentUser?.uid ?: return Result.failure(Exception("User not authenticated"))
-            if (name.isBlank()) return Result.failure(Exception("Group name is required"))
+            val uid = auth.currentUser?.uid ?: return Result.failure(Exception(ErrorMessages.USER_NOT_AUTHENTICATED))
+            if (name.isBlank()) return Result.failure(Exception(ErrorMessages.GROUP_NAME_REQUIRED))
 
             val groupRef = firestore.collection("groups").document(groupId)
             val memberDoc = groupRef.collection("members").document(uid).get().await()
             if (!memberDoc.exists()) return Result.failure(Exception("You are not a member of this group"))
-            if (memberDoc.data?.get("role") != "admin") return Result.failure(Exception("Only group admin can update group settings"))
+            if (memberDoc.data?.get("role") != MemberRole.ADMIN) return Result.failure(Exception("Only group admin can update group settings"))
 
             groupRef.update(mapOf(
                 "name" to name.trim(),
@@ -580,28 +577,59 @@ class FirebaseGroupServiceImpl @Inject constructor(
             )).await()
             Result.success(Unit)
         } catch (e: Exception) {
-            Result.failure(e)
+            Result.failure(Exception(friendlyNetworkMessage(e) ?: e.message, e))
+        }
+    }
+
+    override suspend fun updateGroupBudget(
+        groupId: String,
+        monthlyBudget: Double?,
+        budgetCategories: Map<String, Double>?
+    ): Result<Unit> {
+        return try {
+            val uid = auth.currentUser?.uid ?: return Result.failure(Exception(ErrorMessages.USER_NOT_AUTHENTICATED))
+            val groupRef = firestore.collection("groups").document(groupId)
+            val memberDoc = groupRef.collection("members").document(uid).get().await()
+            if (!memberDoc.exists()) return Result.failure(Exception("You are not a member of this group"))
+            if (memberDoc.data?.get("role") != MemberRole.ADMIN) return Result.failure(Exception("Only group admin can update budget settings"))
+
+            val updateData = mutableMapOf<String, Any>("updatedAt" to System.currentTimeMillis())
+            if (monthlyBudget != null && monthlyBudget > 0) {
+                updateData["monthlyBudget"] = monthlyBudget
+            } else {
+                updateData["monthlyBudget"] = com.google.firebase.firestore.FieldValue.delete()
+            }
+            if (budgetCategories != null && budgetCategories.isNotEmpty()) {
+                updateData["budgetCategories"] = budgetCategories
+            } else {
+                updateData["budgetCategories"] = com.google.firebase.firestore.FieldValue.delete()
+            }
+
+            groupRef.update(updateData).await()
+            Result.success(Unit)
+        } catch (e: Exception) {
+            Result.failure(Exception(friendlyNetworkMessage(e) ?: e.message, e))
         }
     }
 
     override suspend fun transferAdminRole(groupId: String, newAdminUid: String): Result<Unit> {
         return try {
-            val uid = auth.currentUser?.uid ?: return Result.failure(Exception("User not authenticated"))
+            val uid = auth.currentUser?.uid ?: return Result.failure(Exception(ErrorMessages.USER_NOT_AUTHENTICATED))
             if (newAdminUid == uid) return Result.failure(Exception("You are already the admin"))
 
             val groupRef = firestore.collection("groups").document(groupId)
             val currentMemberDoc = groupRef.collection("members").document(uid).get().await()
             if (!currentMemberDoc.exists()) return Result.failure(Exception("You are not a member of this group"))
-            if (currentMemberDoc.data?.get("role") != "admin") return Result.failure(Exception("Only group admin can transfer admin role"))
+            if (currentMemberDoc.data?.get("role") != MemberRole.ADMIN) return Result.failure(Exception("Only group admin can transfer admin role"))
 
             val targetMemberDoc = groupRef.collection("members").document(newAdminUid).get().await()
             if (!targetMemberDoc.exists()) return Result.failure(Exception("Target user is not a member of this group"))
-            if (targetMemberDoc.data?.get("status") != "active") return Result.failure(Exception("Target user is not an active member"))
+            if (targetMemberDoc.data?.get("status") != MemberStatus.ACTIVE) return Result.failure(Exception("Target user is not an active member"))
 
             val now = System.currentTimeMillis()
             val batch = firestore.batch()
             batch.update(groupRef.collection("members").document(uid), mapOf("role" to "member"))
-            batch.update(groupRef.collection("members").document(newAdminUid), mapOf("role" to "admin"))
+            batch.update(groupRef.collection("members").document(newAdminUid), mapOf("role" to MemberRole.ADMIN))
             batch.set(groupRef.collection("activities").document(), mapOf(
                 "type" to "admin_transferred",
                 "description" to "Admin role transferred",
@@ -613,21 +641,21 @@ class FirebaseGroupServiceImpl @Inject constructor(
 
             Result.success(Unit)
         } catch (e: Exception) {
-            Result.failure(e)
+            Result.failure(Exception(friendlyNetworkMessage(e) ?: e.message, e))
         }
     }
 
     override suspend fun addOfflineMember(groupId: String, displayName: String): Result<String> {
         return try {
-            val uid = auth.currentUser?.uid ?: return Result.failure(Exception("User not authenticated"))
+            val uid = auth.currentUser?.uid ?: return Result.failure(Exception(ErrorMessages.USER_NOT_AUTHENTICATED))
             if (displayName.isBlank()) return Result.failure(Exception("Name is required"))
 
             val groupRef = firestore.collection("groups").document(groupId)
             val groupDoc = groupRef.get().await()
-            if (!groupDoc.exists()) return Result.failure(Exception("Group not found"))
+            if (!groupDoc.exists()) return Result.failure(Exception(ErrorMessages.GROUP_NOT_FOUND))
 
             val callerMemberDoc = groupRef.collection("members").document(uid).get().await()
-            if (!callerMemberDoc.exists() || callerMemberDoc.data?.get("status") != "active") {
+            if (!callerMemberDoc.exists() || callerMemberDoc.data?.get("status") != MemberStatus.ACTIVE) {
                 return Result.failure(Exception("You are not a member of this group"))
             }
 
@@ -640,7 +668,7 @@ class FirebaseGroupServiceImpl @Inject constructor(
                 "role" to "member",
                 "joinedAt" to now,
                 "balance" to 0.0,
-                "status" to "active",
+                "status" to MemberStatus.ACTIVE,
                 "isOffline" to true,
                 "addedBy" to uid
             ))
@@ -659,22 +687,22 @@ class FirebaseGroupServiceImpl @Inject constructor(
 
             Result.success(memberRef.id)
         } catch (e: Exception) {
-            Result.failure(e)
+            Result.failure(Exception(friendlyNetworkMessage(e) ?: e.message, e))
         }
     }
 
     override suspend fun claimOfflineMember(groupId: String, memberDocId: String): Result<Unit> {
         return try {
-            val uid = auth.currentUser?.uid ?: return Result.failure(Exception("User not authenticated"))
+            val uid = auth.currentUser?.uid ?: return Result.failure(Exception(ErrorMessages.USER_NOT_AUTHENTICATED))
 
             val groupRef = firestore.collection("groups").document(groupId)
             val memberDoc = groupRef.collection("members").document(memberDocId).get().await()
-            if (!memberDoc.exists()) return Result.failure(Exception("Member not found"))
+            if (!memberDoc.exists()) return Result.failure(Exception(ErrorMessages.MEMBER_NOT_FOUND))
             if (memberDoc.data?.get("isOffline") != true) return Result.failure(Exception("This member is not an offline profile"))
 
             val existingMemberDoc = groupRef.collection("members").document(uid).get().await()
 
-            val memberData = memberDoc.data!!
+            val memberData = memberDoc.data ?: return Result.failure(Exception(ErrorMessages.MEMBER_NOT_FOUND))
             val now = System.currentTimeMillis()
             val batch = firestore.batch()
 
@@ -709,25 +737,25 @@ class FirebaseGroupServiceImpl @Inject constructor(
 
             Result.success(Unit)
         } catch (e: Exception) {
-            Result.failure(e)
+            Result.failure(Exception(friendlyNetworkMessage(e) ?: e.message, e))
         }
     }
 
     override suspend fun linkOfflineMember(groupId: String, memberDocId: String, realUid: String): Result<Unit> {
         return try {
-            val uid = auth.currentUser?.uid ?: return Result.failure(Exception("User not authenticated"))
+            val uid = auth.currentUser?.uid ?: return Result.failure(Exception(ErrorMessages.USER_NOT_AUTHENTICATED))
 
             val groupRef = firestore.collection("groups").document(groupId)
             val adminDoc = groupRef.collection("members").document(uid).get().await()
-            if (adminDoc.data?.get("role") != "admin") return Result.failure(Exception("Only admins can link members"))
+            if (adminDoc.data?.get("role") != MemberRole.ADMIN) return Result.failure(Exception("Only admins can link members"))
 
             val memberDoc = groupRef.collection("members").document(memberDocId).get().await()
-            if (!memberDoc.exists()) return Result.failure(Exception("Member not found"))
+            if (!memberDoc.exists()) return Result.failure(Exception(ErrorMessages.MEMBER_NOT_FOUND))
             if (memberDoc.data?.get("isOffline") != true) return Result.failure(Exception("This member is not an offline profile"))
 
             val existingMemberDoc = groupRef.collection("members").document(realUid).get().await()
 
-            val memberData = memberDoc.data!!
+            val memberData = memberDoc.data ?: return Result.failure(Exception(ErrorMessages.MEMBER_NOT_FOUND))
             val now = System.currentTimeMillis()
             val batch = firestore.batch()
 
@@ -762,7 +790,79 @@ class FirebaseGroupServiceImpl @Inject constructor(
 
             Result.success(Unit)
         } catch (e: Exception) {
-            Result.failure(e)
+            Result.failure(Exception(friendlyNetworkMessage(e) ?: e.message, e))
+        }
+    }
+
+    override suspend fun removeMember(groupId: String, memberUid: String): Result<Unit> {
+        return try {
+            val callerUid = auth.currentUser?.uid ?: return Result.failure(Exception(ErrorMessages.USER_NOT_AUTHENTICATED))
+            if (callerUid == memberUid) return Result.failure(Exception("Use leave group to remove yourself"))
+
+            val groupRef = firestore.collection("groups").document(groupId)
+            val groupDoc = groupRef.get().await()
+            if (!groupDoc.exists()) return Result.failure(Exception(ErrorMessages.GROUP_NOT_FOUND))
+
+            val callerDoc = groupRef.collection("members").document(callerUid).get().await()
+            if (!callerDoc.exists() || callerDoc.getString("role") != MemberRole.ADMIN) {
+                return Result.failure(Exception("Only admins can remove members"))
+            }
+
+            val memberDoc = groupRef.collection("members").document(memberUid).get().await()
+            if (!memberDoc.exists()) return Result.failure(Exception(ErrorMessages.MEMBER_NOT_FOUND))
+            val memberData = memberDoc.data ?: return Result.failure(Exception(ErrorMessages.MEMBER_NOT_FOUND))
+            if (memberData["role"] == MemberRole.ADMIN) return Result.failure(Exception("Cannot remove another admin"))
+
+            // Check if member has any expenses
+            val expensesQuery = groupRef.collection("expenses")
+                .whereEqualTo("paidBy", memberUid)
+                .limit(1)
+                .get()
+                .await()
+            val hasExpenses = !expensesQuery.isEmpty
+
+            val now = System.currentTimeMillis()
+            val batch = firestore.batch()
+
+            if (hasExpenses) {
+                // Convert to offline member to preserve transaction history
+                batch.update(
+                    groupRef.collection("members").document(memberUid),
+                    mapOf(
+                        "uid" to "",
+                        "isOffline" to true,
+                        "status" to "removed",
+                        "updatedAt" to now
+                    )
+                )
+            } else {
+                // No expenses, safe to fully remove
+                batch.delete(groupRef.collection("members").document(memberUid))
+                batch.update(groupRef, mapOf(
+                    "memberCount" to FieldValue.increment(-1),
+                    "updatedAt" to now
+                ))
+            }
+
+            batch.set(
+                groupRef.collection("activities").document(),
+                mapOf(
+                    "type" to "member_removed",
+                    "description" to "Removed member \"${memberData["displayName"]}\"",
+                    "userId" to callerUid,
+                    "data" to mapOf(
+                        "removedUid" to memberUid,
+                        "memberName" to (memberData["displayName"] ?: ""),
+                        "convertedToOffline" to hasExpenses
+                    ),
+                    "createdAt" to now
+                )
+            )
+
+            batch.commit().await()
+            Result.success(Unit)
+        } catch (e: Exception) {
+            Result.failure(Exception(friendlyNetworkMessage(e) ?: e.message, e))
         }
     }
 
@@ -785,7 +885,10 @@ class FirebaseGroupServiceImpl @Inject constructor(
             val splits = data["splits"] as? Map<String, Any>
             if (splits != null && splits.containsKey(oldId)) {
                 val newSplits = splits.toMutableMap()
-                newSplits[newId] = newSplits.remove(oldId)!!
+                val oldSplit = newSplits.remove(oldId)
+                if (oldSplit != null) {
+                    newSplits[newId] = oldSplit
+                }
                 updates["splits"] = newSplits
                 changed = true
             }
@@ -825,7 +928,7 @@ class FirebaseGroupServiceImpl @Inject constructor(
 
         val expensesSnapshot = groupRef.collection("expenses").get().await()
         val settlementsSnapshot = groupRef.collection("settlements").get().await()
-        val membersSnapshot = groupRef.collection("members").whereEqualTo("status", "active").get().await()
+        val membersSnapshot = groupRef.collection("members").whereEqualTo("status", MemberStatus.ACTIVE).get().await()
 
         val memberUids = membersSnapshot.documents.map { it.id }
 

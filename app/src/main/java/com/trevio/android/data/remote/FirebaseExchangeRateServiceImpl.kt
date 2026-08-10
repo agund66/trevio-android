@@ -3,6 +3,8 @@ package com.trevio.android.data.remote
 import com.google.firebase.firestore.FirebaseFirestore
 import com.trevio.android.domain.model.ExchangeRates
 import com.trevio.android.domain.repository.ExchangeRateService
+import com.trevio.android.util.AppConstants
+import com.trevio.android.util.friendlyNetworkMessage
 import kotlinx.coroutines.tasks.await
 import org.json.JSONObject
 import java.net.URL
@@ -15,7 +17,6 @@ class FirebaseExchangeRateServiceImpl @Inject constructor(
 ) : ExchangeRateService {
 
     companion object {
-        private const val BASE_CURRENCY = "INR"
         private const val CACHE_DOC_PATH = "config/exchangeRates"
     }
 
@@ -32,7 +33,7 @@ class FirebaseExchangeRateServiceImpl @Inject constructor(
                     val cachedRates = data["rates"] as? Map<String, Double>
                     if (cachedDate == todayStr && cachedRates != null) {
                         return Result.success(ExchangeRates(
-                            base = data["base"] as? String ?: BASE_CURRENCY,
+                            base = data["base"] as? String ?: AppConstants.BASE_CURRENCY,
                             date = cachedDate,
                             rates = cachedRates,
                             updatedAt = data["updatedAt"] as? Long ?: 0
@@ -43,26 +44,26 @@ class FirebaseExchangeRateServiceImpl @Inject constructor(
 
             fetchAndCacheRates(todayStr)
         } catch (e: Exception) {
-            Result.failure(e)
+            Result.failure(Exception(friendlyNetworkMessage(e) ?: e.message, e))
         }
     }
 
     override suspend fun getRateToBase(currency: String): Result<Double> {
         return try {
-            if (currency == BASE_CURRENCY) return Result.success(1.0)
+            if (currency == AppConstants.BASE_CURRENCY) return Result.success(1.0)
             val rates = getRates().getOrNull()
                 ?: return Result.failure(Exception("Failed to get exchange rates"))
             val rate = rates.rates[currency]
                 ?: return Result.success(1.0)
             Result.success(1.0 / rate)
         } catch (e: Exception) {
-            Result.failure(e)
+            Result.failure(Exception(friendlyNetworkMessage(e) ?: e.message, e))
         }
     }
 
     private suspend fun fetchAndCacheRates(dateStr: String): Result<ExchangeRates> {
         return try {
-            val response = URL("https://open.er-api.com/v6/latest/$BASE_CURRENCY").readText()
+            val response = URL("https://open.er-api.com/v6/latest/${AppConstants.BASE_CURRENCY}").readText()
             val json = JSONObject(response)
             val ratesJson = json.getJSONObject("rates")
             val rates = mutableMapOf<String, Double>()
@@ -74,20 +75,20 @@ class FirebaseExchangeRateServiceImpl @Inject constructor(
 
             val now = System.currentTimeMillis()
             firestore.document(CACHE_DOC_PATH).set(mapOf(
-                "base" to BASE_CURRENCY,
+                "base" to AppConstants.BASE_CURRENCY,
                 "date" to dateStr,
                 "rates" to rates,
                 "updatedAt" to now
             )).await()
 
             Result.success(ExchangeRates(
-                base = BASE_CURRENCY,
+                base = AppConstants.BASE_CURRENCY,
                 date = dateStr,
                 rates = rates,
                 updatedAt = now
             ))
         } catch (e: Exception) {
-            Result.failure(e)
+            Result.failure(Exception(friendlyNetworkMessage(e) ?: e.message, e))
         }
     }
 }

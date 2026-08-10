@@ -7,6 +7,7 @@ import com.trevio.android.domain.model.User
 import com.trevio.android.domain.model.UserSearchResult
 import com.trevio.android.domain.repository.UserService
 import com.trevio.android.util.Calculations
+import com.trevio.android.util.friendlyNetworkMessage
 import kotlinx.coroutines.tasks.await
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -40,7 +41,7 @@ class FirebaseUserServiceImpl @Inject constructor(
                 )
             )
         } catch (e: Exception) {
-            Result.failure(e)
+            Result.failure(Exception(friendlyNetworkMessage(e) ?: e.message, e))
         }
     }
 
@@ -63,7 +64,7 @@ class FirebaseUserServiceImpl @Inject constructor(
                 .update(updates).await()
             Result.success(Unit)
         } catch (e: Exception) {
-            Result.failure(e)
+            Result.failure(Exception(friendlyNetworkMessage(e) ?: e.message, e))
         }
     }
 
@@ -115,7 +116,7 @@ class FirebaseUserServiceImpl @Inject constructor(
                 Result.success(existingUsername)
             }
         } catch (e: Exception) {
-            Result.failure(e)
+            Result.failure(Exception(friendlyNetworkMessage(e) ?: e.message, e))
         }
     }
 
@@ -137,7 +138,7 @@ class FirebaseUserServiceImpl @Inject constructor(
             val doc = firestore.collection("usernames").document(normalized).get().await()
             Result.success(Pair(!doc.exists(), normalized))
         } catch (e: Exception) {
-            Result.failure(e)
+            Result.failure(Exception(friendlyNetworkMessage(e) ?: e.message, e))
         }
     }
 
@@ -169,7 +170,7 @@ class FirebaseUserServiceImpl @Inject constructor(
 
             Result.success(normalized)
         } catch (e: Exception) {
-            Result.failure(e)
+            Result.failure(Exception(friendlyNetworkMessage(e) ?: e.message, e))
         }
     }
 
@@ -200,7 +201,7 @@ class FirebaseUserServiceImpl @Inject constructor(
                 }
             Result.success(users)
         } catch (e: Exception) {
-            Result.failure(e)
+            Result.failure(Exception(friendlyNetworkMessage(e) ?: e.message, e))
         }
     }
 
@@ -211,7 +212,7 @@ class FirebaseUserServiceImpl @Inject constructor(
                 .update(mapOf("fcmToken" to token, "updatedAt" to System.currentTimeMillis())).await()
             Result.success(Unit)
         } catch (e: Exception) {
-            Result.failure(e)
+            Result.failure(Exception(friendlyNetworkMessage(e) ?: e.message, e))
         }
     }
 
@@ -257,7 +258,7 @@ class FirebaseUserServiceImpl @Inject constructor(
 
             Result.success(Unit)
         } catch (e: Exception) {
-            Result.failure(e)
+            Result.failure(Exception(friendlyNetworkMessage(e) ?: e.message, e))
         }
     }
 }

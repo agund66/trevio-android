@@ -50,6 +50,7 @@ import com.trevio.android.core.navigation.TrevioRouteSupport
 import com.trevio.android.domain.model.User
 import com.trevio.android.domain.repository.AuthService
 import com.trevio.android.domain.repository.UserService
+import com.trevio.android.util.CurrencyConverter
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -349,18 +350,7 @@ private fun ViewProfileContent(
             label = "Email",
             value = user.email
         )
-        val currencySymbol = when (user.defaultCurrency) {
-            "INR" -> "₹"
-            "USD" -> "$"
-            "EUR" -> "€"
-            "GBP" -> "£"
-            "AED" -> "د.إ"
-            "SGD" -> "S$"
-            "AUD" -> "A$"
-            "CAD" -> "C$"
-            "JPY" -> "¥"
-            else -> user.defaultCurrency
-        }
+        val currencySymbol = CurrencyConverter.getCurrencySymbol(user.defaultCurrency)
         ProfileInfoCard(
             icon = Icons.Default.Payments,
             iconColor = if (isDark) Color(0xFFFBBF24) else Color(0xFFF59E0B),

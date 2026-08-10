@@ -1,6 +1,7 @@
 package com.trevio.android.data.remote
 
 import android.app.Activity
+import com.trevio.android.util.friendlyNetworkMessage
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.GoogleAuthProvider
 import com.google.firebase.auth.OAuthProvider
@@ -49,7 +50,7 @@ class FirebaseAuthServiceImpl @Inject constructor(
 
             Result.success(firebaseUser.uid)
         } catch (e: Exception) {
-            Result.failure(e)
+            Result.failure(Exception(friendlyNetworkMessage(e) ?: e.message, e))
         }
     }
 
@@ -93,7 +94,7 @@ class FirebaseAuthServiceImpl @Inject constructor(
 
             Result.success(firebaseUser.uid)
         } catch (e: Exception) {
-            Result.failure(e)
+            Result.failure(Exception(friendlyNetworkMessage(e) ?: e.message, e))
         }
     }
 
@@ -138,7 +139,7 @@ class FirebaseAuthServiceImpl @Inject constructor(
             firestore.collection("users").document(user.uid).set(user).await()
             Result.success(Unit)
         } catch (e: Exception) {
-            Result.failure(e)
+            Result.failure(Exception(friendlyNetworkMessage(e) ?: e.message, e))
         }
     }
 

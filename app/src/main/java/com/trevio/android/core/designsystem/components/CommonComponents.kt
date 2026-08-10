@@ -24,6 +24,7 @@ import com.trevio.android.core.designsystem.theme.BalanceNeutral
 import com.trevio.android.core.designsystem.theme.BalancePositive
 import com.trevio.android.core.designsystem.theme.TrevioBorder
 import com.trevio.android.core.designsystem.theme.TrevioBorderDark
+import com.trevio.android.util.CurrencyConverter
 
 @Composable
 fun BalanceChip(
@@ -37,8 +38,8 @@ fun BalanceChip(
         else -> BalanceNeutral
     }
     val text = when {
-        balance > 0.01 -> "you'll get ${formatCurrency(balance, currency)}"
-        balance < -0.01 -> "you'll pay ${formatCurrency(-balance, currency)}"
+        balance > 0.01 -> "you'll get ${CurrencyConverter.formatCurrency(balance, currency)}"
+        balance < -0.01 -> "you'll pay ${CurrencyConverter.formatCurrency(-balance, currency)}"
         else -> "settled up"
     }
     Surface(
@@ -227,13 +228,3 @@ fun TrevioCard(
     }
 }
 
-fun formatCurrency(amount: Double, currency: String = "INR"): String {
-    val symbol = when (currency) {
-        "INR" -> "₹"
-        "USD" -> "$"
-        "EUR" -> "€"
-        "GBP" -> "£"
-        else -> currency
-    }
-    return "$symbol${String.format("%,.2f", amount)}"
-}

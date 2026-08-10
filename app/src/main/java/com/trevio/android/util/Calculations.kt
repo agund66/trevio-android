@@ -82,7 +82,7 @@ object Calculations {
                         val perPerson = item.amount / item.assignedTo.size
                         for (uid in item.assignedTo) {
                             if (memberTotals.containsKey(uid)) {
-                                memberTotals[uid] = memberTotals[uid]!! + perPerson
+                                memberTotals[uid] = (memberTotals[uid] ?: 0.0) + perPerson
                             }
                         }
                     }

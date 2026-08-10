@@ -46,6 +46,12 @@ fun GroupQrCodeDialog(
         }
     }
 
+    DisposableEffect(qrBitmap) {
+        onDispose {
+            qrBitmap?.recycle()
+        }
+    }
+
     Dialog(onDismissRequest = onDismiss) {
         Card(
             modifier = Modifier.fillMaxWidth(),

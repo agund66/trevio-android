@@ -27,6 +27,10 @@ import com.trevio.android.domain.repository.GroupInfo
 import com.trevio.android.domain.repository.GroupService
 import com.trevio.android.domain.repository.SettlementService
 import com.trevio.android.domain.model.Member
+import com.trevio.android.util.CurrencyConverter
+import com.trevio.android.util.MemberRole
+import com.trevio.android.util.MemberStatus
+import com.trevio.android.util.rememberCurrencyFormatter
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -38,6 +42,7 @@ class GroupSettingsViewModel @Inject constructor(
     private val groupService: GroupService,
     private val settlementService: SettlementService,
     private val authService: AuthService,
+    private val exchangeRateService: com.trevio.android.domain.repository.ExchangeRateService,
     savedStateHandle: SavedStateHandle
 ) : ViewModel() {
 
@@ -50,6 +55,10 @@ class GroupSettingsViewModel @Inject constructor(
         val currentUserId: String? = null,
         val name: String = "",
         val description: String = "",
+        val monthlyBudget: String = "",
+        val userCurrency: String = "INR",
+        val currencySymbol: String = "₹",
+        val rates: Map<String, Double> = emptyMap(),
         val error: String? = null,
         val success: String? = null,
         val transferTargetUid: String? = null,
@@ -67,15 +76,27 @@ class GroupSettingsViewModel @Inject constructor(
         _state.value = _state.value.copy(isLoading = true)
         viewModelScope.launch {
             val uid = authService.getCurrentUserId()
+            val user = authService.getCurrentUser()
+            val userCurrency = user?.defaultCurrency ?: "INR"
+            val currencySymbol = CurrencyConverter.getCurrencySymbol(userCurrency)
+            val rates = exchangeRateService.getRates().getOrNull()?.rates ?: emptyMap()
             val info = groupService.getGroupInfo(groupId).getOrNull()
             val members = settlementService.getGroupBalances(groupId).getOrDefault(emptyList())
+            // Convert budget from INR base to user's currency for display
+            val budgetInUserCurrency = info?.monthlyBudget?.let { budget ->
+                CurrencyConverter.convertFromBase(budget, userCurrency, rates)
+            }
             _state.value = _state.value.copy(
                 isLoading = false,
                 groupInfo = info,
                 members = members,
                 currentUserId = uid,
                 name = info?.name ?: "",
-                description = info?.description ?: ""
+                description = info?.description ?: "",
+                monthlyBudget = budgetInUserCurrency?.let { formatBudgetDisplay(it) } ?: "",
+                userCurrency = userCurrency,
+                currencySymbol = currencySymbol,
+                rates = rates
             )
         }
     }
@@ -85,24 +106,64 @@ class GroupSettingsViewModel @Inject constructor(
             val uid = authService.getCurrentUserId()
             val info = groupService.getGroupInfo(groupId).getOrNull()
             val members = settlementService.getGroupBalances(groupId).getOrDefault(emptyList())
+            val userCurrency = _state.value.userCurrency
+            val rates = _state.value.rates
+            // Convert budget from INR base to user's currency for display
+            val budgetInUserCurrency = info?.monthlyBudget?.let { budget ->
+                CurrencyConverter.convertFromBase(budget, userCurrency, rates)
+            }
             _state.value = _state.value.copy(
                 groupInfo = info,
                 members = members,
                 currentUserId = uid,
                 name = info?.name ?: "",
-                description = info?.description ?: ""
+                description = info?.description ?: "",
+                monthlyBudget = budgetInUserCurrency?.let { formatBudgetDisplay(it) } ?: ""
             )
+        }
+    }
+
+    private fun formatBudgetDisplay(amount: Double): String {
+        return if (amount == amount.toLong().toDouble()) {
+            amount.toLong().toString()
+        } else {
+            String.format("%.2f", amount)
         }
     }
 
     fun updateName(v: String) { _state.value = _state.value.copy(name = v) }
     fun updateDescription(v: String) { _state.value = _state.value.copy(description = v) }
+    fun updateMonthlyBudget(v: String) { _state.value = _state.value.copy(monthlyBudget = v.filter { it.isDigit() || it == '.' }) }
+
+    fun saveBudget() {
+        val s = _state.value
+        val budgetInUserCurrency = s.monthlyBudget.toDoubleOrNull()
+        if (budgetInUserCurrency == null || budgetInUserCurrency < 0) {
+            _state.value = s.copy(error = "Budget must be a positive number")
+            return
+        }
+        // Convert from user's currency to INR base for storage
+        val budgetInBase = if (budgetInUserCurrency > 0) {
+            CurrencyConverter.convertToBase(budgetInUserCurrency, s.userCurrency, s.rates)
+        } else null
+        _state.value = s.copy(isSaving = true, error = null, success = null)
+        viewModelScope.launch {
+            groupService.updateGroupBudget(groupId, budgetInBase, null)
+                .onSuccess {
+                    _state.value = s.copy(isSaving = false, success = "Budget updated")
+                    refreshData()
+                }
+                .onFailure { e ->
+                    _state.value = s.copy(isSaving = false, error = e.message)
+                }
+        }
+    }
     fun setTransferTarget(uid: String?) { _state.value = _state.value.copy(transferTargetUid = uid) }
     fun setShowDeleteConfirm(v: Boolean) { _state.value = _state.value.copy(showDeleteConfirm = v) }
     fun setShowLeaveConfirm(v: Boolean) { _state.value = _state.value.copy(showLeaveConfirm = v) }
 
     val isAdmin: Boolean get() = _state.value.currentUserId == _state.value.groupInfo?.createdBy ||
-        _state.value.members.find { it.uid == _state.value.currentUserId }?.role == "admin"
+        _state.value.members.find { it.uid == _state.value.currentUserId }?.role == MemberRole.ADMIN
 
     fun saveGroupSettings() {
         val s = _state.value
@@ -201,7 +262,7 @@ fun GroupSettingsScreen(
         return
     }
 
-    val activeMembers = state.members.filter { it.status == "active" && it.uid != state.currentUserId }
+    val activeMembers = state.members.filter { it.status == MemberStatus.ACTIVE && it.uid != state.currentUserId }
 
     Column(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
         TrevioHeader(
@@ -251,6 +312,34 @@ fun GroupSettingsScreen(
                     ) {
                         if (state.isSaving) CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp, color = MaterialTheme.colorScheme.onPrimary)
                         else Text("Save Changes")
+                    }
+                }
+            }
+
+            // Budget Section (Household groups only)
+            if (state.groupInfo?.template == com.trevio.android.domain.model.GroupTemplate.HOUSEHOLD) {
+                Spacer(modifier = Modifier.height(8.dp))
+                Surface(shape = RoundedCornerShape(16.dp), tonalElevation = 1.dp, modifier = Modifier.fillMaxWidth()) {
+                    Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                        Text("Monthly Budget", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                        Text("Set a monthly spending budget. You'll see progress in the Monthly report.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        OutlinedTextField(
+                            value = state.monthlyBudget,
+                            onValueChange = { viewModel.updateMonthlyBudget(it) },
+                            label = { Text("Monthly budget amount") },
+                            prefix = { Text(state.currencySymbol) },
+                            modifier = Modifier.fillMaxWidth(),
+                            singleLine = true,
+                            shape = RoundedCornerShape(12.dp)
+                        )
+                        Button(
+                            onClick = { viewModel.saveBudget() },
+                            enabled = !state.isSaving,
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            if (state.isSaving) CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp, color = MaterialTheme.colorScheme.onPrimary)
+                            else Text("Save Budget")
+                        }
                     }
                 }
             }

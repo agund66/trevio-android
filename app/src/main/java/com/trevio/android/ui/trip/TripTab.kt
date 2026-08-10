@@ -293,7 +293,11 @@ fun TripTab(
         }.toSortedMap(compareBy { key ->
             if (key == "none") Long.MAX_VALUE else {
                 val parts = key.split("-")
-                parts[0].toLong() * 10000 + parts[1].toLong() * 100 + parts[2].toLong()
+                if (parts.size < 3) return@compareBy 0L
+                val year = parts[0].toLongOrNull() ?: return@compareBy 0L
+                val month = parts[1].toLongOrNull() ?: return@compareBy 0L
+                val day = parts[2].toLongOrNull() ?: return@compareBy 0L
+                year * 10000 + month * 100 + day
             }
         })
 
@@ -301,9 +305,16 @@ fun TripTab(
             item {
                 val label = if (dayKey == "none") "Unscheduled" else {
                     val parts = dayKey.split("-")
-                    java.text.SimpleDateFormat("EEE, dd MMM", java.util.Locale.getDefault()).format(
-                        java.util.GregorianCalendar(parts[0].toInt(), parts[1].toInt(), parts[2].toInt()).time
-                    )
+                    if (parts.size < 3) {
+                        "Unscheduled"
+                    } else {
+                        val y = parts[0].toIntOrNull() ?: return@item
+                        val m = parts[1].toIntOrNull() ?: return@item
+                        val d = parts[2].toIntOrNull() ?: return@item
+                        java.text.SimpleDateFormat("EEE, dd MMM", java.util.Locale.getDefault()).format(
+                            java.util.GregorianCalendar(y, m, d).time
+                        )
+                    }
                 }
                 Text(
                     text = label,

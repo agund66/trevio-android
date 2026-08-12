@@ -242,7 +242,7 @@ fun NotificationsScreen(
 
     if (state.isLoading) {
         Column(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
-            TrevioHeader(title = stringResource(R.string.notifications_title), onBack = { navController.popBackStack() })
+            TrevioHeader(title = stringResource(R.string.notifications_title))
             Box(modifier = Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
                 CircularProgressIndicator()
             }
@@ -252,7 +252,7 @@ fun NotificationsScreen(
 
     state.error?.let { errMsg ->
         Column(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
-            TrevioHeader(title = stringResource(R.string.notifications_title), onBack = { navController.popBackStack() })
+            TrevioHeader(title = stringResource(R.string.notifications_title))
             Box(modifier = Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     Icon(Icons.Default.Warning, contentDescription = null, modifier = Modifier.size(48.dp), tint = MaterialTheme.colorScheme.error)
@@ -269,7 +269,6 @@ fun NotificationsScreen(
     Column(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
         TrevioHeader(
             title = if (unreadCount > 0) "${stringResource(R.string.notifications_title)} ($unreadCount)" else stringResource(R.string.notifications_title),
-            onBack = { navController.popBackStack() },
             actions = {
                 if (unreadCount > 0) {
                     TextButton(

@@ -33,4 +33,5 @@ sealed class TrevioRoute(val route: String) {
         fun createRoute(uid: String) = "user/$uid"
     }
     data object Admin : TrevioRoute("admin")
+    data object More : TrevioRoute("more")
 }

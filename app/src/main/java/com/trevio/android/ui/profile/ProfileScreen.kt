@@ -14,11 +14,9 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Description
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.automirrored.filled.Logout
-import androidx.compose.material.icons.filled.Info
 
 import androidx.compose.material.icons.filled.Mail
 import androidx.compose.material.icons.filled.Payments
@@ -50,7 +48,6 @@ import com.trevio.android.core.designsystem.theme.ThemeMode
 import com.trevio.android.core.designsystem.theme.ThemeViewModel
 import com.trevio.android.core.designsystem.theme.TrevioBorder
 import com.trevio.android.core.navigation.TrevioRoute
-import com.trevio.android.core.navigation.TrevioRouteSupport
 import com.trevio.android.domain.model.User
 import com.trevio.android.domain.repository.AuthService
 import com.trevio.android.domain.repository.UserService
@@ -231,7 +228,9 @@ fun ProfileScreen(
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.common_back), tint = Color.White)
                     }
                 } else {
-                    Spacer(modifier = Modifier.width(48.dp))
+                    IconButton(onClick = { navController.popBackStack() }) {
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.common_back), tint = Color.White)
+                    }
                 }
                 Text(
                     stringResource(R.string.profile_title),
@@ -240,17 +239,14 @@ fun ProfileScreen(
                     color = Color.White,
                     modifier = Modifier.weight(1f)
                 )
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    if (!state.isEditing) {
-                        TextButton(onClick = { viewModel.startEditing() }) {
-                            Icon(Icons.Default.Edit, contentDescription = null, tint = Color.White, modifier = Modifier.size(16.dp))
-                            Spacer(modifier = Modifier.width(4.dp))
-                            Text(stringResource(R.string.profile_edit), color = Color.White, style = MaterialTheme.typography.labelMedium)
-                        }
+                if (!state.isEditing) {
+                    TextButton(onClick = { viewModel.startEditing() }) {
+                        Icon(Icons.Default.Edit, contentDescription = null, tint = Color.White, modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text(stringResource(R.string.profile_edit), color = Color.White, style = MaterialTheme.typography.labelMedium)
                     }
-                    IconButton(onClick = { viewModel.signOut() }) {
-                        Icon(Icons.AutoMirrored.Filled.Logout, contentDescription = stringResource(R.string.profile_sign_out), tint = Color.White)
-                    }
+                } else {
+                    Spacer(modifier = Modifier.width(48.dp))
                 }
             }
         }
@@ -296,8 +292,7 @@ fun ProfileScreen(
                 onEdit = { viewModel.startEditing() },
                 onDelete = { viewModel.deleteAccount() },
                 themeMode = themeMode,
-                onThemeModeChange = { themeViewModel.setThemeMode(it) },
-                onHelpSupport = { navController.navigate(TrevioRouteSupport.Support.route) }
+                onThemeModeChange = { themeViewModel.setThemeMode(it) }
             )
         }
     }
@@ -309,11 +304,9 @@ private fun ViewProfileContent(
     onEdit: () -> Unit,
     onDelete: () -> Unit,
     themeMode: ThemeMode,
-    onThemeModeChange: (ThemeMode) -> Unit,
-    onHelpSupport: () -> Unit = {}
+    onThemeModeChange: (ThemeMode) -> Unit
 ) {
     var showDeleteDialog by remember { mutableStateOf(false) }
-    var showTermsDialog by remember { mutableStateOf(false) }
     val hasUpiId = user.upiId.isNotEmpty()
     val hasPhone = user.phoneNumber.isNotEmpty()
     val country = COUNTRY_CODES.find { it.code == user.countryCode } ?: COUNTRY_CODES.first()
@@ -488,28 +481,6 @@ private fun ViewProfileContent(
         Spacer(modifier = Modifier.height(16.dp))
 
         OutlinedButton(
-            onClick = { showTermsDialog = true },
-            modifier = Modifier.fillMaxWidth(),
-            shape = MaterialTheme.shapes.medium
-        ) {
-            Icon(Icons.Default.Description, contentDescription = null, modifier = Modifier.size(18.dp))
-            Spacer(modifier = Modifier.width(8.dp))
-            Text(stringResource(R.string.profile_terms_conditions))
-        }
-
-        Spacer(modifier = Modifier.height(8.dp))
-
-        OutlinedButton(
-            onClick = onHelpSupport,
-            modifier = Modifier.fillMaxWidth(),
-            shape = MaterialTheme.shapes.medium
-        ) {
-            Icon(Icons.Default.Info, contentDescription = null, modifier = Modifier.size(18.dp))
-            Spacer(modifier = Modifier.width(8.dp))
-            Text(stringResource(R.string.profile_help_support))
-        }
-
-        OutlinedButton(
             onClick = { showDeleteDialog = true },
             modifier = Modifier.fillMaxWidth(),
             shape = MaterialTheme.shapes.medium,
@@ -524,10 +495,6 @@ private fun ViewProfileContent(
         }
 
         Spacer(modifier = Modifier.height(80.dp))
-    }
-
-    if (showTermsDialog) {
-        TermsConditionsDialog(onDismiss = { showTermsDialog = false })
     }
 
     if (showDeleteDialog) {
@@ -767,7 +734,7 @@ private fun EditProfileContent(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun TermsConditionsDialog(onDismiss: () -> Unit) {
+fun TermsConditionsDialog(onDismiss: () -> Unit) {
     AlertDialog(
         onDismissRequest = onDismiss,
         modifier = Modifier.fillMaxWidth()

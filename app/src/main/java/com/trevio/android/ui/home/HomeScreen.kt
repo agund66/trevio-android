@@ -3,6 +3,7 @@ package com.trevio.android.ui.home
 import androidx.annotation.StringRes
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -17,10 +18,8 @@ import androidx.compose.material.icons.filled.Group
 import androidx.compose.material.icons.filled.GroupAdd
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.LocalCafe
-import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.SportsSoccer
 import androidx.compose.material.icons.filled.Warning
-import androidx.compose.material.icons.outlined.Notifications
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -39,6 +38,7 @@ import com.trevio.android.R
 import com.trevio.android.core.UserRefreshNotifier
 import com.trevio.android.core.designsystem.components.EmptyState
 import com.trevio.android.core.designsystem.components.ListItemSkeleton
+import com.trevio.android.core.designsystem.components.MemberAvatar
 import com.trevio.android.core.designsystem.components.TrevioCard
 import com.trevio.android.core.designsystem.theme.BalanceNegative
 import com.trevio.android.core.designsystem.theme.BalanceNegativeDark
@@ -87,6 +87,7 @@ class HomeViewModel @Inject constructor(
         val totalExpenses: Double = 0.0,
         val activeGroups: Int = 0,
         val userDisplayName: String = "",
+        val userPhotoUrl: String? = null,
         val isLoading: Boolean = true,
         @StringRes val error: Int? = null,
         val signedOut: Boolean = false
@@ -134,6 +135,7 @@ class HomeViewModel @Inject constructor(
                         totalExpenses = totalExpenses,
                         activeGroups = activeGroups,
                         userDisplayName = user?.displayName ?: _state.value.userDisplayName,
+                        userPhotoUrl = user?.photoURL ?: _state.value.userPhotoUrl,
                         isLoading = false,
                         error = null
                     )
@@ -157,7 +159,8 @@ class HomeViewModel @Inject constructor(
         viewModelScope.launch {
             val user = authService.getCurrentUser()
             _state.value = _state.value.copy(
-                userDisplayName = user?.displayName ?: _state.value.userDisplayName
+                userDisplayName = user?.displayName ?: _state.value.userDisplayName,
+                userPhotoUrl = user?.photoURL ?: _state.value.userPhotoUrl
             )
         }
     }
@@ -206,7 +209,8 @@ fun HomeScreen(
             Column(modifier = Modifier.fillMaxSize()) {
                 HomeHeader(
                     displayName = state.userDisplayName,
-                    onNotificationsClick = { navController.navigate(TrevioRoute.Notifications.route) },
+                    photoUrl = state.userPhotoUrl,
+                    onProfileClick = { navController.navigate(TrevioRoute.Profile.route) },
                     isLoading = true
                 )
                 // Skeleton placeholders instead of a spinner — shows the
@@ -223,7 +227,8 @@ fun HomeScreen(
             Column(modifier = Modifier.fillMaxSize()) {
                 HomeHeader(
                     displayName = state.userDisplayName,
-                    onNotificationsClick = { navController.navigate(TrevioRoute.Notifications.route) }
+                    photoUrl = state.userPhotoUrl,
+                    onProfileClick = { navController.navigate(TrevioRoute.Profile.route) }
                 )
                 Box(modifier = Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
@@ -241,7 +246,8 @@ fun HomeScreen(
             Column(modifier = Modifier.fillMaxSize()) {
                 HomeHeader(
                     displayName = state.userDisplayName,
-                    onNotificationsClick = { navController.navigate(TrevioRoute.Notifications.route) }
+                    photoUrl = state.userPhotoUrl,
+                    onProfileClick = { navController.navigate(TrevioRoute.Profile.route) }
                 )
                 EmptyState(
                     icon = Icons.Default.Group,
@@ -255,7 +261,8 @@ fun HomeScreen(
             Column(modifier = Modifier.fillMaxSize()) {
                 HomeHeader(
                     displayName = state.userDisplayName,
-                    onNotificationsClick = { navController.navigate(TrevioRoute.Notifications.route) }
+                    photoUrl = state.userPhotoUrl,
+                    onProfileClick = { navController.navigate(TrevioRoute.Profile.route) }
                 )
             LazyColumn(
                 modifier = Modifier.weight(1f),
@@ -365,7 +372,8 @@ fun HomeScreen(
 @Composable
 private fun HomeHeader(
     displayName: String,
-    onNotificationsClick: () -> Unit,
+    onProfileClick: () -> Unit,
+    photoUrl: String? = null,
     isLoading: Boolean = false
 ) {
     Row(
@@ -373,39 +381,49 @@ private fun HomeHeader(
             .fillMaxWidth()
             .background(MaterialTheme.colorScheme.primary)
             .padding(horizontal = 16.dp, vertical = 12.dp),
-        horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Column(modifier = Modifier.weight(1f)) {
-            Text(
-                text = stringResource(R.string.home_welcome_back),
-                style = MaterialTheme.typography.bodySmall,
-                color = Color.White.copy(alpha = 0.8f)
+        // Tappable avatar + greeting — clicking navigates to Profile
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable(onClick = onProfileClick),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            MemberAvatar(
+                name = displayName,
+                photoURL = photoUrl ?: "",
+                size = 40
             )
-            Spacer(modifier = Modifier.height(2.dp))
-            if (isLoading && displayName.isEmpty()) {
-                // Shimmer placeholder for the name while data loads,
-                // instead of showing "there" on first login.
-                Box(
-                    modifier = Modifier
-                        .width(120.dp)
-                        .height(24.dp)
-                        .clip(RoundedCornerShape(4.dp))
-                        .background(Color.White.copy(alpha = 0.2f))
-                )
-            } else {
+            Spacer(modifier = Modifier.width(12.dp))
+            Column {
                 Text(
-                    text = displayName.ifEmpty { stringResource(R.string.home_welcome_back) },
-                    style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.Bold,
-                    color = Color.White,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
+                    text = stringResource(R.string.home_welcome_back),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = Color.White.copy(alpha = 0.8f)
                 )
+                Spacer(modifier = Modifier.height(2.dp))
+                if (isLoading && displayName.isEmpty()) {
+                    // Shimmer placeholder for the name while data loads,
+                    // instead of showing "there" on first login.
+                    Box(
+                        modifier = Modifier
+                            .width(120.dp)
+                            .height(24.dp)
+                            .clip(RoundedCornerShape(4.dp))
+                            .background(Color.White.copy(alpha = 0.2f))
+                    )
+                } else {
+                    Text(
+                        text = displayName.ifEmpty { stringResource(R.string.home_welcome_back) },
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.Bold,
+                        color = Color.White,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
             }
-        }
-        IconButton(onClick = onNotificationsClick) {
-            Icon(Icons.Outlined.Notifications, contentDescription = stringResource(R.string.home_notifications), tint = Color.White)
         }
     }
 }

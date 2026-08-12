@@ -226,7 +226,7 @@ fun CreateGroupScreen(
                 .verticalScroll(rememberScrollState())
                 .padding(horizontal = 20.dp, vertical = 20.dp)
         ) {
-            // ── Template Selection ──
+            // ── Template Selection (2×2 grid) ──
             SectionLabel(stringResource(R.string.create_group_choose_template))
             Spacer(modifier = Modifier.height(4.dp))
             SectionHint(stringResource(R.string.create_group_template_hint))
@@ -254,6 +254,12 @@ fun CreateGroupScreen(
                     onClick = { selectedTemplate = GroupTemplate.TURF },
                     modifier = Modifier.weight(1f)
                 )
+            }
+            Spacer(modifier = Modifier.height(10.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
                 TemplateCard(
                     icon = Icons.Default.Group,
                     title = stringResource(R.string.create_group_template_casual),
@@ -263,12 +269,6 @@ fun CreateGroupScreen(
                     onClick = { selectedTemplate = GroupTemplate.CASUAL },
                     modifier = Modifier.weight(1f)
                 )
-            }
-            Spacer(modifier = Modifier.height(10.dp))
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(10.dp)
-            ) {
                 TemplateCard(
                     icon = Icons.Default.Home,
                     title = stringResource(R.string.create_group_template_household),
@@ -278,7 +278,6 @@ fun CreateGroupScreen(
                     onClick = { selectedTemplate = GroupTemplate.HOUSEHOLD },
                     modifier = Modifier.weight(1f)
                 )
-                Spacer(modifier = Modifier.weight(1f))
             }
             if (selectedTemplate == GroupTemplate.HOUSEHOLD) {
                 Spacer(modifier = Modifier.height(8.dp))
@@ -733,7 +732,6 @@ private fun TemplateCard(
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val isDark = isSystemInDarkTheme()
     val bgGradient = if (selected) {
         Brush.verticalGradient(
             listOf(iconColor.copy(alpha = 0.12f), iconColor.copy(alpha = 0.04f))
@@ -749,19 +747,19 @@ private fun TemplateCard(
         modifier = modifier,
         border = if (selected) BorderStroke(2.dp, iconColor) else BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        shape = RoundedCornerShape(16.dp),
+        shape = RoundedCornerShape(14.dp),
         elevation = CardDefaults.cardElevation(defaultElevation = if (selected) 4.dp else 1.dp)
     ) {
         Box(
             modifier = Modifier
                 .background(bgGradient)
-                .padding(vertical = 20.dp, horizontal = 8.dp),
+                .padding(vertical = 12.dp, horizontal = 6.dp),
             contentAlignment = Alignment.Center
         ) {
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 Box(
                     modifier = Modifier
-                        .size(48.dp)
+                        .size(36.dp)
                         .clip(CircleShape)
                         .background(iconColor.copy(alpha = if (selected) 0.18f else 0.1f)),
                     contentAlignment = Alignment.Center
@@ -770,17 +768,17 @@ private fun TemplateCard(
                         imageVector = icon,
                         contentDescription = null,
                         tint = iconColor,
-                        modifier = Modifier.size(24.dp)
+                        modifier = Modifier.size(20.dp)
                     )
                 }
-                Spacer(modifier = Modifier.height(10.dp))
+                Spacer(modifier = Modifier.height(6.dp))
                 Text(
                     title,
-                    style = MaterialTheme.typography.labelLarge,
+                    style = MaterialTheme.typography.labelMedium,
                     fontWeight = FontWeight.Bold,
                     color = if (selected) iconColor else MaterialTheme.colorScheme.onSurface
                 )
-                Spacer(modifier = Modifier.height(2.dp))
+                Spacer(modifier = Modifier.height(1.dp))
                 Text(
                     subtitle,
                     style = MaterialTheme.typography.labelSmall,

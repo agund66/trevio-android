@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
@@ -205,7 +206,13 @@ fun PhoneSetupScreen(
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Box(modifier = Modifier.clickable { countryMenuExpanded = true }) {
+                    // Country code selector — the OutlinedTextField itself opens
+                    // the dropdown. The wrapping Box has NO clickable modifier
+                    // (previously it intercepted taps and re-opened the menu
+                    // immediately after selecting an item, making only the first
+                    // item selectable). The DropdownMenu is constrained to a
+                    // max height so the ~200 entries are scrollable.
+                    Box {
                         OutlinedTextField(
                             value = "${country.flag} ${country.dialCode}",
                             onValueChange = {},
@@ -213,12 +220,15 @@ fun PhoneSetupScreen(
                             trailingIcon = {
                                 Icon(Icons.Default.ArrowDropDown, contentDescription = stringResource(R.string.profile_select_country))
                             },
-                            modifier = Modifier.width(120.dp),
+                            modifier = Modifier
+                                .width(120.dp)
+                                .clickable { countryMenuExpanded = true },
                             singleLine = true
                         )
                         DropdownMenu(
                             expanded = countryMenuExpanded,
-                            onDismissRequest = { countryMenuExpanded = false }
+                            onDismissRequest = { countryMenuExpanded = false },
+                            modifier = Modifier.heightIn(max = 360.dp)
                         ) {
                             CountryConstants.COUNTRY_CODES.forEach { option ->
                                 DropdownMenuItem(

@@ -4,7 +4,7 @@
     <string name="app_name">Trevio</string>
 
     <!-- ==================== HOME SCREEN ==================== -->
-    <string name="home_welcome_back">Welcome back</string>
+    <string name="home_welcome_back">Welcome</string>
     <string name="home_no_groups_yet">No groups yet</string>
     <string name="home_no_groups_message">Create your first group to start splitting bills with friends. Perfect for trips, turf sessions, or casual splits!</string>
     <string name="home_create_group">Create Group</string>
@@ -181,6 +181,7 @@
     <string name="group_settings_yes_leave">Yes, Leave</string>
     <string name="group_settings_budget_updated">Budget updated</string>
     <string name="group_settings_updated">Group settings updated</string>
+    <string name="group_settings_name_required">Group name cannot be empty</string>
 
     <!-- ==================== CREATE GROUP SCREEN ==================== -->
     <string name="create_group_title">Create Group</string>
@@ -290,6 +291,7 @@
     <string name="add_expense_received">Received</string>
     <string name="add_expense_category">Category</string>
     <string name="add_expense_paid_by">Paid by</string>
+    <string name="add_expense_received_by">Received by</string>
     <string name="add_expense_loading_members">Loading members…</string>
     <string name="add_expense_split_method">Split method</string>
     <string name="add_expense_per_person">%1$s per person</string>
@@ -301,6 +303,7 @@
     <string name="add_expense_shares_note">Amounts are split proportionally based on share values.</string>
     <string name="add_expense_note">Note (optional)</string>
     <string name="add_expense_recurring">Make this a recurring expense</string>
+    <string name="add_expense_recurring_desc">Automatically creates this expense on the chosen schedule so you don\'t have to re-enter it every week or month.</string>
     <string name="add_expense_weekly">Weekly</string>
     <string name="add_expense_monthly">Monthly</string>
     <string name="add_expense_save">Save</string>
@@ -511,6 +514,7 @@
     <string name="edit_entry_description">Description (optional)</string>
     <string name="edit_entry_category">Category</string>
     <string name="edit_entry_paid_by">Paid By</string>
+    <string name="edit_entry_received_by">Received By</string>
     <string name="edit_entry_note">Note (optional)</string>
     <string name="edit_entry_save">Save</string>
     <string name="edit_entry_saving">Saving…</string>

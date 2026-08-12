@@ -206,7 +206,8 @@ fun HomeScreen(
             Column(modifier = Modifier.fillMaxSize()) {
                 HomeHeader(
                     displayName = state.userDisplayName,
-                    onNotificationsClick = { navController.navigate(TrevioRoute.Notifications.route) }
+                    onNotificationsClick = { navController.navigate(TrevioRoute.Notifications.route) },
+                    isLoading = true
                 )
                 // Skeleton placeholders instead of a spinner — shows the
                 // approximate layout before data arrives from cache/server.
@@ -364,7 +365,8 @@ fun HomeScreen(
 @Composable
 private fun HomeHeader(
     displayName: String,
-    onNotificationsClick: () -> Unit
+    onNotificationsClick: () -> Unit,
+    isLoading: Boolean = false
 ) {
     Row(
         modifier = Modifier
@@ -381,14 +383,26 @@ private fun HomeHeader(
                 color = Color.White.copy(alpha = 0.8f)
             )
             Spacer(modifier = Modifier.height(2.dp))
-            Text(
-                text = displayName.ifEmpty { "there" },
-                style = MaterialTheme.typography.titleLarge,
-                fontWeight = FontWeight.Bold,
-                color = Color.White,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
+            if (isLoading && displayName.isEmpty()) {
+                // Shimmer placeholder for the name while data loads,
+                // instead of showing "there" on first login.
+                Box(
+                    modifier = Modifier
+                        .width(120.dp)
+                        .height(24.dp)
+                        .clip(RoundedCornerShape(4.dp))
+                        .background(Color.White.copy(alpha = 0.2f))
+                )
+            } else {
+                Text(
+                    text = displayName.ifEmpty { stringResource(R.string.home_welcome_back) },
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold,
+                    color = Color.White,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
         }
         IconButton(onClick = onNotificationsClick) {
             Icon(Icons.Outlined.Notifications, contentDescription = stringResource(R.string.home_notifications), tint = Color.White)

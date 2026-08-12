@@ -25,6 +25,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.TextRange
+import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.annotation.StringRes
@@ -257,7 +259,8 @@ fun AddExpenseScreen(
     viewModel: ExpenseViewModel = hiltViewModel()
 ) {
     var description by remember { mutableStateOf("") }
-    var amountStr by remember { mutableStateOf("") }
+    var amountValue by remember { mutableStateOf(TextFieldValue("")) }
+    val amountStr = amountValue.text
     var category by remember { mutableStateOf("other") }
     var splitType by remember { mutableStateOf(SplitType.EQUAL) }
     val state by viewModel.state.collectAsState()
@@ -305,7 +308,7 @@ fun AddExpenseScreen(
                 showSuccess = false
                 viewModel.resetSaved()
                 description = ""
-                amountStr = ""
+                amountValue = TextFieldValue("")
                 category = AppConstants.DEFAULT_CATEGORY
                 splitType = SplitType.EQUAL
                 splitValues.clear()
@@ -373,8 +376,8 @@ fun AddExpenseScreen(
                 .padding(20.dp)
         ) {
             OutlinedTextField(
-                value = amountStr,
-                onValueChange = { amountStr = it.filter { c -> c.isDigit() || c == '.' || c == '+' || c == '-' || c == '*' || c == '/' } },
+                value = amountValue,
+                onValueChange = { amountValue = it.copy(text = it.text.filter { c -> c.isDigit() || c == '.' || c == '+' || c == '-' || c == '*' || c == '/' }) },
                 label = { Text(stringResource(R.string.add_expense_amount_label, currencySymbol)) },
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                 modifier = Modifier.fillMaxWidth(),
@@ -394,7 +397,15 @@ fun AddExpenseScreen(
                 Text(stringResource(R.string.add_expense_quick_calc), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 listOf("+" to "+", "−" to "-", "×" to "*", "÷" to "/").forEach { (label, op) ->
                     OutlinedButton(
-                        onClick = { amountStr = amountStr + op },
+                        onClick = {
+                            // Append the operator and move the cursor to the
+                            // end so the user can continue typing immediately.
+                            val newText = amountStr + op
+                            amountValue = TextFieldValue(
+                                text = newText,
+                                selection = TextRange(newText.length)
+                            )
+                        },
                         modifier = Modifier.size(40.dp),
                         contentPadding = PaddingValues(0.dp),
                         shape = RoundedCornerShape(8.dp)
@@ -404,7 +415,7 @@ fun AddExpenseScreen(
                 }
                 if (amountStr.isNotEmpty()) {
                     TextButton(
-                        onClick = { amountStr = "" },
+                        onClick = { amountValue = TextFieldValue("") },
                         contentPadding = PaddingValues(horizontal = 8.dp)
                     ) {
                         Text(stringResource(R.string.add_expense_clear), style = MaterialTheme.typography.bodySmall)
@@ -480,6 +491,32 @@ fun AddExpenseScreen(
                     }
                 }
                 Spacer(modifier = Modifier.height(12.dp))
+
+                // Paid By / Received By — shown right below the Spent/Received
+                // toggle for household groups. The label changes based on the
+                // selection: "Paid by" for Spent, "Received by" for Received.
+                SectionLabel(
+                    if (isIncome) stringResource(R.string.add_expense_received_by)
+                    else stringResource(R.string.add_expense_paid_by)
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                if (members.isEmpty()) {
+                    Text(stringResource(R.string.add_expense_loading_members), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                } else {
+                    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        activeMembers.forEach { member ->
+                            FilterChip(
+                                selected = effectivePaidBy == member.uid,
+                                onClick = { paidByUid = member.uid },
+                                label = {
+                                    val name = member.displayName.split(" ").firstOrNull() ?: ""
+                                    Text(if (member.uid == currentUserId) "$name (${stringResource(R.string.add_expense_you)})" else name)
+                                }
+                            )
+                        }
+                    }
+                }
+                Spacer(modifier = Modifier.height(16.dp))
             }
 
             SectionLabel(stringResource(R.string.add_expense_category))
@@ -517,22 +554,25 @@ fun AddExpenseScreen(
                 }
             }
 
-            Spacer(modifier = Modifier.height(16.dp))
-            SectionLabel(stringResource(R.string.add_expense_paid_by))
-            Spacer(modifier = Modifier.height(8.dp))
-            if (members.isEmpty()) {
-                Text(stringResource(R.string.add_expense_loading_members), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            } else {
-                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    activeMembers.forEach { member ->
-                        FilterChip(
-                            selected = effectivePaidBy == member.uid,
-                            onClick = { paidByUid = member.uid },
-                            label = {
-                                val name = member.displayName.split(" ").firstOrNull() ?: ""
-                                Text(if (member.uid == currentUserId) "$name (${stringResource(R.string.add_expense_you)})" else name)
-                            }
-                        )
+            // Paid By for non-household groups (shown after category)
+            if (!isHousehold) {
+                Spacer(modifier = Modifier.height(16.dp))
+                SectionLabel(stringResource(R.string.add_expense_paid_by))
+                Spacer(modifier = Modifier.height(8.dp))
+                if (members.isEmpty()) {
+                    Text(stringResource(R.string.add_expense_loading_members), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                } else {
+                    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        activeMembers.forEach { member ->
+                            FilterChip(
+                                selected = effectivePaidBy == member.uid,
+                                onClick = { paidByUid = member.uid },
+                                label = {
+                                    val name = member.displayName.split(" ").firstOrNull() ?: ""
+                                    Text(if (member.uid == currentUserId) "$name (${stringResource(R.string.add_expense_you)})" else name)
+                                }
+                            )
+                        }
                     }
                 }
             }
@@ -713,21 +753,29 @@ fun AddExpenseScreen(
                 shape = RoundedCornerShape(12.dp)
             )
 
-            // Recurring expense toggle
+            // Recurring expense toggle — with top/bottom padding and a
+            // helper text explaining the benefit to the user.
+            Spacer(modifier = Modifier.height(16.dp))
             Surface(
                 shape = RoundedCornerShape(12.dp),
                 tonalElevation = 1.dp,
                 modifier = Modifier.fillMaxWidth()
             ) {
-                Column(modifier = Modifier.padding(12.dp).fillMaxWidth()) {
+                Column(modifier = Modifier.padding(16.dp).fillMaxWidth()) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Checkbox(checked = isRecurring, onCheckedChange = { isRecurring = it })
                         Icon(Icons.Default.Repeat, contentDescription = null, modifier = Modifier.size(18.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
                         Spacer(modifier = Modifier.width(8.dp))
                         Text(stringResource(R.string.add_expense_recurring), style = MaterialTheme.typography.bodyMedium)
                     }
+                    Spacer(modifier = Modifier.height(6.dp))
+                    Text(
+                        text = stringResource(R.string.add_expense_recurring_desc),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                    )
                     if (isRecurring) {
-                        Spacer(modifier = Modifier.height(8.dp))
+                        Spacer(modifier = Modifier.height(12.dp))
                         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                             FilterChip(
                                 selected = recurringFrequency == com.trevio.android.domain.model.RecurringFrequency.WEEKLY,
@@ -743,6 +791,7 @@ fun AddExpenseScreen(
                     }
                 }
             }
+            Spacer(modifier = Modifier.height(16.dp))
 
             Spacer(modifier = Modifier.height(8.dp))
             if (state.error != null) {

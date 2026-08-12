@@ -48,11 +48,15 @@ fun GroupQrCodeDialog(
         }
     }
 
-    DisposableEffect(qrBitmap) {
-        onDispose {
-            qrBitmap?.recycle()
-        }
-    }
+    // NOTE: We intentionally do NOT recycle the bitmap manually.
+    // The previous implementation used `DisposableEffect(qrBitmap)` with
+    // `onDispose { qrBitmap?.recycle() }`, but because `qrBitmap` is a
+    // delegated state property, the onDispose lambda captured the state
+    // delegate (not the value). When the key changed from null → bitmap,
+    // the old onDispose ran and read the *current* value (the new bitmap),
+    // recycling it immediately — which then crashed the Image composable
+    // with "Cannot draw a recycled Bitmap". Letting GC handle the bitmap
+    // is safe and avoids this class of bug.
 
     Dialog(onDismissRequest = onDismiss) {
         Card(

@@ -72,7 +72,8 @@ class GroupSettingsViewModel @Inject constructor(
         val transferTargetUid: String? = null,
         val showDeleteConfirm: Boolean = false,
         val showLeaveConfirm: Boolean = false,
-        val isSaving: Boolean = false
+        val isSaving: Boolean = false,
+        val savedAndNavigateBack: Boolean = false
     )
 
     private val _state = MutableStateFlow(SettingsState())
@@ -143,29 +144,6 @@ class GroupSettingsViewModel @Inject constructor(
     fun updateDescription(v: String) { _state.value = _state.value.copy(description = v) }
     fun updateMonthlyBudget(v: String) { _state.value = _state.value.copy(monthlyBudget = v.filter { it.isDigit() || it == '.' }) }
 
-    fun saveBudget() {
-        val s = _state.value
-        val budgetInUserCurrency = s.monthlyBudget.toDoubleOrNull()
-        if (budgetInUserCurrency == null || budgetInUserCurrency < 0) {
-            _state.value = s.copy(error = R.string.group_settings_budget_error)
-            return
-        }
-        // Convert from user's currency to INR base for storage
-        val budgetInBase = if (budgetInUserCurrency > 0) {
-            CurrencyConverter.convertToBase(budgetInUserCurrency, s.userCurrency, s.rates)
-        } else null
-        _state.value = s.copy(isSaving = true, error = null, success = null)
-        viewModelScope.launch {
-            groupService.updateGroupBudget(groupId, budgetInBase, null)
-                .onSuccess {
-                    _state.value = s.copy(isSaving = false, success = R.string.group_settings_budget_updated)
-                    refreshData()
-                }
-                .onFailure { e ->
-                    _state.value = s.copy(isSaving = false, error = e.toStringResId())
-                }
-        }
-    }
     fun setTransferTarget(uid: String?) { _state.value = _state.value.copy(transferTargetUid = uid) }
     fun setShowDeleteConfirm(v: Boolean) { _state.value = _state.value.copy(showDeleteConfirm = v) }
     fun setShowLeaveConfirm(v: Boolean) { _state.value = _state.value.copy(showLeaveConfirm = v) }
@@ -173,19 +151,53 @@ class GroupSettingsViewModel @Inject constructor(
     val isAdmin: Boolean get() = _state.value.currentUserId == _state.value.groupInfo?.createdBy ||
         _state.value.members.find { it.uid == _state.value.currentUserId }?.role == MemberRole.ADMIN
 
-    fun saveGroupSettings() {
+    /**
+     * Saves group details (name + description) and, for household groups,
+     * the monthly budget in a single operation. On success, signals the
+     * UI to navigate back to the previous screen.
+     */
+    fun saveAllAndNavigateBack() {
         val s = _state.value
+        if (s.name.isBlank()) {
+            _state.value = s.copy(error = R.string.group_settings_name_required)
+            return
+        }
+        val isHousehold = s.groupInfo?.template == com.trevio.android.domain.model.GroupTemplate.HOUSEHOLD
+        val budgetInUserCurrency = if (isHousehold) s.monthlyBudget.toDoubleOrNull() else null
+        if (isHousehold && s.monthlyBudget.isNotBlank() && (budgetInUserCurrency == null || budgetInUserCurrency < 0)) {
+            _state.value = s.copy(error = R.string.group_settings_budget_error)
+            return
+        }
+        val budgetInBase = if (isHousehold && budgetInUserCurrency != null && budgetInUserCurrency > 0) {
+            CurrencyConverter.convertToBase(budgetInUserCurrency, s.userCurrency, s.rates)
+        } else null
+
         _state.value = s.copy(isSaving = true, error = null, success = null)
         viewModelScope.launch {
-            groupService.updateGroup(groupId, s.name, s.description)
-                .onSuccess {
-                    _state.value = s.copy(isSaving = false, success = R.string.group_settings_updated)
-                    refreshData()
+            // Step 1: update group name + description
+            val detailsResult = groupService.updateGroup(groupId, s.name, s.description)
+            if (detailsResult.isFailure) {
+                _state.value = s.copy(isSaving = false, error = detailsResult.exceptionOrNull()?.toStringResId())
+                return@launch
+            }
+            // Step 2: update budget for household groups
+            if (isHousehold) {
+                val budgetResult = groupService.updateGroupBudget(groupId, budgetInBase, null)
+                if (budgetResult.isFailure) {
+                    _state.value = s.copy(isSaving = false, error = budgetResult.exceptionOrNull()?.toStringResId())
+                    return@launch
                 }
-                .onFailure { e ->
-                    _state.value = s.copy(isSaving = false, error = e.toStringResId())
-                }
+            }
+            _state.value = s.copy(
+                isSaving = false,
+                success = R.string.group_settings_updated,
+                savedAndNavigateBack = true
+            )
         }
+    }
+
+    fun consumeNavigateBack() {
+        _state.value = _state.value.copy(savedAndNavigateBack = false)
     }
 
     fun transferAdmin() {
@@ -271,6 +283,18 @@ fun GroupSettingsScreen(
     }
 
     val activeMembers = state.members.filter { it.status == MemberStatus.ACTIVE && it.uid != state.currentUserId }
+    val isHousehold = state.groupInfo?.template == com.trevio.android.domain.model.GroupTemplate.HOUSEHOLD
+    // Only show transfer admin section when there are other active members
+    // to transfer the role to. With a single member (the admin), the section
+    // is meaningless.
+    val showTransferAdmin = activeMembers.isNotEmpty()
+
+    LaunchedEffect(state.savedAndNavigateBack) {
+        if (state.savedAndNavigateBack) {
+            viewModel.consumeNavigateBack()
+            navController.popBackStack()
+        }
+    }
 
     Column(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
         TrevioHeader(
@@ -286,7 +310,7 @@ fun GroupSettingsScreen(
                     Text(stringResource(state.error!!), modifier = Modifier.padding(12.dp), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onErrorContainer)
                 }
             }
-            if (state.success != null) {
+            if (state.success != null && !state.savedAndNavigateBack) {
                 val isDark = isSystemInDarkTheme()
                 val successColor = if (isDark) BalancePositiveDark else BalancePositive
                 val successTextColor = if (isDark) SuccessTextDark else SuccessTextLight
@@ -295,7 +319,7 @@ fun GroupSettingsScreen(
                 }
             }
 
-            // Group Details Section
+            // ── Group Details + Budget (single unified form) ──
             Surface(shape = RoundedCornerShape(16.dp), tonalElevation = 1.dp, modifier = Modifier.fillMaxWidth()) {
                 Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     Text(stringResource(R.string.group_settings_group_details), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
@@ -313,22 +337,9 @@ fun GroupSettingsScreen(
                         modifier = Modifier.fillMaxWidth(),
                         minLines = 2
                     )
-                    Button(
-                        onClick = { viewModel.saveGroupSettings() },
-                        enabled = state.name.isNotBlank() && !state.isSaving,
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        if (state.isSaving) CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp, color = MaterialTheme.colorScheme.onPrimary)
-                        else Text(stringResource(R.string.group_settings_save))
-                    }
-                }
-            }
-
-            // Budget Section (Household groups only)
-            if (state.groupInfo?.template == com.trevio.android.domain.model.GroupTemplate.HOUSEHOLD) {
-                Spacer(modifier = Modifier.height(8.dp))
-                Surface(shape = RoundedCornerShape(16.dp), tonalElevation = 1.dp, modifier = Modifier.fillMaxWidth()) {
-                    Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    // Budget field for household groups — inside the same card
+                    if (isHousehold) {
+                        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
                         Text(stringResource(R.string.group_settings_monthly_budget), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
                         Text(stringResource(R.string.group_settings_budget_desc), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         OutlinedTextField(
@@ -340,24 +351,25 @@ fun GroupSettingsScreen(
                             singleLine = true,
                             shape = RoundedCornerShape(12.dp)
                         )
-                        Button(
-                            onClick = { viewModel.saveBudget() },
-                            enabled = !state.isSaving,
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            if (state.isSaving) CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp, color = MaterialTheme.colorScheme.onPrimary)
-                            else Text(stringResource(R.string.group_settings_save_budget))
-                        }
+                    }
+                    // Single Save button for all fields
+                    Button(
+                        onClick = { viewModel.saveAllAndNavigateBack() },
+                        enabled = state.name.isNotBlank() && !state.isSaving,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        if (state.isSaving) CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp, color = MaterialTheme.colorScheme.onPrimary)
+                        else Text(stringResource(R.string.group_settings_save))
                     }
                 }
             }
 
-            // Transfer Admin Section
-            Surface(shape = RoundedCornerShape(16.dp), tonalElevation = 1.dp, modifier = Modifier.fillMaxWidth()) {
-                Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Text(stringResource(R.string.group_settings_transfer_admin_role), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-                    Text(stringResource(R.string.group_settings_transfer_desc), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    if (activeMembers.isNotEmpty()) {
+            // Transfer Admin Section — only when there are other active members
+            if (showTransferAdmin) {
+                Surface(shape = RoundedCornerShape(16.dp), tonalElevation = 1.dp, modifier = Modifier.fillMaxWidth()) {
+                    Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                        Text(stringResource(R.string.group_settings_transfer_admin_role), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                        Text(stringResource(R.string.group_settings_transfer_desc), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         activeMembers.forEach { m ->
                             Surface(
                                 onClick = { viewModel.setTransferTarget(m.uid) },
@@ -384,8 +396,6 @@ fun GroupSettingsScreen(
                                 if (state.isSaving) Text(stringResource(R.string.group_settings_transferring)) else Text(stringResource(R.string.group_settings_transfer_admin_role))
                             }
                         }
-                    } else {
-                        Text(stringResource(R.string.group_settings_no_transfer_members), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f))
                     }
                 }
             }

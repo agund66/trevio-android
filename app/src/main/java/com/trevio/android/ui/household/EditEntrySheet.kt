@@ -120,6 +120,31 @@ fun EditEntrySheet(
 
             Spacer(modifier = Modifier.height(16.dp))
 
+            // Paid By / Received By — shown right below the Spent/Received
+            // toggle. Label changes based on selection.
+            Text(
+                text = stringResource(if (isIncome) R.string.edit_entry_received_by else R.string.edit_entry_paid_by),
+                fontSize = 14.sp,
+                fontWeight = FontWeight.Medium,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+            FlowRow(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                activeMembers.forEach { member ->
+                    PaidByChip(
+                        name = member.displayName,
+                        selected = selectedPaidBy == member.uid,
+                        onClick = { selectedPaidBy = member.uid }
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+
             // Amount
             OutlinedTextField(
                 value = amountText,
@@ -169,30 +194,6 @@ fun EditEntrySheet(
                         category = cat,
                         selected = selectedCategory == cat.key,
                         onClick = { selectedCategory = cat.key }
-                    )
-                }
-            }
-
-            Spacer(modifier = Modifier.height(16.dp))
-
-            // Paid By
-            Text(
-                text = stringResource(R.string.edit_entry_paid_by),
-                fontSize = 14.sp,
-                fontWeight = FontWeight.Medium,
-                color = MaterialTheme.colorScheme.onSurface
-            )
-            Spacer(modifier = Modifier.height(8.dp))
-            FlowRow(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                activeMembers.forEach { member ->
-                    PaidByChip(
-                        name = member.displayName,
-                        selected = selectedPaidBy == member.uid,
-                        onClick = { selectedPaidBy = member.uid }
                     )
                 }
             }

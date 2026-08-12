@@ -329,7 +329,7 @@ fun TripTab(
                     modifier = Modifier.padding(start = 4.dp, bottom = 4.dp)
                 )
             }
-            items(items) { item ->
+            items(items, key = { it.itemId }) { item ->
                 ItineraryItemCard(
                     item = item,
                     currencyFormatter = currencyFormatter,
@@ -371,7 +371,7 @@ fun TripTab(
             }
         }
 
-        items(state.locations) { loc ->
+        items(state.locations, key = { it.locationId }) { loc ->
             LocationCard(
                 location = loc,
                 onRemove = { viewModel.removeLocation(loc.locationId) }

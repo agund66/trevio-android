@@ -290,7 +290,7 @@ fun AdminScreen(
                     )
                 }
 
-                items(filteredUsers) { user ->
+                items(filteredUsers, key = { it.uid }) { user ->
                     UserRow(
                         user = user,
                         isCurrentUser = user.uid == currentUid,

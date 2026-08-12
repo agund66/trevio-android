@@ -56,6 +56,7 @@ import com.trevio.android.core.designsystem.theme.TemplateHouseholdDark
 import com.trevio.android.core.designsystem.theme.TemplateTrip
 import com.trevio.android.core.designsystem.theme.TemplateTripDark
 import com.trevio.android.core.designsystem.theme.TrevioBorder
+import com.trevio.android.data.remote.FirestoreObservers
 import com.trevio.android.domain.model.AppNotification
 import com.trevio.android.domain.model.BroadcastMessage
 import com.trevio.android.domain.model.BroadcastPriority
@@ -70,6 +71,7 @@ import com.trevio.android.util.toStringResId
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
@@ -78,7 +80,8 @@ class NotificationsViewModel @Inject constructor(
     private val notificationService: NotificationService,
     private val broadcastService: BroadcastService,
     private val authService: AuthService,
-    private val groupService: GroupService
+    private val groupService: GroupService,
+    private val firestoreObservers: FirestoreObservers
 ) : ViewModel() {
 
     data class NotificationsState(
@@ -95,18 +98,39 @@ class NotificationsViewModel @Inject constructor(
     private val _state = MutableStateFlow(NotificationsState())
     val state: StateFlow<NotificationsState> = _state
 
+    /// Tracks the current notifications listener so repeated
+    /// loadNotifications() calls don't create multiple Firestore listeners.
+    private var notificationsListenerJob: kotlinx.coroutines.Job? = null
+
     init { loadNotifications() }
 
+    /**
+     * Starts a real-time listener for notifications.  Broadcasts are
+     * fetched once (they change rarely).  With offline persistence
+     * enabled, the first notification emission comes from cache.
+     */
     fun loadNotifications() {
         _state.value = _state.value.copy(isLoading = true)
+        // Cancel any existing listener before starting a new one
+        // to prevent duplicate Firestore listeners.
+        notificationsListenerJob?.cancel()
+        notificationsListenerJob = viewModelScope.launch {
+            try {
+                firestoreObservers.observeNotifications(20).collect { result ->
+                    _state.value = _state.value.copy(
+                        isLoading = false,
+                        notifications = result.items,
+                        hasMore = result.hasMore
+                    )
+                }
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                _state.value = NotificationsState(isLoading = false, error = e.toStringResId())
+            }
+        }
+        // Fetch broadcasts once (best-effort, non-blocking)
         viewModelScope.launch {
-            notificationService.getNotifications(20, null)
-                .onSuccess { result ->
-                    _state.value = _state.value.copy(isLoading = false, notifications = result.items, hasMore = result.hasMore)
-                }
-                .onFailure { e ->
-                    _state.value = NotificationsState(isLoading = false, error = e.toStringResId())
-                }
             val uid = authService.getCurrentUserId()
             val user = authService.getCurrentUser()
             if (uid != null && user != null) {

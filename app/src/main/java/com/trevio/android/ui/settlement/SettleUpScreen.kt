@@ -225,7 +225,7 @@ fun SettleUpScreen(
             contentPadding = PaddingValues(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            items(state.debts) { debt ->
+            items(state.debts, key = { "${it.fromUid}_${it.toUid}" }) { debt ->
                 DebtCard(
                     debt = debt,
                     currentUserId = currentUserId,

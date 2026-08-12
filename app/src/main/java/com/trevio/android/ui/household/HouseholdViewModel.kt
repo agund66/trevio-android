@@ -14,6 +14,7 @@ import com.trevio.android.domain.model.MonthlyReport
 import com.trevio.android.domain.model.LocalizedString
 import com.trevio.android.domain.model.SplitType
 import com.trevio.android.domain.model.TransactionType
+import com.trevio.android.data.remote.FirestoreObservers
 import com.trevio.android.domain.repository.AuthService
 import com.trevio.android.domain.repository.ExpenseService
 import com.trevio.android.domain.repository.GroupInfo
@@ -31,9 +32,12 @@ import com.trevio.android.util.computeCategoryUsageCount
 import com.trevio.android.util.suggestDescriptions
 import com.trevio.android.util.toStringResId
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.launch
 import java.util.Calendar
 import javax.inject.Inject
@@ -68,6 +72,7 @@ class HouseholdViewModel @Inject constructor(
     private val exchangeRateService: ExchangeRateService,
     private val settlementService: SettlementService,
     private val authService: AuthService,
+    private val firestoreObservers: FirestoreObservers,
     savedStateHandle: SavedStateHandle
 ) : ViewModel() {
 
@@ -76,98 +81,100 @@ class HouseholdViewModel @Inject constructor(
     private val _state = MutableStateFlow(HouseholdState())
     val state: StateFlow<HouseholdState> = _state.asStateFlow()
 
+    /// Tracks the current real-time listener coroutine so repeated
+    /// loadData() calls don't create multiple Firestore listeners.
+    private var listenerJob: kotlinx.coroutines.Job? = null
+
     init {
         loadData()
     }
 
     fun loadData() {
         if (groupId.isBlank()) return
-        viewModelScope.launch {
+        // Cancel any existing listener before starting a new one
+        // to prevent duplicate Firestore listeners.
+        listenerJob?.cancel()
+        listenerJob = viewModelScope.launch {
             _state.value = _state.value.copy(isLoading = true, error = null)
+
+            // Fetch user + exchange rates once (they change rarely).
+            // These are NOT on real-time listeners.
+            val (user, rates) = coroutineScope {
+                val userAsync = async { authService.getCurrentUser() }
+                val ratesAsync = async { exchangeRateService.getRates().getOrNull()?.rates ?: emptyMap() }
+                Pair(userAsync.await(), ratesAsync.await())
+            }
+
+            val userCurrency = user?.defaultCurrency ?: com.trevio.android.util.AppConstants.BASE_CURRENCY
+            val currencySymbol = CurrencyConverter.getCurrencySymbol(userCurrency)
+
+            // Combine real-time flows for groupInfo, expenses, and members.
+            // Each emits independently; combine fires whenever any one emits,
+            // so the UI updates incrementally as cache → server data arrives.
             try {
-                val groupInfoResult = groupService.getGroupInfo(groupId)
-                val groupInfo = groupInfoResult.getOrNull()
+                combine(
+                    firestoreObservers.observeGroupInfo(groupId),
+                    firestoreObservers.observeGroupExpenses(groupId, AppConstants.HOUSEHOLD_PAGE_SIZE),
+                    firestoreObservers.observeGroupBalances(groupId)
+                ) { info, expensesResult, members ->
+                    Triple(info, expensesResult.items, members)
+                }.collect { (groupInfo, rawExpenses, members) ->
+                    // Convert each expense's amount to the viewer's currency for display.
+                    val convertedExpenses = rawExpenses.map { expense ->
+                        val convertedAmount = CurrencyConverter.convertCurrency(
+                            expense.amount, expense.currency, userCurrency, rates
+                        )
+                        expense.copy(
+                            amount = convertedAmount,
+                            currency = userCurrency,
+                            originalAmount = expense.amount,
+                            originalCurrency = expense.currency
+                        )
+                    }
 
-                // Load user's default currency
-                val user = authService.getCurrentUser()
-                val userCurrency = user?.defaultCurrency ?: com.trevio.android.util.AppConstants.BASE_CURRENCY
-                val currencySymbol = CurrencyConverter.getCurrencySymbol(userCurrency)
+                    val budgetInUserCurrency = groupInfo?.monthlyBudget?.let { budget ->
+                        CurrencyConverter.convertFromBase(budget, userCurrency, rates)
+                    }
 
-                // Load exchange rates
-                val ratesResult = exchangeRateService.getRates()
-                val rates = ratesResult.getOrNull()?.rates ?: emptyMap()
-
-                // Load all expenses (large page size to get everything for household)
-                val expensesResult = expenseService.getGroupExpenses(groupId, pageSize = AppConstants.HOUSEHOLD_PAGE_SIZE, lastExpenseId = null)
-                val rawExpenses = expensesResult.getOrNull()?.items ?: emptyList()
-
-                // Convert each expense's amount to the viewer's currency for display.
-                // Preserve the original amount and currency so edits can save back
-                // in the original currency instead of overwriting with the display currency.
-                val convertedExpenses = rawExpenses.map { expense ->
-                    val convertedAmount = CurrencyConverter.convertCurrency(
-                        expense.amount, expense.currency, userCurrency, rates
+                    val dailySummary = computeDailySummary(convertedExpenses, _state.value.selectedDate)
+                    val monthlyReport = computeMonthlyReport(
+                        convertedExpenses, members,
+                        _state.value.selectedYear,
+                        _state.value.selectedMonth,
+                        budgetInUserCurrency
                     )
-                    expense.copy(
-                        amount = convertedAmount,
-                        currency = userCurrency,
-                        originalAmount = expense.amount,
-                        originalCurrency = expense.currency
+                    val gamification = computeGamification(
+                        convertedExpenses, members,
+                        budgetInUserCurrency,
+                        monthlyReport.totalSpent,
+                        userCurrency
+                    )
+                    val categoryUsage = computeCategoryUsageCount(convertedExpenses)
+
+                    _state.value = HouseholdState(
+                        isLoading = false,
+                        groupInfo = groupInfo,
+                        expenses = convertedExpenses,
+                        members = members,
+                        dailySummary = dailySummary,
+                        monthlyReport = monthlyReport,
+                        gamification = gamification,
+                        categoryUsage = categoryUsage,
+                        currentUserId = getCurrentUserId(),
+                        userCurrency = userCurrency,
+                        currencySymbol = currencySymbol,
+                        convertedBudget = budgetInUserCurrency,
+                        exchangeRates = rates,
+                        selectedDate = _state.value.selectedDate,
+                        selectedYear = _state.value.selectedYear,
+                        selectedMonth = _state.value.selectedMonth
                     )
                 }
-
-                // Convert budget from INR base to user's currency for display/analytics
-                val budgetInUserCurrency = groupInfo?.monthlyBudget?.let { budget ->
-                    CurrencyConverter.convertFromBase(budget, userCurrency, rates)
-                }
-
-                // Load members from group info
-                val members = loadMembers()
-
-                val dailySummary = computeDailySummary(convertedExpenses, _state.value.selectedDate)
-                val monthlyReport = computeMonthlyReport(
-                    convertedExpenses, members,
-                    _state.value.selectedYear,
-                    _state.value.selectedMonth,
-                    budgetInUserCurrency
-                )
-                val gamification = computeGamification(
-                    convertedExpenses, members,
-                    budgetInUserCurrency,
-                    monthlyReport.totalSpent,
-                    userCurrency
-                )
-                val categoryUsage = computeCategoryUsageCount(convertedExpenses)
-
-                _state.value = HouseholdState(
-                    isLoading = false,
-                    groupInfo = groupInfo,
-                    expenses = convertedExpenses,
-                    members = members,
-                    dailySummary = dailySummary,
-                    monthlyReport = monthlyReport,
-                    gamification = gamification,
-                    categoryUsage = categoryUsage,
-                    currentUserId = getCurrentUserId(),
-                    userCurrency = userCurrency,
-                    currencySymbol = currencySymbol,
-                    convertedBudget = budgetInUserCurrency,
-                    exchangeRates = rates,
-                    selectedDate = _state.value.selectedDate,
-                    selectedYear = _state.value.selectedYear,
-                    selectedMonth = _state.value.selectedMonth
-                )
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
             } catch (e: Exception) {
                 _state.value = _state.value.copy(isLoading = false, error = e.toStringResId())
             }
-        }
-    }
-
-    private suspend fun loadMembers(): List<Member> {
-        return try {
-            settlementService.getGroupBalances(groupId).getOrDefault(emptyList())
-        } catch (e: Exception) {
-            emptyList()
         }
     }
 

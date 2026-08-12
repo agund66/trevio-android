@@ -25,6 +25,11 @@ import com.trevio.android.util.Logger
 import com.trevio.android.util.MemberRole
 import com.trevio.android.util.MemberStatus
 import com.trevio.android.util.toStorageString
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -84,11 +89,35 @@ class FirebaseExpenseServiceImpl @Inject constructor(
             val expenseDate = if (date > 0) date else now
             val expenseRef = groupRef.collection("expenses").document()
 
+            // Fetch payer's profile for denormalized paidByName on expense doc,
+            // and current user's profile for the activity log.
+            // In the common case paidBy == uid, so only one fetch is needed.
+            val (paidByName, displayName, photoURL) = if (paidBy == uid) {
+                val userDoc = firestore.collection("users").document(uid).get().await()
+                Triple(
+                    userDoc.getString("displayName") ?: "Unknown",
+                    userDoc.getString("displayName") ?: "",
+                    userDoc.getString("photoURL") ?: ""
+                )
+            } else {
+                val (payerDoc, currentUserDoc) = coroutineScope {
+                    val payerAsync = async { firestore.collection("users").document(paidBy).get().await() }
+                    val currentAsync = async { firestore.collection("users").document(uid).get().await() }
+                    Pair(payerAsync.await(), currentAsync.await())
+                }
+                Triple(
+                    payerDoc.getString("displayName") ?: "Unknown",
+                    currentUserDoc.getString("displayName") ?: "",
+                    currentUserDoc.getString("photoURL") ?: ""
+                )
+            }
+
             val expenseData = mutableMapOf<String, Any>(
                 "description" to description,
                 "amount" to amount,
                 "currency" to currency,
                 "paidBy" to paidBy,
+                "paidByName" to paidByName,
                 "splitType" to splitType.toStorageString(),
                 "splits" to calculatedSplits.mapValues { (_, v) ->
                     mapOf("amount" to v.amount, "shareValue" to v.shareValue)
@@ -140,6 +169,8 @@ class FirebaseExpenseServiceImpl @Inject constructor(
                 "type" to activityType,
                 "description" to activityDesc,
                 "userId" to uid,
+                "userName" to displayName,
+                "userPhotoURL" to photoURL,
                 "data" to mapOf("expenseId" to expenseRef.id, "amount" to amount, "description" to description),
                 "createdAt" to now
             ))
@@ -159,52 +190,58 @@ class FirebaseExpenseServiceImpl @Inject constructor(
                 recalculateBalances(groupId)
             }
 
-            // Notify all active group members except the creator (non-blocking — don't fail expense creation if notifications fail)
-            try {
-                val groupName = groupDoc.getString("name") ?: ""
-                val creatorDoc = firestore.collection("users").document(uid).get().await()
-                val creatorName = creatorDoc.getString("displayName") ?: "Someone"
-                val activeMembers = groupRef.collection("members")
-                    .whereEqualTo("status", MemberStatus.ACTIVE).get().await()
+            // Notify all active group members except the creator.
+            // Fire-and-forget: launch in a background coroutine so the
+            // caller sees success immediately after the expense + balance
+            // recalculation completes, without waiting for notification
+            // batch commits.
+            CoroutineScope(Dispatchers.IO).launch {
+                try {
+                    val groupName = groupDoc.getString("name") ?: ""
+                    val creatorDoc = firestore.collection("users").document(uid).get().await()
+                    val creatorName = creatorDoc.getString("displayName") ?: "Someone"
+                    val activeMembers = groupRef.collection("members")
+                        .whereEqualTo("status", MemberStatus.ACTIVE).get().await()
 
-                var notifyBatch = firestore.batch()
-                var count = 0
-                for (memberDoc in activeMembers.documents) {
-                    val memberUid = memberDoc.id
-                    if (memberUid == uid) continue
-                    val notifRef = firestore.collection("users").document(memberUid)
-                        .collection("notifications").document()
-                    val notifType = if (transactionType == TransactionType.INCOME) "income_added" else "expense_added"
-                    val notifTitle = if (transactionType == TransactionType.INCOME) "New Income Added" else "New Expense Added"
-                    val notifBody = if (transactionType == TransactionType.INCOME) {
-                        "$creatorName added income \"$description\" ($currency $amount) in \"$groupName\""
-                    } else {
-                        "$creatorName added \"$description\" ($currency $amount) in \"$groupName\""
+                    var notifyBatch = firestore.batch()
+                    var count = 0
+                    for (memberDoc in activeMembers.documents) {
+                        val memberUid = memberDoc.id
+                        if (memberUid == uid) continue
+                        val notifRef = firestore.collection("users").document(memberUid)
+                            .collection("notifications").document()
+                        val notifType = if (transactionType == TransactionType.INCOME) "income_added" else "expense_added"
+                        val notifTitle = if (transactionType == TransactionType.INCOME) "New Income Added" else "New Expense Added"
+                        val notifBody = if (transactionType == TransactionType.INCOME) {
+                            "$creatorName added income \"$description\" ($currency $amount) in \"$groupName\""
+                        } else {
+                            "$creatorName added \"$description\" ($currency $amount) in \"$groupName\""
+                        }
+                        notifyBatch.set(notifRef, mapOf(
+                            "type" to notifType,
+                            "title" to notifTitle,
+                            "body" to notifBody,
+                            "data" to mapOf(
+                                "groupId" to groupId,
+                                "groupName" to groupName,
+                                "expenseId" to expenseRef.id,
+                                "type" to notifType
+                            ),
+                            "read" to false,
+                            "createdAt" to now
+                        ))
+                        count++
+                        if (count % 400 == 0) {
+                            notifyBatch.commit().await()
+                            notifyBatch = firestore.batch()
+                        }
                     }
-                    notifyBatch.set(notifRef, mapOf(
-                        "type" to notifType,
-                        "title" to notifTitle,
-                        "body" to notifBody,
-                        "data" to mapOf(
-                            "groupId" to groupId,
-                            "groupName" to groupName,
-                            "expenseId" to expenseRef.id,
-                            "type" to notifType
-                        ),
-                        "read" to false,
-                        "createdAt" to now
-                    ))
-                    count++
-                    if (count % 400 == 0) {
+                    if (count % 400 != 0) {
                         notifyBatch.commit().await()
-                        notifyBatch = firestore.batch()
                     }
+                } catch (notifError: Exception) {
+                    Logger.w("FirebaseExpenseService", "Failed to send expense notifications", notifError)
                 }
-                if (count % 400 != 0) {
-                    notifyBatch.commit().await()
-                }
-            } catch (notifError: Exception) {
-                Logger.w("FirebaseExpenseService", "Failed to send expense notifications", notifError)
             }
 
             Result.success(expenseRef.id)
@@ -265,7 +302,12 @@ class FirebaseExpenseServiceImpl @Inject constructor(
             if (description.isNotBlank()) updateData["description"] = description
             if (amount > 0) updateData["amount"] = amount
             if (currency.isNotBlank()) updateData["currency"] = currency
-            if (paidBy.isNotBlank()) updateData["paidBy"] = paidBy
+            if (paidBy.isNotBlank()) {
+                updateData["paidBy"] = paidBy
+                // Update denormalized paidByName when paidBy changes
+                val paidByUserDoc = firestore.collection("users").document(paidBy).get().await()
+                updateData["paidByName"] = paidByUserDoc.getString("displayName") ?: "Unknown"
+            }
             if (category.isNotBlank()) updateData["category"] = category
             updateData["note"] = note
             updateData["transactionType"] = transactionType.toStorageString()
@@ -318,6 +360,10 @@ class FirebaseExpenseServiceImpl @Inject constructor(
             val oldTransactionType = (oldExpense["transactionType"] as? String) ?: "expense"
             val newTransactionType = transactionType.toStorageString()
 
+            val userDoc = firestore.collection("users").document(uid).get().await()
+            val displayName = userDoc.getString("displayName") ?: ""
+            val photoURL = userDoc.getString("photoURL") ?: ""
+
             val batch = firestore.batch()
             batch.update(expenseRef, updateData)
             // Handle totalExpenses based on transaction type changes
@@ -351,6 +397,8 @@ class FirebaseExpenseServiceImpl @Inject constructor(
                 "type" to (if (newTransactionType == "income") "income_updated" else "expense_updated"),
                 "description" to (if (newTransactionType == "income") "Updated income: ${if (description.isNotBlank()) description else oldExpense["description"]}" else "Updated expense: ${if (description.isNotBlank()) description else oldExpense["description"]}"),
                 "userId" to uid,
+                "userName" to displayName,
+                "userPhotoURL" to photoURL,
                 "data" to mapOf("expenseId" to expenseId, "groupId" to groupId),
                 "createdAt" to now
             ))
@@ -397,6 +445,10 @@ class FirebaseExpenseServiceImpl @Inject constructor(
             val amountInBase = expenseAmount * expenseRate
             val transactionTypeStr = (expenseData["transactionType"] as? String) ?: "expense"
 
+            val userDoc = firestore.collection("users").document(uid).get().await()
+            val displayName = userDoc.getString("displayName") ?: ""
+            val photoURL = userDoc.getString("photoURL") ?: ""
+
             val batch = firestore.batch()
             batch.delete(expenseRef)
             // Only decrement totalExpenses if it was an expense (not income)
@@ -412,6 +464,8 @@ class FirebaseExpenseServiceImpl @Inject constructor(
                 "type" to (if (transactionTypeStr == "income") "income_deleted" else "expense_deleted"),
                 "description" to (if (transactionTypeStr == "income") "Deleted income: ${expenseData["description"]}" else "Deleted expense: ${expenseData["description"]}"),
                 "userId" to uid,
+                "userName" to displayName,
+                "userPhotoURL" to photoURL,
                 "data" to mapOf("expenseId" to expenseId, "groupId" to groupId, "amount" to expenseAmount),
                 "createdAt" to now
             ))
@@ -460,6 +514,7 @@ class FirebaseExpenseServiceImpl @Inject constructor(
                     amount = (data["amount"] as? Number)?.toDouble() ?: 0.0,
                     currency = data["currency"] as? String ?: AppConstants.BASE_CURRENCY,
                     paidBy = data["paidBy"] as? String ?: "",
+                    paidByName = data["paidByName"] as? String ?: "",
                     splitType = SplitType.valueOf((data["splitType"] as? String ?: "equal").uppercase()),
                     splits = splitsRaw.mapValues { (_, v) ->
                         SplitEntry(
@@ -552,7 +607,27 @@ class FirebaseExpenseServiceImpl @Inject constructor(
 
         val balances = Calculations.calculateBalances(expenses, settlements, memberUids)
 
+        // Compute simplified debts in the same pass and store on group doc
+        val simplifiedDebts = Calculations.simplifyDebts(balances)
+        val debtsForStorage = simplifiedDebts.map { d ->
+            mapOf(
+                "fromUid" to d.fromUid,
+                "toUid" to d.toUid,
+                "amount" to (kotlin.math.round(d.amount * 100) / 100)
+            )
+        }
+
         val balanceEntries = balances.entries.toList()
+        // If there are no balance entries, still store simplifiedDebts on the group doc
+        if (balanceEntries.isEmpty()) {
+            val batch = firestore.batch()
+            batch.update(groupRef, mapOf(
+                "simplifiedDebts" to debtsForStorage,
+                "updatedAt" to System.currentTimeMillis()
+            ))
+            batch.commit().await()
+            return
+        }
         val batchSize = 400
         for (i in balanceEntries.indices step batchSize) {
             val chunk = balanceEntries.subList(i, minOf(i + batchSize, balanceEntries.size))
@@ -560,6 +635,13 @@ class FirebaseExpenseServiceImpl @Inject constructor(
             for ((memberUid, balance) in chunk) {
                 val roundedBalance = kotlin.math.round(balance * 100) / 100
                 batch.update(groupRef.collection("members").document(memberUid), mapOf("balance" to roundedBalance))
+            }
+            // Store simplified debts on the group doc in the first batch
+            if (i == 0) {
+                batch.update(groupRef, mapOf(
+                    "simplifiedDebts" to debtsForStorage,
+                    "updatedAt" to System.currentTimeMillis()
+                ))
             }
             batch.commit().await()
         }

@@ -34,6 +34,7 @@ import androidx.lifecycle.viewModelScope
 import com.trevio.android.R
 import com.trevio.android.core.UserRefreshNotifier
 import com.trevio.android.core.designsystem.components.EmptyState
+import com.trevio.android.core.designsystem.components.ListItemSkeleton
 import com.trevio.android.core.designsystem.components.TrevioCard
 import com.trevio.android.core.designsystem.components.TrevioHeader
 import com.trevio.android.core.designsystem.theme.BalanceNegative
@@ -50,6 +51,7 @@ import com.trevio.android.core.designsystem.theme.TemplateTurf
 import com.trevio.android.core.designsystem.theme.TemplateTurfDark
 import com.trevio.android.core.designsystem.theme.TrevioBorder
 import com.trevio.android.core.navigation.TrevioRoute
+import com.trevio.android.data.remote.FirestoreObservers
 import com.trevio.android.domain.model.Group
 import com.trevio.android.domain.model.GroupTemplate
 import com.trevio.android.domain.repository.GroupService
@@ -58,13 +60,15 @@ import com.trevio.android.util.toStringResId
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 @HiltViewModel
 class GroupsListViewModel @Inject constructor(
     private val groupService: GroupService,
-    private val userRefreshNotifier: UserRefreshNotifier
+    private val userRefreshNotifier: UserRefreshNotifier,
+    private val firestoreObservers: FirestoreObservers
 ) : ViewModel() {
 
     data class GroupsListState(
@@ -76,38 +80,50 @@ class GroupsListViewModel @Inject constructor(
     private val _state = MutableStateFlow(GroupsListState())
     val state: StateFlow<GroupsListState> = _state
 
+    /// Tracks the current groups listener so repeated loadGroups()
+    /// calls don't create multiple Firestore listeners.
+    private var groupsListenerJob: kotlinx.coroutines.Job? = null
+
     init {
         loadGroups()
         viewModelScope.launch {
             userRefreshNotifier.userRefreshed.collect {
-                refreshGroups()
+                // Listener auto-updates; refresh is a no-op but kept
+                // for API compatibility with the UserRefreshNotifier pattern.
             }
         }
     }
 
+    /**
+     * Starts a real-time listener for the user's groups.  With offline
+     * persistence enabled, the first emission comes from cache (instant)
+     * and subsequent emissions arrive from the server silently.
+     */
     fun loadGroups() {
         _state.value = _state.value.copy(isLoading = true)
-        viewModelScope.launch {
-            groupService.getUserGroups()
-                .onSuccess { groups ->
+        // Cancel any existing listener before starting a new one
+        // to prevent duplicate Firestore listeners.
+        groupsListenerJob?.cancel()
+        groupsListenerJob = viewModelScope.launch {
+            try {
+                firestoreObservers.observeUserGroups().collect { groups ->
                     _state.value = GroupsListState(groups = groups, isLoading = false)
                 }
-                .onFailure { e ->
-                    _state.value = GroupsListState(isLoading = false, error = e.toStringResId())
-                }
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                _state.value = GroupsListState(isLoading = false, error = e.toStringResId())
+            }
         }
     }
 
+    /**
+     * Groups are kept fresh by the real-time listener.  This method
+     * is kept for API compatibility (called from needsRefresh and
+     * JoinGroupSheet callbacks).
+     */
     fun refreshGroups() {
-        viewModelScope.launch {
-            groupService.getUserGroups()
-                .onSuccess { groups ->
-                    _state.value = _state.value.copy(groups = groups, error = null)
-                }
-                .onFailure { e ->
-                    _state.value = _state.value.copy(error = e.toStringResId())
-                }
-        }
+        // No-op: the listener in loadGroups() handles updates automatically.
     }
 }
 
@@ -132,11 +148,15 @@ fun GroupsListScreen(
         }
     }
 
-    if (state.isLoading) {
+    // Only show skeletons on a true cold start (no cached data).
+    // With real-time listeners + offline persistence, repeat visits
+    // emit cached data instantly — skeletons are barely visible.
+    if (state.isLoading && state.groups.isEmpty() && state.error == null) {
         Column(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
             TrevioHeader(title = stringResource(R.string.groups_title))
-            Box(modifier = Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
-                CircularProgressIndicator()
+            repeat(5) {
+                ListItemSkeleton()
+                Spacer(Modifier.height(8.dp))
             }
         }
         return

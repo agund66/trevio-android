@@ -44,6 +44,9 @@ class FirebaseGroupServiceImpl @Inject constructor(
 
             val userDoc = firestore.collection("users").document(uid).get().await()
             val userCurrency = userDoc.getString("defaultCurrency") ?: AppConstants.BASE_CURRENCY
+            val displayName = userDoc.getString("displayName") ?: ""
+            val username = userDoc.getString("username") ?: ""
+            val photoURL = userDoc.getString("photoURL") ?: ""
 
             val now = System.currentTimeMillis()
             val inviteCode = Calculations.generateInviteCode()
@@ -70,15 +73,21 @@ class FirebaseGroupServiceImpl @Inject constructor(
             batch.set(groupRef, groupData)
             batch.set(groupRef.collection("members").document(uid), mapOf(
                 "uid" to uid,
+                "displayName" to displayName,
+                "username" to username,
+                "photoURL" to photoURL,
                 "role" to MemberRole.ADMIN,
                 "joinedAt" to now,
                 "balance" to 0.0,
-                "status" to MemberStatus.ACTIVE
+                "status" to MemberStatus.ACTIVE,
+                "isOffline" to false
             ))
             batch.set(groupRef.collection("activities").document(), mapOf(
                 "type" to "group_created",
                 "description" to "Group created",
                 "userId" to uid,
+                "userName" to displayName,
+                "userPhotoURL" to photoURL,
                 "data" to mapOf("groupName" to name.trim()),
                 "createdAt" to now
             ))
@@ -119,15 +128,32 @@ class FirebaseGroupServiceImpl @Inject constructor(
             val now = System.currentTimeMillis()
             val batch = firestore.batch()
 
+            // Fetch user profile for denormalization onto member doc
+            val userDoc = firestore.collection("users").document(uid).get().await()
+            val displayName = userDoc.getString("displayName") ?: ""
+            val username = userDoc.getString("username") ?: ""
+            val photoURL = userDoc.getString("photoURL") ?: ""
+
             if (memberDoc.exists() && memberDoc.data?.get("status") == "pending") {
-                batch.update(memberDoc.reference, mapOf("status" to MemberStatus.ACTIVE, "joinedAt" to now))
+                batch.update(memberDoc.reference, mapOf(
+                    "status" to MemberStatus.ACTIVE,
+                    "joinedAt" to now,
+                    "displayName" to displayName,
+                    "username" to username,
+                    "photoURL" to photoURL,
+                    "isOffline" to false
+                ))
             } else {
                 batch.set(groupDoc.reference.collection("members").document(uid), mapOf(
                     "uid" to uid,
+                    "displayName" to displayName,
+                    "username" to username,
+                    "photoURL" to photoURL,
                     "role" to "member",
                     "joinedAt" to now,
                     "balance" to 0.0,
-                    "status" to MemberStatus.ACTIVE
+                    "status" to MemberStatus.ACTIVE,
+                    "isOffline" to false
                 ))
                 batch.update(groupDoc.reference, mapOf(
                     "memberCount" to FieldValue.increment(1),
@@ -138,6 +164,8 @@ class FirebaseGroupServiceImpl @Inject constructor(
                 "type" to "member_joined",
                 "description" to "Member joined via invite code",
                 "userId" to uid,
+                "userName" to displayName,
+                "userPhotoURL" to photoURL,
                 "data" to mapOf("groupId" to groupId),
                 "createdAt" to now
             ))
@@ -200,12 +228,21 @@ class FirebaseGroupServiceImpl @Inject constructor(
         val groupRef = firestore.collection("groups").document(groupId)
         val pendingMemberDoc = groupRef.collection("members").document(toUid).get().await()
         if (!pendingMemberDoc.exists()) {
+            // Fetch invitee's profile for denormalization
+            val inviteeDoc = firestore.collection("users").document(toUid).get().await()
+            val inviteeName = inviteeDoc.getString("displayName") ?: ""
+            val inviteeUsername = inviteeDoc.getString("username") ?: ""
+            val inviteePhoto = inviteeDoc.getString("photoURL") ?: ""
             groupRef.collection("members").document(toUid).set(mapOf(
                 "uid" to toUid,
+                "displayName" to inviteeName,
+                "username" to inviteeUsername,
+                "photoURL" to inviteePhoto,
                 "role" to "member",
                 "joinedAt" to now,
                 "balance" to 0.0,
-                "status" to "pending"
+                "status" to "pending",
+                "isOffline" to false
             )).await()
             groupRef.update(mapOf("memberCount" to FieldValue.increment(1), "updatedAt" to now)).await()
         }
@@ -248,11 +285,32 @@ class FirebaseGroupServiceImpl @Inject constructor(
             val batch = firestore.batch()
             batch.update(inviteDoc.reference, mapOf("status" to "accepted"))
 
+            // Fetch user profile for denormalization onto member doc
+            val userDoc = firestore.collection("users").document(uid).get().await()
+            val displayName = userDoc.getString("displayName") ?: ""
+            val username = userDoc.getString("username") ?: ""
+            val photoURL = userDoc.getString("photoURL") ?: ""
+
             if (existingMemberDoc.exists() && existingMemberDoc.data?.get("status") == "pending") {
-                batch.update(groupDoc.reference.collection("members").document(uid), mapOf("status" to MemberStatus.ACTIVE, "joinedAt" to now))
+                batch.update(groupDoc.reference.collection("members").document(uid), mapOf(
+                    "status" to MemberStatus.ACTIVE,
+                    "joinedAt" to now,
+                    "displayName" to displayName,
+                    "username" to username,
+                    "photoURL" to photoURL,
+                    "isOffline" to false
+                ))
             } else {
                 batch.set(groupDoc.reference.collection("members").document(uid), mapOf(
-                    "uid" to uid, "role" to "member", "joinedAt" to now, "balance" to 0.0, "status" to MemberStatus.ACTIVE
+                    "uid" to uid,
+                    "displayName" to displayName,
+                    "username" to username,
+                    "photoURL" to photoURL,
+                    "role" to "member",
+                    "joinedAt" to now,
+                    "balance" to 0.0,
+                    "status" to MemberStatus.ACTIVE,
+                    "isOffline" to false
                 ))
                 batch.update(groupDoc.reference, mapOf(
                     "memberCount" to FieldValue.increment(1),
@@ -263,6 +321,8 @@ class FirebaseGroupServiceImpl @Inject constructor(
                 "type" to "member_joined",
                 "description" to "Member joined via invitation",
                 "userId" to uid,
+                "userName" to displayName,
+                "userPhotoURL" to photoURL,
                 "data" to mapOf("groupId" to groupId, "invitationId" to invitationId),
                 "createdAt" to now
             ))
@@ -314,6 +374,9 @@ class FirebaseGroupServiceImpl @Inject constructor(
 
             val memberData = memberDoc.data
             val now = System.currentTimeMillis()
+            val userDoc = firestore.collection("users").document(uid).get().await()
+            val displayName = userDoc.getString("displayName") ?: ""
+            val photoURL = userDoc.getString("photoURL") ?: ""
             val batch = firestore.batch()
 
             if (memberData?.get("role") == MemberRole.ADMIN) {
@@ -341,6 +404,8 @@ class FirebaseGroupServiceImpl @Inject constructor(
                 "type" to "member_left",
                 "description" to "Member left the group",
                 "userId" to uid,
+                "userName" to displayName,
+                "userPhotoURL" to photoURL,
                 "data" to mapOf("groupId" to groupId),
                 "createdAt" to now
             ))
@@ -464,34 +529,20 @@ class FirebaseGroupServiceImpl @Inject constructor(
 
             val snapshot = query.get().await()
 
-            val activities = mutableListOf<Activity>()
-
-            val uniqueUserIds = snapshot.documents.mapNotNull { (it.data ?: emptyMap())["userId"] as? String }.filter { it.isNotEmpty() }.distinct()
-            val userDocs = coroutineScope {
-                uniqueUserIds.associateWith { uid ->
-                    async { firestore.collection("users").document(uid).get().await() }
-                }.mapValues { it.value.await() }
-            }
-            val userMap = mutableMapOf<String, Map<String, Any>?>()
-            userDocs.forEach { (uid, doc) -> userMap[uid] = doc.data }
-
-            for (doc in snapshot.documents) {
+            // Use denormalized userName/userPhotoURL from activity docs
+            val activities = snapshot.documents.map { doc ->
                 val data = doc.data ?: emptyMap()
-                val userId = data["userId"] as? String ?: ""
-                val userData = userMap[userId]
                 @Suppress("UNCHECKED_CAST")
                 val activityData = data["data"] as? Map<String, Any>
-                activities.add(
-                    Activity(
-                        activityId = doc.id,
-                        type = data["type"] as? String ?: "unknown",
-                        description = data["description"] as? String ?: "",
-                        userId = userId,
-                        userName = userData?.get("displayName") as? String ?: "Someone",
-                        userPhotoURL = userData?.get("photoURL") as? String ?: "",
-                        createdAt = DateUtils.toMillis(data["createdAt"]) ?: 0,
-                        data = activityData
-                    )
+                Activity(
+                    activityId = doc.id,
+                    type = data["type"] as? String ?: "unknown",
+                    description = data["description"] as? String ?: "",
+                    userId = data["userId"] as? String ?: "",
+                    userName = data["userName"] as? String ?: "Someone",
+                    userPhotoURL = data["userPhotoURL"] as? String ?: "",
+                    createdAt = DateUtils.toMillis(data["createdAt"]) ?: 0,
+                    data = activityData
                 )
             }
             Result.success(PaginatedResult(
@@ -640,6 +691,9 @@ class FirebaseGroupServiceImpl @Inject constructor(
             if (targetMemberDoc.data?.get("status") != MemberStatus.ACTIVE) return Result.failure(Exception("Target user is not an active member"))
 
             val now = System.currentTimeMillis()
+            val userDoc = firestore.collection("users").document(uid).get().await()
+            val displayName = userDoc.getString("displayName") ?: ""
+            val photoURL = userDoc.getString("photoURL") ?: ""
             val batch = firestore.batch()
             batch.update(groupRef.collection("members").document(uid), mapOf("role" to "member"))
             batch.update(groupRef.collection("members").document(newAdminUid), mapOf("role" to MemberRole.ADMIN))
@@ -647,6 +701,8 @@ class FirebaseGroupServiceImpl @Inject constructor(
                 "type" to "admin_transferred",
                 "description" to "Admin role transferred",
                 "userId" to uid,
+                "userName" to displayName,
+                "userPhotoURL" to photoURL,
                 "data" to mapOf("newAdminUid" to newAdminUid),
                 "createdAt" to now
             ))
@@ -673,6 +729,9 @@ class FirebaseGroupServiceImpl @Inject constructor(
             }
 
             val now = System.currentTimeMillis()
+            val userDoc = firestore.collection("users").document(uid).get().await()
+            val displayName = userDoc.getString("displayName") ?: ""
+            val photoURL = userDoc.getString("photoURL") ?: ""
             val memberRef = groupRef.collection("members").document()
             val batch = firestore.batch()
             batch.set(memberRef, mapOf(
@@ -693,6 +752,8 @@ class FirebaseGroupServiceImpl @Inject constructor(
                 "type" to "member_added",
                 "description" to "Added offline member \"$displayName\"",
                 "userId" to uid,
+                "userName" to displayName,
+                "userPhotoURL" to photoURL,
                 "data" to mapOf("groupId" to groupId, "memberName" to displayName.trim()),
                 "createdAt" to now
             ))
@@ -717,6 +778,10 @@ class FirebaseGroupServiceImpl @Inject constructor(
 
             val memberData = memberDoc.data ?: return Result.failure(Exception(ErrorMessages.MEMBER_NOT_FOUND))
             val now = System.currentTimeMillis()
+            val userDoc = firestore.collection("users").document(uid).get().await()
+            val displayName = userDoc.getString("displayName") ?: ""
+            val username = userDoc.getString("username") ?: ""
+            val photoURL = userDoc.getString("photoURL") ?: ""
             val batch = firestore.batch()
 
             if (existingMemberDoc.exists()) {
@@ -726,8 +791,11 @@ class FirebaseGroupServiceImpl @Inject constructor(
                 batch.update(groupRef, mapOf("memberCount" to FieldValue.increment(-1)))
             } else {
                 // No existing doc — create one with offline member's data
+                // but denormalize the claiming user's username/photoURL
                 val claimedData = memberData.toMutableMap()
                 claimedData["uid"] = uid
+                claimedData["username"] = username
+                claimedData["photoURL"] = photoURL
                 claimedData["isOffline"] = false
                 claimedData["claimedAt"] = now
                 claimedData["claimedBy"] = uid
@@ -739,6 +807,8 @@ class FirebaseGroupServiceImpl @Inject constructor(
                 "type" to "member_claimed",
                 "description" to "Member claimed offline profile",
                 "userId" to uid,
+                "userName" to displayName,
+                "userPhotoURL" to photoURL,
                 "data" to mapOf("groupId" to groupId, "memberDocId" to memberDocId),
                 "createdAt" to now
             ))
@@ -770,6 +840,13 @@ class FirebaseGroupServiceImpl @Inject constructor(
 
             val memberData = memberDoc.data ?: return Result.failure(Exception(ErrorMessages.MEMBER_NOT_FOUND))
             val now = System.currentTimeMillis()
+            val userDoc = firestore.collection("users").document(uid).get().await()
+            val displayName = userDoc.getString("displayName") ?: ""
+            val photoURL = userDoc.getString("photoURL") ?: ""
+            // Fetch target user's profile for denormalization on the linked member doc
+            val targetUserDoc = firestore.collection("users").document(realUid).get().await()
+            val targetUsername = targetUserDoc.getString("username") ?: ""
+            val targetPhotoURL = targetUserDoc.getString("photoURL") ?: ""
             val batch = firestore.batch()
 
             if (existingMemberDoc.exists()) {
@@ -779,8 +856,11 @@ class FirebaseGroupServiceImpl @Inject constructor(
                 batch.update(groupRef, mapOf("memberCount" to FieldValue.increment(-1)))
             } else {
                 // No existing doc — create one with offline member's data
+                // but denormalize the target user's username/photoURL
                 val linkedData = memberData.toMutableMap()
                 linkedData["uid"] = realUid
+                linkedData["username"] = targetUsername
+                linkedData["photoURL"] = targetPhotoURL
                 linkedData["isOffline"] = false
                 linkedData["claimedAt"] = now
                 linkedData["claimedBy"] = uid
@@ -792,6 +872,8 @@ class FirebaseGroupServiceImpl @Inject constructor(
                 "type" to "member_linked",
                 "description" to "Admin linked offline profile to user",
                 "userId" to uid,
+                "userName" to displayName,
+                "userPhotoURL" to photoURL,
                 "data" to mapOf("groupId" to groupId, "memberDocId" to memberDocId, "linkedUid" to realUid),
                 "createdAt" to now
             ))
@@ -835,6 +917,9 @@ class FirebaseGroupServiceImpl @Inject constructor(
             val hasExpenses = !expensesQuery.isEmpty
 
             val now = System.currentTimeMillis()
+            val callerUserDoc = firestore.collection("users").document(callerUid).get().await()
+            val callerDisplayName = callerUserDoc.getString("displayName") ?: ""
+            val callerPhotoURL = callerUserDoc.getString("photoURL") ?: ""
             val batch = firestore.batch()
 
             if (hasExpenses) {
@@ -863,6 +948,8 @@ class FirebaseGroupServiceImpl @Inject constructor(
                     "type" to "member_removed",
                     "description" to "Removed member \"${memberData["displayName"]}\"",
                     "userId" to callerUid,
+                    "userName" to callerDisplayName,
+                    "userPhotoURL" to callerPhotoURL,
                     "data" to mapOf(
                         "removedUid" to memberUid,
                         "memberName" to (memberData["displayName"] ?: ""),

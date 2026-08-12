@@ -34,6 +34,7 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.trevio.android.core.UserRefreshNotifier
+import com.trevio.android.core.designsystem.components.ListItemSkeleton
 import com.trevio.android.core.designsystem.components.LoadingIndicator
 import com.trevio.android.core.designsystem.components.MemberAvatar
 import com.trevio.android.core.designsystem.components.TrevioCard
@@ -82,6 +83,7 @@ import com.trevio.android.domain.repository.UserService
 import com.trevio.android.ui.analytics.AnalyticsTab
 import com.trevio.android.ui.trip.TripTab
 import com.trevio.android.util.AppConstants
+import com.trevio.android.data.remote.FirestoreObservers
 import com.trevio.android.util.DateUtils
 import com.trevio.android.util.MemberRole
 import com.trevio.android.util.rememberCurrencyFormatter
@@ -90,6 +92,8 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.collect
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
@@ -101,6 +105,7 @@ class GroupViewModel @Inject constructor(
     private val userService: UserService,
     private val authService: AuthService,
     private val userRefreshNotifier: UserRefreshNotifier,
+    private val firestoreObservers: FirestoreObservers,
     savedStateHandle: SavedStateHandle
 ) : ViewModel() {
 
@@ -137,6 +142,14 @@ class GroupViewModel @Inject constructor(
     private val _state = MutableStateFlow(GroupState())
     val state: StateFlow<GroupState> = _state
 
+    /// Tracks the current activity listener coroutine so repeated
+    /// loadActivities() calls don't create multiple Firestore listeners.
+    private var activitiesListenerJob: kotlinx.coroutines.Job? = null
+
+    /// Tracks the main data listener (combine of groupInfo/expenses/balances)
+    /// so repeated loadData() calls don't create multiple Firestore listeners.
+    private var dataListenerJob: kotlinx.coroutines.Job? = null
+
     init {
         loadData()
         viewModelScope.launch {
@@ -146,41 +159,81 @@ class GroupViewModel @Inject constructor(
         }
     }
 
+    /**
+     * Starts real-time Firestore listeners for groupInfo, expenses, and
+     * members.  With offline persistence enabled, the first emission
+     * comes from cache (instant) and subsequent emissions arrive from
+     * the server silently — no full-screen loader on repeat visits.
+     *
+     * Simplified debts are fetched once on load and on refresh because
+     * they require client-side computation over all expenses + settlements.
+     */
     fun loadData() {
         _state.value = _state.value.copy(isLoading = true)
-        viewModelScope.launch {
+
+        // Cancel any existing listener before starting a new one
+        // to prevent duplicate Firestore listeners.
+        dataListenerJob?.cancel()
+        dataListenerJob = viewModelScope.launch {
             val currentUid = authService.getCurrentUserId()
-            val info = groupService.getGroupInfo(groupId).getOrNull()
-            val expensesResult = expenseService.getGroupExpenses(groupId, AppConstants.DEFAULT_PAGE_SIZE, null).getOrNull()
+            _state.value = _state.value.copy(currentUserId = currentUid)
+
+            // Combine the three real-time flows into a single state update.
+            // Each flow emits independently; combine fires whenever any one
+            // emits, so the UI updates incrementally as cache → server data
+            // arrives.
+            try {
+                combine(
+                    firestoreObservers.observeGroupInfo(groupId),
+                    firestoreObservers.observeGroupExpenses(groupId, AppConstants.DEFAULT_PAGE_SIZE),
+                    firestoreObservers.observeGroupBalances(groupId)
+                ) { info, expensesResult, members ->
+                    Triple(info, expensesResult, members)
+                }.collect { (info, expensesResult, members) ->
+                    _state.value = _state.value.copy(
+                        isLoading = false,
+                        groupInfo = info,
+                        expenses = expensesResult.items,
+                        expensesHasMore = expensesResult.hasMore,
+                        members = members,
+                        currentUserId = currentUid
+                    )
+                }
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                _state.value = _state.value.copy(
+                    isLoading = false,
+                    error = e.toStringResId()
+                )
+            }
+        }
+
+        // Fetch debts separately — heavy computation, not a simple listener.
+        // Done in parallel with the listeners so it doesn't block them.
+        refreshDebts()
+    }
+
+    /**
+     * Re-fetches data that is NOT covered by real-time listeners
+     * (simplified debts + member balances with latest user profiles).
+     * The listener-managed data (groupInfo, expenses) updates
+     * automatically, but member display names/photos come from the
+     * users collection which the listener doesn't watch — so we
+     * re-fetch balances here to pick up profile changes.
+     */
+    fun refreshData() {
+        refreshDebts()
+        viewModelScope.launch {
             val members = settlementService.getGroupBalances(groupId).getOrDefault(emptyList())
-            val debts = settlementService.getSimplifiedDebts(groupId).getOrDefault(emptyList())
-            _state.value = _state.value.copy(
-                isLoading = false,
-                groupInfo = info,
-                expenses = expensesResult?.items ?: emptyList(),
-                expensesHasMore = expensesResult?.hasMore ?: false,
-                members = members,
-                debts = debts,
-                currentUserId = currentUid
-            )
+            _state.value = _state.value.copy(members = members)
         }
     }
 
-    fun refreshData() {
+    private fun refreshDebts() {
         viewModelScope.launch {
-            val currentUid = authService.getCurrentUserId()
-            val info = groupService.getGroupInfo(groupId).getOrNull()
-            val expensesResult = expenseService.getGroupExpenses(groupId, AppConstants.DEFAULT_PAGE_SIZE, null).getOrNull()
-            val members = settlementService.getGroupBalances(groupId).getOrDefault(emptyList())
             val debts = settlementService.getSimplifiedDebts(groupId).getOrDefault(emptyList())
-            _state.value = _state.value.copy(
-                groupInfo = info,
-                expenses = expensesResult?.items ?: emptyList(),
-                expensesHasMore = expensesResult?.hasMore ?: false,
-                members = members,
-                debts = debts,
-                currentUserId = currentUid
-            )
+            _state.value = _state.value.copy(debts = debts)
         }
     }
 
@@ -256,14 +309,28 @@ class GroupViewModel @Inject constructor(
 
     fun loadActivities() {
         _state.value = _state.value.copy(activitiesLoading = true, activitiesError = null)
-        viewModelScope.launch {
-            groupService.getGroupActivities(groupId, AppConstants.DEFAULT_PAGE_SIZE, null)
-                .onSuccess { result ->
-                    _state.value = _state.value.copy(activities = result.items, activitiesLoading = false, activitiesHasMore = result.hasMore)
-                }
-                .onFailure { e ->
-                    _state.value = _state.value.copy(activitiesLoading = false, activitiesError = e.toStringResId())
-                }
+        // Cancel any existing listener before starting a new one
+        // to prevent duplicate Firestore listeners.
+        activitiesListenerJob?.cancel()
+        activitiesListenerJob = viewModelScope.launch {
+            try {
+                firestoreObservers.observeGroupActivities(groupId, AppConstants.DEFAULT_PAGE_SIZE)
+                    .collect { result ->
+                        _state.value = _state.value.copy(
+                            activities = result.items,
+                            activitiesLoading = false,
+                            activitiesHasMore = result.hasMore,
+                            activitiesError = null
+                        )
+                    }
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                _state.value = _state.value.copy(
+                    activitiesLoading = false,
+                    activitiesError = e.toStringResId()
+                )
+            }
         }
     }
 
@@ -461,14 +528,21 @@ fun GroupDetailScreen(
             }
         }
     ) { padding ->
-        if (state.isLoading) {
+        // Only show the full-screen spinner on a true cold start (no
+        // cached data at all).  With real-time listeners + offline
+        // persistence, repeat visits emit cached data instantly, so
+        // the spinner is barely visible.  If we have groupInfo from
+        // cache, skip the spinner and render content directly.
+        if (state.isLoading && state.groupInfo == null) {
             Column(modifier = Modifier.padding(padding).background(MaterialTheme.colorScheme.background)) {
                 TrevioHeader(
                     title = stringResource(R.string.group_detail_title),
                     onBack = { navController.popBackStack() }
                 )
-                Box(modifier = Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
-                    CircularProgressIndicator()
+                // Skeleton placeholders instead of a spinner
+                repeat(4) {
+                    ListItemSkeleton()
+                    Spacer(Modifier.height(8.dp))
                 }
             }
             return@Scaffold

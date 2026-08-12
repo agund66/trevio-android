@@ -63,6 +63,47 @@ class FirebaseUserServiceImpl @Inject constructor(
             )
             firestore.collection("users").document(user.uid)
                 .update(updates).await()
+            // Sync denormalized profile info to all member docs
+            syncUserProfileToGroups()
+            Result.success(Unit)
+        } catch (e: Exception) {
+            Result.failure(Exception(friendlyNetworkMessage(e) ?: e.message, e))
+        }
+    }
+
+    /**
+     * Syncs the current user's displayName, username, and photoURL to
+     * all member docs across all groups they belong to.  This keeps
+     * denormalized profile info fresh when the user updates their profile.
+     */
+    override suspend fun syncUserProfileToGroups(): Result<Unit> {
+        return try {
+            val uid = auth.currentUser?.uid ?: return Result.failure(Exception("User not authenticated"))
+            val userDoc = firestore.collection("users").document(uid).get().await()
+            val displayName = userDoc.getString("displayName") ?: ""
+            val username = userDoc.getString("username") ?: ""
+            val photoURL = userDoc.getString("photoURL") ?: ""
+
+            // Find all groups where this user is an active, non-offline member
+            val memberSnapshot = firestore.collectionGroup("members")
+                .whereEqualTo("uid", uid)
+                .whereEqualTo("status", "active")
+                .get().await()
+
+            val toUpdate = memberSnapshot.documents.filter { it.getBoolean("isOffline") != true }
+            val batchSize = 400
+            for (i in toUpdate.indices step batchSize) {
+                val chunk = toUpdate.subList(i, minOf(i + batchSize, toUpdate.size))
+                val batch = firestore.batch()
+                for (memberDoc in chunk) {
+                    batch.update(memberDoc.reference, mapOf(
+                        "displayName" to displayName,
+                        "username" to username,
+                        "photoURL" to photoURL
+                    ))
+                }
+                batch.commit().await()
+            }
             Result.success(Unit)
         } catch (e: Exception) {
             Result.failure(Exception(friendlyNetworkMessage(e) ?: e.message, e))
@@ -168,6 +209,9 @@ class FirebaseUserServiceImpl @Inject constructor(
             batch.set(firestore.collection("usernames").document(normalized), mapOf("uid" to uid))
             batch.update(userDocRef, mapOf("username" to normalized, "updatedAt" to System.currentTimeMillis()))
             batch.commit().await()
+
+            // Sync username to all member docs
+            syncUserProfileToGroups()
 
             Result.success(normalized)
         } catch (e: Exception) {

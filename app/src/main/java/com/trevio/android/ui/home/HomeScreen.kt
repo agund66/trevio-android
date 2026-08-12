@@ -38,6 +38,7 @@ import androidx.lifecycle.viewModelScope
 import com.trevio.android.R
 import com.trevio.android.core.UserRefreshNotifier
 import com.trevio.android.core.designsystem.components.EmptyState
+import com.trevio.android.core.designsystem.components.ListItemSkeleton
 import com.trevio.android.core.designsystem.components.TrevioCard
 import com.trevio.android.core.designsystem.theme.BalanceNegative
 import com.trevio.android.core.designsystem.theme.BalanceNegativeDark
@@ -57,6 +58,7 @@ import com.trevio.android.core.designsystem.theme.TrevioBorderDark
 import com.trevio.android.core.navigation.TrevioRoute
 import com.trevio.android.domain.model.Group
 import com.trevio.android.domain.model.GroupTemplate
+import com.trevio.android.data.remote.FirestoreObservers
 import com.trevio.android.domain.repository.AuthService
 import com.trevio.android.domain.repository.GroupService
 import com.trevio.android.ui.group.JoinGroupSheet
@@ -65,6 +67,7 @@ import com.trevio.android.util.toStringResId
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
@@ -72,7 +75,8 @@ import javax.inject.Inject
 class HomeViewModel @Inject constructor(
     private val groupService: GroupService,
     private val authService: AuthService,
-    private val userRefreshNotifier: UserRefreshNotifier
+    private val userRefreshNotifier: UserRefreshNotifier,
+    private val firestoreObservers: FirestoreObservers
 ) : ViewModel() {
 
     data class HomeData(
@@ -91,6 +95,10 @@ class HomeViewModel @Inject constructor(
     private val _state = MutableStateFlow(HomeData())
     val state: StateFlow<HomeData> = _state
 
+    /// Tracks the current groups listener so repeated loadGroups()
+    /// calls don't create multiple Firestore listeners.
+    private var groupsListenerJob: kotlinx.coroutines.Job? = null
+
     init {
         loadGroups()
         viewModelScope.launch {
@@ -100,42 +108,20 @@ class HomeViewModel @Inject constructor(
         }
     }
 
+    /**
+     * Starts a real-time listener for the user's groups.  With offline
+     * persistence enabled, the first emission comes from cache (instant)
+     * and subsequent emissions arrive from the server silently.
+     */
     fun loadGroups() {
         _state.value = _state.value.copy(isLoading = true, error = null)
-        viewModelScope.launch {
+        // Cancel any existing listener before starting a new one
+        // to prevent duplicate Firestore listeners.
+        groupsListenerJob?.cancel()
+        groupsListenerJob = viewModelScope.launch {
             val user = authService.getCurrentUser()
-            groupService.getUserGroups()
-                .onSuccess { groups ->
-                    val totalOwed = groups.filter { it.yourBalance > 0 }.sumOf { it.yourBalance }
-                    val totalOwing = groups.filter { it.yourBalance < 0 }.sumOf { -it.yourBalance }
-                    val totalExpenses = groups.sumOf { it.totalExpenses }
-                    val activeGroups = groups.count { !it.archived }
-                    _state.value = HomeData(
-                        groups = groups,
-                        totalOwed = totalOwed,
-                        totalOwing = totalOwing,
-                        netBalance = totalOwed - totalOwing,
-                        totalExpenses = totalExpenses,
-                        activeGroups = activeGroups,
-                        userDisplayName = user?.displayName ?: "",
-                        isLoading = false
-                    )
-                }
-                .onFailure { e ->
-                    _state.value = _state.value.copy(
-                        isLoading = false,
-                        error = e.toStringResId(),
-                        userDisplayName = _state.value.userDisplayName
-                    )
-                }
-        }
-    }
-
-    fun refreshGroups() {
-        viewModelScope.launch {
-            val user = authService.getCurrentUser()
-            groupService.getUserGroups()
-                .onSuccess { groups ->
+            try {
+                firestoreObservers.observeUserGroups().collect { groups ->
                     val totalOwed = groups.filter { it.yourBalance > 0 }.sumOf { it.yourBalance }
                     val totalOwing = groups.filter { it.yourBalance < 0 }.sumOf { -it.yourBalance }
                     val totalExpenses = groups.sumOf { it.totalExpenses }
@@ -148,12 +134,31 @@ class HomeViewModel @Inject constructor(
                         totalExpenses = totalExpenses,
                         activeGroups = activeGroups,
                         userDisplayName = user?.displayName ?: _state.value.userDisplayName,
+                        isLoading = false,
                         error = null
                     )
                 }
-                .onFailure { e ->
-                    _state.value = _state.value.copy(error = e.toStringResId())
-                }
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                _state.value = _state.value.copy(
+                    isLoading = false,
+                    error = e.toStringResId()
+                )
+            }
+        }
+    }
+
+    /**
+     * Re-fetches the user's display name.  Groups are already kept
+     * fresh by the real-time listener started in [loadGroups].
+     */
+    fun refreshGroups() {
+        viewModelScope.launch {
+            val user = authService.getCurrentUser()
+            _state.value = _state.value.copy(
+                userDisplayName = user?.displayName ?: _state.value.userDisplayName
+            )
         }
     }
 
@@ -194,14 +199,20 @@ fun HomeScreen(
     }
 
     Box(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
-        if (state.isLoading) {
+        // Only show skeletons on a true cold start (no cached data).
+        // With real-time listeners + offline persistence, repeat visits
+        // emit cached data instantly — skeletons are barely visible.
+        if (state.isLoading && state.groups.isEmpty() && state.error == null) {
             Column(modifier = Modifier.fillMaxSize()) {
                 HomeHeader(
                     displayName = state.userDisplayName,
                     onNotificationsClick = { navController.navigate(TrevioRoute.Notifications.route) }
                 )
-                Box(modifier = Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
-                    CircularProgressIndicator()
+                // Skeleton placeholders instead of a spinner — shows the
+                // approximate layout before data arrives from cache/server.
+                repeat(4) {
+                    ListItemSkeleton()
+                    Spacer(Modifier.height(8.dp))
                 }
             }
             return@Box

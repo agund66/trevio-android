@@ -68,20 +68,7 @@ class FirebaseSettlementServiceImpl @Inject constructor(
             val now = System.currentTimeMillis()
             val settlementRef = groupRef.collection("settlements").document()
 
-            val settlementData = mutableMapOf<String, Any>(
-                "fromUid" to fromUid,
-                "toUid" to toUid,
-                "amount" to amountInBase,
-                "currency" to AppConstants.BASE_CURRENCY,
-                "originalAmount" to amount,
-                "originalCurrency" to currency,
-                "method" to method.toStorageString(),
-                "date" to now,
-                "createdBy" to uid,
-                "createdAt" to now
-            )
-            if (upiRefId != null) settlementData["upiRefId"] = upiRefId
-
+            // Fetch user/member docs for denormalized fromName/toName on settlement doc
             val (fromUserDoc, fromMemberDoc, toUserDoc, toMemberDoc) = coroutineScope {
                 val fromUserAsync = async { firestore.collection("users").document(fromUid).get().await() }
                 val fromMemberAsync = async { groupRef.collection("members").document(fromUid).get().await() }
@@ -101,6 +88,27 @@ class FirebaseSettlementServiceImpl @Inject constructor(
             } else {
                 toUserDoc.data?.get("displayName") as? String ?: "Someone"
             }
+            val fromUserPhotoURL = if (fromIsOffline) {
+                fromMemberDoc.data?.get("photoURL") as? String ?: ""
+            } else {
+                fromUserDoc.data?.get("photoURL") as? String ?: ""
+            }
+
+            val settlementData = mutableMapOf<String, Any>(
+                "fromUid" to fromUid,
+                "toUid" to toUid,
+                "fromName" to fromUserName,
+                "toName" to toUserName,
+                "amount" to amountInBase,
+                "currency" to AppConstants.BASE_CURRENCY,
+                "originalAmount" to amount,
+                "originalCurrency" to currency,
+                "method" to method.toStorageString(),
+                "date" to now,
+                "createdBy" to uid,
+                "createdAt" to now
+            )
+            if (upiRefId != null) settlementData["upiRefId"] = upiRefId
 
             val batch = firestore.batch()
             batch.set(settlementRef, settlementData)
@@ -108,6 +116,8 @@ class FirebaseSettlementServiceImpl @Inject constructor(
                 "type" to "settlement_added",
                 "description" to "$fromUserName settled $currency $amount with $toUserName",
                 "userId" to uid,
+                "userName" to (if (uid == fromUid) fromUserName else toUserName),
+                "userPhotoURL" to (if (uid == fromUid) fromUserPhotoURL else (if (toIsOffline) (toMemberDoc.data?.get("photoURL") as? String ?: "") else (toUserDoc.data?.get("photoURL") as? String ?: ""))),
                 "data" to mapOf(
                     "settlementId" to settlementRef.id,
                     "fromUid" to fromUid,
@@ -165,10 +175,27 @@ class FirebaseSettlementServiceImpl @Inject constructor(
             val memberDoc = groupRef.collection("members").document(uid).get().await()
             if (!memberDoc.exists()) return Result.failure(Exception("You are not a member of this group"))
 
-            val debts = calculateSimplifiedDebts(groupId)
+            // Read pre-computed simplifiedDebts from group doc (stored by recalculateBalances).
+            // Fall back to client-side computation for older docs without this field.
+            val groupDoc = groupRef.get().await()
+            @Suppress("UNCHECKED_CAST")
+            val storedDebts = groupDoc.get("simplifiedDebts") as? List<Map<String, Any>>
+            val debts = if (storedDebts != null) {
+                storedDebts.map { d ->
+                    Calculations.SimplifiedDebtRaw(
+                        fromUid = d["fromUid"] as? String ?: "",
+                        toUid = d["toUid"] as? String ?: "",
+                        amount = (d["amount"] as? Number)?.toDouble() ?: 0.0
+                    )
+                }
+            } else {
+                calculateSimplifiedDebts(groupId)
+            }
 
             val allUids = debts.flatMap { listOf(it.fromUid, it.toUid) }.filter { it.isNotEmpty() }.distinct()
 
+            // Fetch member docs (for denormalized displayName/photoURL) and
+            // user docs (for upiId/phoneNumber/countryCode — not denormalized).
             val (memberDocs, userDocs) = coroutineScope {
                 val members = allUids.associateWith { async { groupRef.collection("members").document(it).get().await() } }
                     .mapValues { it.value.await() }
@@ -188,39 +215,18 @@ class FirebaseSettlementServiceImpl @Inject constructor(
                 val fromIsOffline = fromMemberData?.get("isOffline") as? Boolean ?: false
                 val toIsOffline = toMemberData?.get("isOffline") as? Boolean ?: false
 
-                val fromName: String
-                val fromPhotoURL: String
-                val fromUpiId: String
-                if (fromIsOffline) {
-                    fromName = fromMemberData?.get("displayName") as? String ?: "Unknown"
-                    fromPhotoURL = ""
-                    fromUpiId = ""
-                } else {
-                    val fromData = userMap[debt.fromUid]
-                    fromName = fromData?.get("displayName") as? String ?: "Unknown"
-                    fromPhotoURL = fromData?.get("photoURL") as? String ?: ""
-                    fromUpiId = fromData?.get("upiId") as? String ?: ""
-                }
+                // Use denormalized displayName/photoURL from member docs
+                val fromName = fromMemberData?.get("displayName") as? String ?: "Unknown"
+                val fromPhotoURL = fromMemberData?.get("photoURL") as? String ?: ""
+                val toName = toMemberData?.get("displayName") as? String ?: "Unknown"
+                val toPhotoURL = toMemberData?.get("photoURL") as? String ?: ""
 
-                val toName: String
-                val toPhotoURL: String
-                val toUpiId: String
-                val toPhoneNumber: String
-                val toCountryCode: String
-                if (toIsOffline) {
-                    toName = toMemberData?.get("displayName") as? String ?: "Unknown"
-                    toPhotoURL = ""
-                    toUpiId = ""
-                    toPhoneNumber = ""
-                    toCountryCode = ""
-                } else {
-                    val toData = userMap[debt.toUid]
-                    toName = toData?.get("displayName") as? String ?: "Unknown"
-                    toPhotoURL = toData?.get("photoURL") as? String ?: ""
-                    toUpiId = toData?.get("upiId") as? String ?: ""
-                    toPhoneNumber = toData?.get("phoneNumber") as? String ?: ""
-                    toCountryCode = toData?.get("countryCode") as? String ?: ""
-                }
+                // upiId/phoneNumber/countryCode only available from user docs
+                // (not denormalized — sensitive payment info)
+                val fromUpiId = if (fromIsOffline) "" else userMap[debt.fromUid]?.get("upiId") as? String ?: ""
+                val toUpiId = if (toIsOffline) "" else userMap[debt.toUid]?.get("upiId") as? String ?: ""
+                val toPhoneNumber = if (toIsOffline) "" else userMap[debt.toUid]?.get("phoneNumber") as? String ?: ""
+                val toCountryCode = if (toIsOffline) "" else userMap[debt.toUid]?.get("countryCode") as? String ?: ""
 
                 SimplifiedDebt(
                     fromUid = debt.fromUid,
@@ -253,45 +259,19 @@ class FirebaseSettlementServiceImpl @Inject constructor(
                 .whereIn("status", listOf("active", "pending"))
                 .get().await()
 
-            val onlineMemberIds = membersSnapshot.documents
-                .filter { (it.data ?: emptyMap())["isOffline"] as? Boolean != true }
-                .map { it.id }
-
-            val userDocs = coroutineScope {
-                onlineMemberIds.associateWith { uid ->
-                    async { firestore.collection("users").document(uid).get().await() }
-                }.mapValues { it.value.await() }
-            }
-            val userMap = mutableMapOf<String, Map<String, Any>?>()
-            userDocs.forEach { (uid, doc) -> userMap[uid] = doc.data }
-
+            // Use denormalized fields from member docs — no user doc fetches
             val members = membersSnapshot.documents.mapNotNull { doc ->
                 val data = doc.data ?: return@mapNotNull null
-                val isOffline = data["isOffline"] as? Boolean ?: false
-                if (isOffline) {
-                    Member(
-                        uid = doc.id,
-                        displayName = data["displayName"] as? String ?: "Unknown",
-                        username = "",
-                        photoURL = "",
-                        balance = (data["balance"] as? Number)?.toDouble() ?: 0.0,
-                        role = data["role"] as? String ?: "member",
-                        status = data["status"] as? String ?: "active",
-                        isOffline = true
-                    )
-                } else {
-                    val userData = userMap[doc.id]
-                    Member(
-                        uid = doc.id,
-                        displayName = userData?.get("displayName") as? String ?: "Unknown",
-                        username = userData?.get("username") as? String ?: "",
-                        photoURL = userData?.get("photoURL") as? String ?: "",
-                        balance = (data["balance"] as? Number)?.toDouble() ?: 0.0,
-                        role = data["role"] as? String ?: "member",
-                        status = data["status"] as? String ?: "active",
-                        isOffline = false
-                    )
-                }
+                Member(
+                    uid = doc.id,
+                    displayName = data["displayName"] as? String ?: "Unknown",
+                    username = data["username"] as? String ?: "",
+                    photoURL = data["photoURL"] as? String ?: "",
+                    balance = (data["balance"] as? Number)?.toDouble() ?: 0.0,
+                    role = data["role"] as? String ?: "member",
+                    status = data["status"] as? String ?: "active",
+                    isOffline = data["isOffline"] as? Boolean ?: false
+                )
             }
             Result.success(members)
         } catch (e: Exception) {
@@ -322,44 +302,33 @@ class FirebaseSettlementServiceImpl @Inject constructor(
 
             val snapshot = query.get().await()
 
+            // Collect UIDs for fallback name resolution (older docs may not have fromName/toName)
             val allUids = snapshot.documents.flatMap { doc ->
                 val data = doc.data ?: emptyMap()
                 listOf(data["fromUid"] as? String ?: "", data["toUid"] as? String ?: "")
             }.filter { it.isNotEmpty() }.distinct()
 
-            val (memberDocs, userDocs) = coroutineScope {
-                val members = allUids.associateWith { async { groupRef.collection("members").document(it).get().await() } }
+            // Only fetch member docs for fallback — prefer denormalized fromName/toName
+            val memberDocs = coroutineScope {
+                allUids.associateWith { async { groupRef.collection("members").document(it).get().await() } }
                     .mapValues { it.value.await() }
-                val users = allUids.associateWith { async { firestore.collection("users").document(it).get().await() } }
-                    .mapValues { it.value.await() }
-                members to users
             }
-
             val memberMap = mutableMapOf<String, Map<String, Any>?>()
             memberDocs.forEach { (uid, doc) -> memberMap[uid] = doc.data }
-            val userMap = mutableMapOf<String, Map<String, Any>?>()
-            userDocs.forEach { (uid, doc) -> userMap[uid] = doc.data }
 
             val settlements = snapshot.documents.map { doc ->
                 val data = doc.data ?: emptyMap()
                 val fromUid = data["fromUid"] as? String ?: ""
                 val toUid = data["toUid"] as? String ?: ""
 
-                val fromMemberData = memberMap[fromUid]
-                val toMemberData = memberMap[toUid]
-                val fromIsOffline = fromMemberData?.get("isOffline") as? Boolean ?: false
-                val toIsOffline = toMemberData?.get("isOffline") as? Boolean ?: false
-
-                val fromName = if (fromIsOffline) {
-                    fromMemberData?.get("displayName") as? String ?: "Unknown"
-                } else {
-                    userMap[fromUid]?.get("displayName") as? String ?: "Unknown"
-                }
-                val toName = if (toIsOffline) {
-                    toMemberData?.get("displayName") as? String ?: "Unknown"
-                } else {
-                    userMap[toUid]?.get("displayName") as? String ?: "Unknown"
-                }
+                // Prefer denormalized fromName/toName from settlement doc,
+                // fall back to member doc displayName for older docs
+                val fromName = (data["fromName"] as? String)
+                    ?: memberMap[fromUid]?.get("displayName") as? String
+                    ?: "Unknown"
+                val toName = (data["toName"] as? String)
+                    ?: memberMap[toUid]?.get("displayName") as? String
+                    ?: "Unknown"
 
                 Settlement(
                     settlementId = doc.id,
@@ -461,7 +430,27 @@ class FirebaseSettlementServiceImpl @Inject constructor(
 
         val balances = Calculations.calculateBalances(expenses, settlements, memberUids)
 
+        // Compute simplified debts in the same pass and store on group doc
+        val simplifiedDebts = Calculations.simplifyDebts(balances)
+        val debtsForStorage = simplifiedDebts.map { d ->
+            mapOf(
+                "fromUid" to d.fromUid,
+                "toUid" to d.toUid,
+                "amount" to (kotlin.math.round(d.amount * 100) / 100)
+            )
+        }
+
         val balanceEntries = balances.entries.toList()
+        // If there are no balance entries, still store simplifiedDebts on the group doc
+        if (balanceEntries.isEmpty()) {
+            val batch = firestore.batch()
+            batch.update(groupRef, mapOf(
+                "simplifiedDebts" to debtsForStorage,
+                "updatedAt" to System.currentTimeMillis()
+            ))
+            batch.commit().await()
+            return
+        }
         val batchSize = 400
         for (i in balanceEntries.indices step batchSize) {
             val chunk = balanceEntries.subList(i, minOf(i + batchSize, balanceEntries.size))
@@ -469,6 +458,12 @@ class FirebaseSettlementServiceImpl @Inject constructor(
             for ((memberUid, balance) in chunk) {
                 val roundedBalance = kotlin.math.round(balance * 100) / 100
                 batch.update(groupRef.collection("members").document(memberUid), mapOf("balance" to roundedBalance))
+            }
+            if (i == 0) {
+                batch.update(groupRef, mapOf(
+                    "simplifiedDebts" to debtsForStorage,
+                    "updatedAt" to System.currentTimeMillis()
+                ))
             }
             batch.commit().await()
         }

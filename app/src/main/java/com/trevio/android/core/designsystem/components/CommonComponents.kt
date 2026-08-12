@@ -1,5 +1,7 @@
 package com.trevio.android.core.designsystem.components
 
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.isSystemInDarkTheme
@@ -10,6 +12,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -145,6 +148,81 @@ fun LoadingIndicator(modifier: Modifier = Modifier) {
         contentAlignment = Alignment.Center
     ) {
         CircularProgressIndicator()
+    }
+}
+
+/**
+ * A shimmering placeholder box used in skeleton loading states.
+ * Provides better perceived performance than a spinner — the user
+ * sees the approximate layout before data arrives.
+ */
+@Composable
+fun ShimmerBox(
+    modifier: Modifier = Modifier,
+    cornerRadius: androidx.compose.ui.unit.Dp = 8.dp
+) {
+    // Pulse alpha animation for a subtle shimmer effect
+    val transition = androidx.compose.animation.core.rememberInfiniteTransition()
+    val pulseAlpha by transition.animateFloat(
+        initialValue = 0.3f,
+        targetValue = 0.7f,
+        animationSpec = androidx.compose.animation.core.infiniteRepeatable(
+            animation = androidx.compose.animation.core.tween(1000, easing = androidx.compose.animation.core.FastOutSlowInEasing),
+            repeatMode = androidx.compose.animation.core.RepeatMode.Reverse
+        )
+    )
+    val baseColor = if (isSystemInDarkTheme()) {
+        MaterialTheme.colorScheme.surfaceVariant
+    } else {
+        MaterialTheme.colorScheme.surfaceVariant
+    }
+    Box(
+        modifier = modifier
+            .clip(RoundedCornerShape(cornerRadius))
+            .background(baseColor.copy(alpha = pulseAlpha))
+    )
+}
+
+/**
+ * Skeleton placeholder for a list item with an avatar, title, and subtitle.
+ */
+@Composable
+fun ListItemSkeleton(modifier: Modifier = Modifier) {
+    Row(
+        modifier = modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        ShimmerBox(
+            modifier = Modifier.size(40.dp),
+            cornerRadius = 20.dp
+        )
+        Spacer(Modifier.width(12.dp))
+        Column(modifier = Modifier.weight(1f)) {
+            ShimmerBox(
+                modifier = Modifier.fillMaxWidth(0.6f).height(16.dp)
+            )
+            Spacer(Modifier.height(8.dp))
+            ShimmerBox(
+                modifier = Modifier.fillMaxWidth(0.4f).height(12.dp)
+            )
+        }
+    }
+}
+
+/**
+ * Skeleton placeholder for a card with a title and rows.
+ */
+@Composable
+fun CardSkeleton(modifier: Modifier = Modifier, rowCount: Int = 3) {
+    Column(
+        modifier = modifier.fillMaxWidth().padding(16.dp)
+    ) {
+        ShimmerBox(modifier = Modifier.fillMaxWidth(0.5f).height(20.dp))
+        Spacer(Modifier.height(16.dp))
+        repeat(rowCount) {
+            ListItemSkeleton()
+            if (it < rowCount - 1) Spacer(Modifier.height(4.dp))
+        }
     }
 }
 

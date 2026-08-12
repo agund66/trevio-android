@@ -14,6 +14,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
@@ -21,6 +22,7 @@ import com.trevio.android.domain.model.BillItem
 import com.trevio.android.domain.model.ItemizedSplitData
 import com.trevio.android.domain.model.Member
 import com.trevio.android.util.MemberStatus
+import com.trevio.android.R
 import java.util.Locale
 
 @OptIn(ExperimentalLayoutApi::class)
@@ -29,7 +31,8 @@ fun ItemizedSplitEditor(
     members: List<Member>,
     currencySymbol: String,
     itemizedData: ItemizedSplitData,
-    onItemizedDataChange: (ItemizedSplitData) -> Unit
+    onItemizedDataChange: (ItemizedSplitData) -> Unit,
+    expenseAmount: Double = 0.0
 ) {
     val activeMembers = members.filter { it.status == MemberStatus.ACTIVE }
 
@@ -131,6 +134,8 @@ fun ItemizedSplitEditor(
     val isValid = itemizedData.items.isNotEmpty() &&
         itemizedData.items.all { it.name.isNotBlank() && it.amount > 0.0 && it.assignedTo.isNotEmpty() }
 
+    val totalMatchesExpense = expenseAmount <= 0.0 || kotlin.math.abs(grandTotal - expenseAmount) <= 0.01
+
     Column(modifier = Modifier.fillMaxWidth()) {
         // Items list
         if (itemizedData.items.isEmpty()) {
@@ -143,9 +148,9 @@ fun ItemizedSplitEditor(
                     modifier = Modifier.padding(24.dp).fillMaxWidth(),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    Text("No items added yet.", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(stringResource(R.string.itemized_no_items), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     Spacer(modifier = Modifier.height(4.dp))
-                    Text("Tap \"Add Item\" to start splitting your bill item by item.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(stringResource(R.string.itemized_tap_add), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
         }
@@ -176,7 +181,7 @@ fun ItemizedSplitEditor(
                         OutlinedTextField(
                             value = item.name,
                             onValueChange = { updateItem(item.itemId, item.copy(name = it)) },
-                            placeholder = { Text("Item ${index + 1} name") },
+                            placeholder = { Text(stringResource(R.string.itemized_item_name, index + 1)) },
                             modifier = Modifier.weight(1f),
                             singleLine = true,
                             textStyle = MaterialTheme.typography.bodyMedium,
@@ -188,7 +193,7 @@ fun ItemizedSplitEditor(
                                 val parsed = v.filter { c -> c.isDigit() || c == '.' }.toDoubleOrNull() ?: 0.0
                                 updateItem(item.itemId, item.copy(amount = parsed))
                             },
-                            placeholder = { Text("0.00") },
+                            placeholder = { Text(stringResource(R.string.amount_placeholder)) },
                             modifier = Modifier.width(90.dp),
                             singleLine = true,
                             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
@@ -197,10 +202,10 @@ fun ItemizedSplitEditor(
                             prefix = { Text(currencySymbol, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
                         )
                         IconButton(onClick = { duplicateItem(item.itemId) }, modifier = Modifier.size(32.dp)) {
-                            Icon(Icons.Default.ContentCopy, contentDescription = "Duplicate", modifier = Modifier.size(18.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Icon(Icons.Default.ContentCopy, contentDescription = stringResource(R.string.itemized_duplicate), modifier = Modifier.size(18.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                         IconButton(onClick = { removeItem(item.itemId) }, modifier = Modifier.size(32.dp)) {
-                            Icon(Icons.Default.Delete, contentDescription = "Remove", modifier = Modifier.size(18.dp), tint = MaterialTheme.colorScheme.error)
+                            Icon(Icons.Default.Delete, contentDescription = stringResource(R.string.itemized_remove), modifier = Modifier.size(18.dp), tint = MaterialTheme.colorScheme.error)
                         }
                     }
 
@@ -212,7 +217,7 @@ fun ItemizedSplitEditor(
                             onClick = { assignAll(item.itemId) },
                             contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp)
                         ) {
-                            Text("All", style = MaterialTheme.typography.labelSmall)
+                            Text(stringResource(R.string.itemized_assign_all), style = MaterialTheme.typography.labelSmall)
                         }
                         activeMembers.forEach { member ->
                             val isAssigned = item.assignedTo.contains(member.uid)
@@ -232,8 +237,8 @@ fun ItemizedSplitEditor(
                         Spacer(modifier = Modifier.height(4.dp))
                         val perPerson = item.amount / item.assignedTo.size
                         Text(
-                            "$currencySymbol${String.format(Locale.getDefault(), "%.2f", perPerson)} each" +
-                                if (item.assignedTo.size > 1) " × ${item.assignedTo.size} people" else "",
+                            if (item.assignedTo.size > 1) stringResource(R.string.itemized_per_person_multiple, "$currencySymbol${String.format(Locale.getDefault(), "%.2f", perPerson)}", item.assignedTo.size)
+                            else stringResource(R.string.itemized_per_person_each, "$currencySymbol${String.format(Locale.getDefault(), "%.2f", perPerson)}"),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -251,7 +256,7 @@ fun ItemizedSplitEditor(
         ) {
             Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(18.dp))
             Spacer(modifier = Modifier.width(4.dp))
-            Text("Add Item")
+            Text(stringResource(R.string.itemized_add_item))
         }
 
         // Tax & Tip
@@ -269,7 +274,7 @@ fun ItemizedSplitEditor(
                     ) {
                         // Tax
                         Column(modifier = Modifier.weight(1f)) {
-                            Text("Tax", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text(stringResource(R.string.itemized_tax), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                             Spacer(modifier = Modifier.height(4.dp))
                             OutlinedTextField(
                                 value = if (taxAmt > 0.0) String.format(Locale.getDefault(), "%.2f", taxAmt) else "",
@@ -277,7 +282,7 @@ fun ItemizedSplitEditor(
                                     val parsed = v.filter { c -> c.isDigit() || c == '.' }.toDoubleOrNull() ?: 0.0
                                     onItemizedDataChange(itemizedData.copy(taxAmount = parsed))
                                 },
-                                placeholder = { Text("0.00") },
+                                placeholder = { Text(stringResource(R.string.amount_placeholder)) },
                                 modifier = Modifier.fillMaxWidth(),
                                 singleLine = true,
                                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
@@ -290,18 +295,18 @@ fun ItemizedSplitEditor(
                                 FilterChip(
                                     selected = itemizedData.taxSplitMode == "proportional",
                                     onClick = { onItemizedDataChange(itemizedData.copy(taxSplitMode = "proportional")) },
-                                    label = { Text("Prop", style = MaterialTheme.typography.labelSmall) }
+                                    label = { Text(stringResource(R.string.itemized_proportional), style = MaterialTheme.typography.labelSmall) }
                                 )
                                 FilterChip(
                                     selected = itemizedData.taxSplitMode == "equal",
                                     onClick = { onItemizedDataChange(itemizedData.copy(taxSplitMode = "equal")) },
-                                    label = { Text("Equal", style = MaterialTheme.typography.labelSmall) }
+                                    label = { Text(stringResource(R.string.itemized_equal), style = MaterialTheme.typography.labelSmall) }
                                 )
                             }
                         }
                         // Tip
                         Column(modifier = Modifier.weight(1f)) {
-                            Text("Tip", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text(stringResource(R.string.itemized_tip), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                             Spacer(modifier = Modifier.height(4.dp))
                             OutlinedTextField(
                                 value = if (tipAmt > 0.0) String.format(Locale.getDefault(), "%.2f", tipAmt) else "",
@@ -309,7 +314,7 @@ fun ItemizedSplitEditor(
                                     val parsed = v.filter { c -> c.isDigit() || c == '.' }.toDoubleOrNull() ?: 0.0
                                     onItemizedDataChange(itemizedData.copy(tipAmount = parsed))
                                 },
-                                placeholder = { Text("0.00") },
+                                placeholder = { Text(stringResource(R.string.amount_placeholder)) },
                                 modifier = Modifier.fillMaxWidth(),
                                 singleLine = true,
                                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
@@ -322,12 +327,12 @@ fun ItemizedSplitEditor(
                                 FilterChip(
                                     selected = itemizedData.tipSplitMode == "proportional",
                                     onClick = { onItemizedDataChange(itemizedData.copy(tipSplitMode = "proportional")) },
-                                    label = { Text("Prop", style = MaterialTheme.typography.labelSmall) }
+                                    label = { Text(stringResource(R.string.itemized_proportional), style = MaterialTheme.typography.labelSmall) }
                                 )
                                 FilterChip(
                                     selected = itemizedData.tipSplitMode == "equal",
                                     onClick = { onItemizedDataChange(itemizedData.copy(tipSplitMode = "equal")) },
-                                    label = { Text("Equal", style = MaterialTheme.typography.labelSmall) }
+                                    label = { Text(stringResource(R.string.itemized_equal), style = MaterialTheme.typography.labelSmall) }
                                 )
                             }
                         }
@@ -344,26 +349,26 @@ fun ItemizedSplitEditor(
             ) {
                 Column(modifier = Modifier.padding(12.dp)) {
                     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                        Text("Items total", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text(stringResource(R.string.itemized_subtotal), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         Text("$currencySymbol${String.format(Locale.getDefault(), "%.2f", itemsTotal)}", style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Medium)
                     }
                     if (taxAmt > 0) {
                         Spacer(modifier = Modifier.height(2.dp))
                         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                            Text("Tax", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text(stringResource(R.string.itemized_tax), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                             Text("$currencySymbol${String.format(Locale.getDefault(), "%.2f", taxAmt)}", style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Medium)
                         }
                     }
                     if (tipAmt > 0) {
                         Spacer(modifier = Modifier.height(2.dp))
                         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                            Text("Tip", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text(stringResource(R.string.itemized_tip), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                             Text("$currencySymbol${String.format(Locale.getDefault(), "%.2f", tipAmt)}", style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Medium)
                         }
                     }
                     HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
                     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                        Text("Grand total", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
+                        Text(stringResource(R.string.itemized_grand_total), style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
                         Text("$currencySymbol${String.format(Locale.getDefault(), "%.2f", grandTotal)}", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
                     }
                 }
@@ -377,7 +382,7 @@ fun ItemizedSplitEditor(
                 elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
             ) {
                 Column(modifier = Modifier.padding(12.dp)) {
-                    Text("Per person breakdown", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Medium)
+                    Text(stringResource(R.string.itemized_per_member), style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Medium)
                     Spacer(modifier = Modifier.height(8.dp))
                     activeMembers.forEach { member ->
                         Row(
@@ -400,7 +405,20 @@ fun ItemizedSplitEditor(
         if (!isValid && itemizedData.items.isNotEmpty()) {
             Spacer(modifier = Modifier.height(8.dp))
             Text(
-                "Each item needs a name, amount, and at least one person assigned.",
+                stringResource(R.string.itemized_validation),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.error
+            )
+        }
+
+        if (!totalMatchesExpense && itemizedData.items.isNotEmpty() && isValid) {
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(
+                stringResource(
+                    R.string.itemized_total_mismatch_error,
+                    "$currencySymbol${String.format(Locale.getDefault(), "%.2f", grandTotal)}",
+                    "$currencySymbol${String.format(Locale.getDefault(), "%.2f", expenseAmount)}"
+                ),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.error
             )

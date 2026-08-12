@@ -2,6 +2,8 @@ package com.trevio.android.ui.expense
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -12,13 +14,16 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.annotation.StringRes
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.trevio.android.core.designsystem.components.TrevioHeader
+import com.trevio.android.core.designsystem.theme.*
 import com.trevio.android.domain.model.ItemizedSplitData
 import com.trevio.android.domain.model.SplitEntry
 import com.trevio.android.domain.model.SplitType
@@ -27,9 +32,13 @@ import com.trevio.android.domain.repository.AuthService
 import com.trevio.android.domain.repository.ExpenseService
 import com.trevio.android.domain.repository.SettlementService
 import com.trevio.android.domain.model.Member
+import com.trevio.android.util.AppConstants
 import com.trevio.android.util.CurrencyConverter
+import com.trevio.android.util.HouseholdCategories
 import com.trevio.android.util.MemberRole
 import com.trevio.android.util.MemberStatus
+import com.trevio.android.util.toStringResId
+import com.trevio.android.R
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -55,8 +64,8 @@ class EditExpenseViewModel @Inject constructor(
         val notFound: Boolean = false,
         val description: String = "",
         val amount: String = "",
-        val currency: String = "INR",
-        val category: String = "other",
+        val currency: String = AppConstants.BASE_CURRENCY,
+        val category: String = AppConstants.DEFAULT_CATEGORY,
         val splitType: SplitType = SplitType.EQUAL,
         val paidByUid: String = "",
         val note: String = "",
@@ -65,7 +74,7 @@ class EditExpenseViewModel @Inject constructor(
         val transactionType: TransactionType = TransactionType.EXPENSE,
         val isSaving: Boolean = false,
         val isDeleting: Boolean = false,
-        val error: String? = null,
+        @StringRes val error: Int? = null,
         val loaded: Boolean = false
     )
 
@@ -79,7 +88,7 @@ class EditExpenseViewModel @Inject constructor(
         viewModelScope.launch {
             val uid = authService.getCurrentUserId()
             val members = settlementService.getGroupBalances(groupId).getOrDefault(emptyList())
-            val expensesResult = expenseService.getGroupExpenses(groupId, 500, null).getOrNull()
+            val expensesResult = expenseService.getGroupExpenses(groupId, AppConstants.LARGE_PAGE_SIZE, null).getOrNull()
             val expenses = expensesResult?.items ?: emptyList()
             val expense = expenses.find { it.expenseId == expenseId }
 
@@ -131,13 +140,44 @@ class EditExpenseViewModel @Inject constructor(
         val s = _state.value
         val numericAmount = s.amount.toDoubleOrNull() ?: 0.0
         if (s.description.isBlank() || numericAmount <= 0.0) {
-            _state.value = s.copy(error = "Description and amount are required")
+            _state.value = s.copy(error = R.string.edit_expense_error)
             return
         }
         if (s.splitType == SplitType.ITEMIZED) {
             if (s.itemizedData.items.isEmpty() || s.itemizedData.items.any { it.name.isBlank() || it.amount <= 0.0 || it.assignedTo.isEmpty() }) {
-                _state.value = s.copy(error = "All items must have a name, amount, and assigned member")
+                _state.value = s.copy(error = R.string.edit_expense_itemized_error)
                 return
+            }
+            val itemsTotal = s.itemizedData.items.filter { it.assignedTo.isNotEmpty() }.sumOf { it.amount }
+            val grandTotal = if (itemsTotal > 0) itemsTotal + s.itemizedData.taxAmount + s.itemizedData.tipAmount else 0.0
+            if (kotlin.math.abs(grandTotal - numericAmount) > 0.01) {
+                _state.value = s.copy(error = R.string.edit_expense_itemized_total_error)
+                return
+            }
+        }
+        if (s.splitType != SplitType.EQUAL && s.splitType != SplitType.ITEMIZED) {
+            val activeMembers = s.members.filter { it.status == MemberStatus.ACTIVE }
+            val splitSum = activeMembers.sumOf { s.splitValues[it.uid]?.toDoubleOrNull() ?: 0.0 }
+            when (s.splitType) {
+                SplitType.EXACT -> {
+                    if (kotlin.math.abs(splitSum - numericAmount) > 0.01) {
+                        _state.value = s.copy(error = R.string.edit_expense_exact_total_error)
+                        return
+                    }
+                }
+                SplitType.PERCENT -> {
+                    if (kotlin.math.abs(splitSum - 100.0) > 0.01) {
+                        _state.value = s.copy(error = R.string.edit_expense_percent_total_error)
+                        return
+                    }
+                }
+                SplitType.SHARES -> {
+                    if (splitSum <= 0.0) {
+                        _state.value = s.copy(error = R.string.edit_expense_shares_error)
+                        return
+                    }
+                }
+                else -> {}
             }
         }
         _state.value = s.copy(isSaving = true, error = null)
@@ -172,7 +212,7 @@ class EditExpenseViewModel @Inject constructor(
                 _state.value = s.copy(isSaving = false)
                 onDone()
             }.onFailure { e ->
-                _state.value = s.copy(isSaving = false, error = e.message)
+                _state.value = s.copy(isSaving = false, error = e.toStringResId())
             }
         }
     }
@@ -186,12 +226,13 @@ class EditExpenseViewModel @Inject constructor(
                     onDone()
                 }
                 .onFailure { e ->
-                    _state.value = _state.value.copy(isDeleting = false, error = e.message)
+                    _state.value = _state.value.copy(isDeleting = false, error = e.toStringResId())
                 }
         }
     }
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun EditExpenseScreen(
     navController: androidx.navigation.NavHostController,
@@ -202,12 +243,12 @@ fun EditExpenseScreen(
 
     Column(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
         TrevioHeader(
-            title = "Edit Expense",
+            title = stringResource(R.string.edit_expense_title),
             onBack = { navController.popBackStack() },
             actions = {
                 if (state.canEdit && state.loaded) {
                     IconButton(onClick = { showDeleteDialog = true }) {
-                        Icon(Icons.Default.Delete, contentDescription = "Delete", tint = Color.White)
+                        Icon(Icons.Default.Delete, contentDescription = stringResource(R.string.edit_expense_delete), tint = Color.White)
                     }
                 }
             }
@@ -219,14 +260,14 @@ fun EditExpenseScreen(
             }
         } else if (state.notFound) {
             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                Text("Expense not found.", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(stringResource(R.string.edit_expense_not_found), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         } else if (!state.canEdit) {
             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text("You can only edit expenses you created.", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(stringResource(R.string.edit_expense_cannot_edit), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     Spacer(modifier = Modifier.height(8.dp))
-                    Text("Group admins can also edit any expense.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f))
+                    Text(stringResource(R.string.edit_expense_admin_can_edit), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f))
                 }
             }
         } else {
@@ -236,7 +277,7 @@ fun EditExpenseScreen(
             ) {
                 if (state.error != null) {
                     Surface(color = MaterialTheme.colorScheme.errorContainer, shape = RoundedCornerShape(12.dp)) {
-                        Text(state.error!!, modifier = Modifier.padding(12.dp), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onErrorContainer)
+                        Text(stringResource(state.error!!), modifier = Modifier.padding(12.dp), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onErrorContainer)
                     }
                 }
 
@@ -251,10 +292,14 @@ fun EditExpenseScreen(
                     else -> state.amount.isNotBlank() && activeMembers.isNotEmpty()
                 }
 
+                val currencySymbol = remember(state.currency) {
+                    CurrencyConverter.getCurrencySymbol(state.currency)
+                }
+
                 OutlinedTextField(
                     value = state.amount,
                     onValueChange = { viewModel.updateAmount(it) },
-                    label = { Text("Amount") },
+                    label = { Text(stringResource(R.string.edit_expense_amount_label, currencySymbol)) },
                     modifier = Modifier.fillMaxWidth(),
                     singleLine = true,
                     shape = RoundedCornerShape(12.dp)
@@ -263,19 +308,19 @@ fun EditExpenseScreen(
                 OutlinedTextField(
                     value = state.description,
                     onValueChange = { viewModel.updateDescription(it) },
-                    label = { Text("Description") },
+                    label = { Text(stringResource(R.string.edit_expense_description)) },
                     modifier = Modifier.fillMaxWidth(),
                     singleLine = true,
                     shape = RoundedCornerShape(12.dp)
                 )
 
-                Text("Category", style = MaterialTheme.typography.labelLarge)
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
-                    listOf("food", "transport", "shopping", "turf", "accommodation", "other").forEach { cat ->
+                Text(stringResource(R.string.edit_expense_category), style = MaterialTheme.typography.labelLarge)
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    HouseholdCategories.DEFAULT_CATEGORIES.forEach { cat ->
                         FilterChip(
                             selected = state.category == cat,
                             onClick = { viewModel.updateCategory(cat) },
-                            label = { Text(cat.replaceFirstChar { it.uppercase() }) }
+                            label = { Text(stringResource(HouseholdCategories.DEFAULT_CATEGORY_LABELS[cat] ?: R.string.cat_other)) }
                         )
                     }
                 }
@@ -283,44 +328,52 @@ fun EditExpenseScreen(
                 OutlinedTextField(
                     value = state.note,
                     onValueChange = { viewModel.updateNote(it) },
-                    label = { Text("Note (optional)") },
+                    label = { Text(stringResource(R.string.edit_expense_note)) },
                     modifier = Modifier.fillMaxWidth(),
                     minLines = 2,
                     maxLines = 3,
                     shape = RoundedCornerShape(12.dp)
                 )
 
-                Text("Paid by", style = MaterialTheme.typography.labelLarge)
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                Text(stringResource(R.string.edit_expense_paid_by), style = MaterialTheme.typography.labelLarge)
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     activeMembers.forEach { m ->
                         FilterChip(
                             selected = (state.paidByUid.ifBlank { activeMembers.find { it.uid == state.currentUserId }?.uid ?: "" }) == m.uid,
                             onClick = { viewModel.updatePaidBy(m.uid) },
-                            label = { Text(m.displayName.split(" ").firstOrNull() ?: m.displayName + if (m.uid == state.currentUserId) " (You)" else "") }
+                            label = { Text(m.displayName.split(" ").firstOrNull() ?: m.displayName + if (m.uid == state.currentUserId) " (${stringResource(R.string.edit_expense_you)})" else "") }
                         )
                     }
                 }
 
-                Text("Split method", style = MaterialTheme.typography.labelLarge)
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(stringResource(R.string.edit_expense_split_method), style = MaterialTheme.typography.labelLarge)
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     SplitType.entries.forEach { st ->
                         FilterChip(
                             selected = state.splitType == st,
                             onClick = { viewModel.updateSplitType(st) },
-                            label = { Text(st.name.lowercase().replaceFirstChar { it.uppercase() }) }
+                            label = {
+                                Text(
+                                    when (st) {
+                                        SplitType.EQUAL -> stringResource(R.string.edit_expense_equal)
+                                        SplitType.EXACT -> stringResource(R.string.edit_expense_exact)
+                                        SplitType.PERCENT -> stringResource(R.string.edit_expense_percent)
+                                        SplitType.SHARES -> stringResource(R.string.edit_expense_shares)
+                                        SplitType.ITEMIZED -> stringResource(R.string.edit_expense_itemized)
+                                    }
+                                )
+                            }
                         )
                     }
                 }
 
                 if (state.splitType == SplitType.ITEMIZED && activeMembers.isNotEmpty()) {
-                    val currencySymbol = remember(state.currency) {
-                        CurrencyConverter.getCurrencySymbol(state.currency)
-                    }
                     ItemizedSplitEditor(
                         members = activeMembers,
                         currencySymbol = currencySymbol,
                         itemizedData = state.itemizedData,
-                        onItemizedDataChange = { viewModel.updateItemizedData(it) }
+                        onItemizedDataChange = { viewModel.updateItemizedData(it) },
+                        expenseAmount = state.amount.toDoubleOrNull() ?: 0.0
                     )
                 }
 
@@ -330,7 +383,7 @@ fun EditExpenseScreen(
                             activeMembers.forEach { m ->
                                 Row(verticalAlignment = Alignment.CenterVertically) {
                                     Text(
-                                        m.displayName + if (m.uid == state.currentUserId) " (You)" else "",
+                                        m.displayName + if (m.uid == state.currentUserId) " (${stringResource(R.string.edit_expense_you)})" else "",
                                         style = MaterialTheme.typography.bodyMedium,
                                         modifier = Modifier.weight(1f)
                                     )
@@ -353,7 +406,7 @@ fun EditExpenseScreen(
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     if (state.isSaving) CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp, color = MaterialTheme.colorScheme.onPrimary)
-                    else Text("Save Changes")
+                    else Text(stringResource(R.string.edit_expense_save))
                 }
             }
         }
@@ -362,8 +415,8 @@ fun EditExpenseScreen(
     if (showDeleteDialog) {
         AlertDialog(
             onDismissRequest = { showDeleteDialog = false },
-            title = { Text("Delete Expense?") },
-            text = { Text("This action cannot be undone. Balances will be recalculated.") },
+            title = { Text(stringResource(R.string.edit_expense_delete_confirm)) },
+            text = { Text(stringResource(R.string.edit_expense_delete_message)) },
             confirmButton = {
                 TextButton(
                     onClick = {
@@ -371,9 +424,9 @@ fun EditExpenseScreen(
                         viewModel.delete { navController.popBackStack() }
                     },
                     colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)
-                ) { Text("Delete") }
+                ) { Text(stringResource(R.string.edit_expense_delete)) }
             },
-            dismissButton = { TextButton(onClick = { showDeleteDialog = false }) { Text("Cancel") } }
+            dismissButton = { TextButton(onClick = { showDeleteDialog = false }) { Text(stringResource(R.string.common_cancel)) } }
         )
     }
 }

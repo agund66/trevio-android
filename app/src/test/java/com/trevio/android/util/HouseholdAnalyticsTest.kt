@@ -5,7 +5,9 @@ import androidx.compose.material.icons.filled.Category
 import androidx.compose.material.icons.filled.LocalGroceryStore
 import androidx.compose.ui.graphics.Color
 import com.google.common.truth.Truth.assertThat
+import com.trevio.android.R
 import com.trevio.android.domain.model.Expense
+import com.trevio.android.domain.model.LocalizedString
 import com.trevio.android.domain.model.Member
 import com.trevio.android.domain.model.TransactionType
 import java.util.Calendar
@@ -358,7 +360,9 @@ class HouseholdAnalyticsTest {
     @Test
     fun monthlyReport_monthLabelCorrect() {
         val result = computeMonthlyReport(emptyList(), emptyList(), 2024, 0)
-        assertThat(result.monthLabel).isEqualTo("January 2024")
+        assertThat(result.monthLabelText).isEqualTo(
+            LocalizedString(R.string.month_year, listOf(LocalizedString(R.string.month_january), 2024))
+        )
         assertThat(result.month).isEqualTo("2024-01")
     }
 
@@ -372,7 +376,7 @@ class HouseholdAnalyticsTest {
         assertThat(result.membersLoggedToday).isEqualTo(0)
         assertThat(result.totalMembers).isEqualTo(0)
         assertThat(result.monthlyBadge).isNull()
-        assertThat(result.insightMessage).isNull()
+        assertThat(result.insightMessageText).isNull()
     }
 
     @Test
@@ -458,14 +462,14 @@ class HouseholdAnalyticsTest {
     fun gamification_badgeStreakChampion() {
         val expenses = consecutiveDayExpenses(30)
         val result = computeGamification(expenses, emptyList(), monthlyBudget = null, monthlySpent = 0.0)
-        assertThat(result.monthlyBadge).isEqualTo("streak_champion")
+        assertThat(result.monthlyBadge).isEqualTo(LocalizedString(R.string.badge_streak_champion))
     }
 
     @Test
     fun gamification_badgeBudgetMaster() {
         // No streak (empty), budget set, spent within budget
         val result = computeGamification(emptyList(), emptyList(), monthlyBudget = 1000.0, monthlySpent = 500.0)
-        assertThat(result.monthlyBadge).isEqualTo("budget_master")
+        assertThat(result.monthlyBadge).isEqualTo(LocalizedString(R.string.badge_budget_master))
     }
 
     @Test
@@ -476,7 +480,7 @@ class HouseholdAnalyticsTest {
             expense(amount = 20.0, date = todayTs(11), paidBy = "u2")
         )
         val result = computeGamification(expenses, members)
-        assertThat(result.monthlyBadge).isEqualTo("all_stars")
+        assertThat(result.monthlyBadge).isEqualTo(LocalizedString(R.string.badge_all_stars))
     }
 
     @Test
@@ -491,19 +495,23 @@ class HouseholdAnalyticsTest {
     @Test
     fun gamification_insightBudgetExceeded() {
         val result = computeGamification(emptyList(), emptyList(), monthlyBudget = 100.0, monthlySpent = 120.0)
-        assertThat(result.insightMessage).isEqualTo("You've exceeded your monthly budget by ₹20.00")
+        assertThat(result.insightMessageText).isEqualTo(
+            LocalizedString(R.string.insight_budget_exceeded, listOf("₹20.00"))
+        )
     }
 
     @Test
     fun gamification_insightWithinBudget() {
         val result = computeGamification(emptyList(), emptyList(), monthlyBudget = 100.0, monthlySpent = 85.0)
-        assertThat(result.insightMessage).isEqualTo("You've used 85.0% of your budget. ₹15.00 left.")
+        assertThat(result.insightMessageText).isEqualTo(
+            LocalizedString(R.string.insight_budget_used, listOf("85.0", "₹15.00"))
+        )
     }
 
     @Test
     fun gamification_insightNoBudget_returnsNull() {
         val result = computeGamification(emptyList(), emptyList(), monthlyBudget = null, monthlySpent = 0.0)
-        assertThat(result.insightMessage).isNull()
+        assertThat(result.insightMessageText).isNull()
     }
 
     @Test
@@ -514,7 +522,12 @@ class HouseholdAnalyticsTest {
             expense(amount = 50.0, date = todayTs(), category = "transport")
         )
         val result = computeGamification(expenses, emptyList(), monthlyBudget = null, monthlySpent = 0.0)
-        assertThat(result.insightMessage).isEqualTo("Groceries is 66.67% of your spending this month")
+        assertThat(result.insightMessageText).isEqualTo(
+            LocalizedString(R.string.insight_top_category, listOf(
+                LocalizedString(HouseholdCategories.getCategoryLabelResId("groceries")),
+                "66.67"
+            ))
+        )
     }
 
     // ─── computeMemberContributions ────────────────────────────────

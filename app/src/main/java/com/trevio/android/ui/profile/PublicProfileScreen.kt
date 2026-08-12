@@ -1,5 +1,6 @@
 package com.trevio.android.ui.profile
 
+import androidx.annotation.StringRes
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.isSystemInDarkTheme
@@ -20,16 +21,19 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 
+import com.trevio.android.R
 import com.trevio.android.core.designsystem.components.TrevioCard
-import com.trevio.android.core.designsystem.theme.TrevioBorder
+import com.trevio.android.core.designsystem.theme.*
 import com.trevio.android.domain.model.User
 import com.trevio.android.domain.repository.UserService
+import com.trevio.android.util.toStringResId
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -44,7 +48,7 @@ class PublicProfileViewModel @Inject constructor(
     data class State(
         val user: User? = null,
         val isLoading: Boolean = true,
-        val error: String? = null
+        @StringRes val error: Int? = null
     )
 
     private val _state = MutableStateFlow(State())
@@ -58,7 +62,7 @@ class PublicProfileViewModel @Inject constructor(
                     _state.value = State(user = user, isLoading = false)
                 }
                 .onFailure { e ->
-                    _state.value = State(isLoading = false, error = e.message)
+                    _state.value = State(isLoading = false, error = e.toStringResId())
                 }
         }
     }
@@ -87,9 +91,9 @@ fun PublicProfileScreen(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     IconButton(onClick = { navController.popBackStack() }) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = Color.White)
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.common_back), tint = Color.White)
                     }
-                    Text("Profile", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = Color.White)
+                    Text(stringResource(R.string.public_profile_title), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = Color.White)
                 }
             }
             Box(modifier = Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
@@ -102,7 +106,7 @@ fun PublicProfileScreen(
     val user = state.user
     if (user == null) {
         Box(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background), contentAlignment = Alignment.Center) {
-            Text("User not found", color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(stringResource(R.string.public_profile_not_found), color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
         return
     }
@@ -124,10 +128,10 @@ fun PublicProfileScreen(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 IconButton(onClick = { navController.popBackStack() }) {
-                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = Color.White)
+                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.common_back), tint = Color.White)
                 }
                 Text(
-                    "Profile",
+                    stringResource(R.string.public_profile_title),
                     style = MaterialTheme.typography.titleLarge,
                     fontWeight = FontWeight.Bold,
                     color = Color.White
@@ -187,14 +191,14 @@ fun PublicProfileScreen(
             val isDark = isSystemInDarkTheme()
             ProfileInfoCard(
                 icon = Icons.Default.Person,
-                iconColor = if (isDark) Color(0xFF818CF8) else Color(0xFF6366F1),
-                label = "Username",
+                iconColor = if (isDark) CategoryTransportDark else CategoryTransport,
+                label = stringResource(R.string.public_profile_username),
                 value = "@${user.username}"
             )
             ProfileInfoCard(
                 icon = Icons.Default.Mail,
-                iconColor = if (isDark) Color(0xFF4ADE80) else Color(0xFF22C55E),
-                label = "Email",
+                iconColor = if (isDark) BalancePositiveDark else BalancePositive,
+                label = stringResource(R.string.public_profile_email),
                 value = user.email
             )
 
@@ -202,16 +206,16 @@ fun PublicProfileScreen(
             if (user.upiId.isNotEmpty()) {
                 ProfileInfoCard(
                     icon = Icons.Default.Wallet,
-                    iconColor = if (isDark) Color(0xFF2DD4BF) else Color(0xFF0D9488),
-                    label = "Pay via UPI ID",
+                    iconColor = if (isDark) CategoryAccommodationDark else CategoryAccommodation,
+                    label = stringResource(R.string.public_profile_pay_upi),
                     value = user.upiId
                 )
             } else if (user.phoneNumber.isNotEmpty()) {
                 val country = COUNTRY_CODES.find { it.code == user.countryCode } ?: COUNTRY_CODES.first()
                 ProfileInfoCard(
                     icon = Icons.Default.Phone,
-                    iconColor = if (isDark) Color(0xFF2DD4BF) else Color(0xFF0D9488),
-                    label = "Pay via Mobile Number",
+                    iconColor = if (isDark) CategoryAccommodationDark else CategoryAccommodation,
+                    label = stringResource(R.string.public_profile_pay_phone),
                     value = "${country.dialCode} ${user.phoneNumber}"
                 )
             }

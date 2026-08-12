@@ -22,7 +22,7 @@ class CurrencyViewModel @Inject constructor(
 ) : ViewModel() {
 
     data class CurrencyState(
-        val userCurrency: String = "INR",
+        val userCurrency: String = AppConstants.BASE_CURRENCY,
         val rates: Map<String, Double> = emptyMap(),
         val isLoading: Boolean = true
     )
@@ -35,7 +35,7 @@ class CurrencyViewModel @Inject constructor(
     fun loadRates() {
         viewModelScope.launch {
             val user = authService.getCurrentUser()
-            val userCurrency = user?.defaultCurrency ?: "INR"
+            val userCurrency = user?.defaultCurrency ?: AppConstants.BASE_CURRENCY
             exchangeRateService.getRates()
                 .onSuccess { exchangeRates ->
                     _state.value = CurrencyState(
@@ -55,7 +55,7 @@ class CurrencyViewModel @Inject constructor(
 
     fun formatBase(amountInBase: Double): String {
         val currentState = _state.value
-        if (currentState.rates.isEmpty()) return CurrencyConverter.formatCurrency(amountInBase, "INR")
+        if (currentState.rates.isEmpty()) return CurrencyConverter.formatCurrency(amountInBase, AppConstants.BASE_CURRENCY)
         val converted = CurrencyConverter.convertFromBase(amountInBase, currentState.userCurrency, currentState.rates)
         return CurrencyConverter.formatCurrency(converted, currentState.userCurrency)
     }

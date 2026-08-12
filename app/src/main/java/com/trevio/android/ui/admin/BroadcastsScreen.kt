@@ -20,13 +20,16 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.trevio.android.R
 import com.trevio.android.core.designsystem.components.TrevioCard
 import com.trevio.android.core.designsystem.components.TrevioHeader
+import com.trevio.android.core.designsystem.theme.*
 import com.trevio.android.domain.model.BroadcastMessage
 import com.trevio.android.domain.model.BroadcastPriority
 import com.trevio.android.domain.model.BroadcastTargetType
@@ -66,13 +69,13 @@ fun BroadcastsScreen(
             verticalAlignment = Alignment.CenterVertically
         ) {
             Column {
-                Text("Broadcast Messages", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                Text("Send HTML-formatted messages to users", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(stringResource(R.string.broadcasts_title), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                Text(stringResource(R.string.broadcasts_subtitle), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
             Button(onClick = { viewModel.showForm() }) {
                 Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(18.dp))
                 Spacer(modifier = Modifier.width(4.dp))
-                Text("New")
+                Text(stringResource(R.string.broadcasts_new))
             }
         }
 
@@ -82,16 +85,16 @@ fun BroadcastsScreen(
             modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            BroadcastStatCard("Total", state.broadcasts.size.toString(), Modifier.weight(1f))
-            BroadcastStatCard("Active", active.toString(), Modifier.weight(1f))
-            BroadcastStatCard("Stopped", inactive.toString(), Modifier.weight(1f))
+            BroadcastStatCard(stringResource(R.string.broadcasts_total), state.broadcasts.size.toString(), Modifier.weight(1f))
+            BroadcastStatCard(stringResource(R.string.broadcasts_active), active.toString(), Modifier.weight(1f))
+            BroadcastStatCard(stringResource(R.string.broadcasts_stopped), inactive.toString(), Modifier.weight(1f))
         }
 
         Spacer(modifier = Modifier.height(8.dp))
 
         if (state.error != null) {
             Text(
-                state.error!!,
+                stringResource(state.error!!),
                 color = MaterialTheme.colorScheme.error,
                 style = MaterialTheme.typography.bodySmall,
                 modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
@@ -126,7 +129,7 @@ fun BroadcastsScreen(
                             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                                 Icon(Icons.Default.Campaign, contentDescription = null, modifier = Modifier.size(40.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f))
                                 Spacer(modifier = Modifier.height(8.dp))
-                                Text("No broadcasts yet", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                Text(stringResource(R.string.broadcasts_no_broadcasts), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                             }
                         }
                     }
@@ -157,19 +160,19 @@ private fun BroadcastRow(
 ) {
     val isDark = isSystemInDarkTheme()
     val priorityColor = when (broadcast.priority) {
-        BroadcastPriority.CRITICAL -> if (isDark) Color(0xFFF87171) else Color(0xFFEF4444)
-        BroadcastPriority.MAINTENANCE -> if (isDark) Color(0xFFFBBF24) else Color(0xFFF59E0B)
-        BroadcastPriority.INFO -> if (isDark) Color(0xFF60A5FA) else Color(0xFF3B82F6)
+        BroadcastPriority.CRITICAL -> if (isDark) BalanceNegativeDark else BalanceNegative
+        BroadcastPriority.MAINTENANCE -> if (isDark) TrevioWarningDarkTheme else TrevioWarning
+        BroadcastPriority.INFO -> if (isDark) TrevioSecondaryDarkTheme else TrevioSecondary
     }
     val priorityLabel = when (broadcast.priority) {
-        BroadcastPriority.CRITICAL -> "Critical"
-        BroadcastPriority.MAINTENANCE -> "Maintenance"
-        BroadcastPriority.INFO -> "Info"
+        BroadcastPriority.CRITICAL -> stringResource(R.string.broadcasts_priority_critical)
+        BroadcastPriority.MAINTENANCE -> stringResource(R.string.broadcasts_priority_maintenance)
+        BroadcastPriority.INFO -> stringResource(R.string.broadcasts_priority_info)
     }
     val targetLabel = when (broadcast.targetType) {
-        BroadcastTargetType.ALL -> "All Users"
-        BroadcastTargetType.ALL_EXCEPT_BLOCKED -> "All (except blocked)"
-        BroadcastTargetType.SPECIFIC -> "Specific (${broadcast.targetUids.size})"
+        BroadcastTargetType.ALL -> stringResource(R.string.broadcasts_target_all)
+        BroadcastTargetType.ALL_EXCEPT_BLOCKED -> stringResource(R.string.broadcasts_target_except_blocked)
+        BroadcastTargetType.SPECIFIC -> stringResource(R.string.broadcasts_target_specific) + " (${broadcast.targetUids.size})"
     }
 
     TrevioCard(onClick = onClick) {
@@ -197,12 +200,12 @@ private fun BroadcastRow(
                 }
                 Spacer(modifier = Modifier.weight(1f))
                 if (broadcast.active) {
-                    Surface(color = if (isSystemInDarkTheme()) Color(0xFF4ADE80) else Color(0xFF22C55E).copy(alpha = 0.1f), shape = RoundedCornerShape(6.dp)) {
-                        Text("Active", style = MaterialTheme.typography.labelSmall, color = if (isSystemInDarkTheme()) Color(0xFF4ADE80) else Color(0xFF22C55E), modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp))
+                    Surface(color = if (isSystemInDarkTheme()) BalancePositiveDark else BalancePositive.copy(alpha = 0.1f), shape = RoundedCornerShape(6.dp)) {
+                        Text(stringResource(R.string.broadcasts_active), style = MaterialTheme.typography.labelSmall, color = if (isSystemInDarkTheme()) BalancePositiveDark else BalancePositive, modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp))
                     }
                 } else {
                     Surface(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.05f), shape = RoundedCornerShape(6.dp)) {
-                        Text("Stopped", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp))
+                        Text(stringResource(R.string.broadcasts_stopped), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp))
                     }
                 }
             }
@@ -216,16 +219,16 @@ private fun BroadcastRow(
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Icon(Icons.Default.Visibility, contentDescription = null, modifier = Modifier.size(12.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
                     Spacer(modifier = Modifier.width(2.dp))
-                    Text("$readCount reads", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(stringResource(R.string.broadcasts_read_count, readCount), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
-                Text("by ${broadcast.createdByName}", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(stringResource(R.string.broadcasts_created_by, broadcast.createdByName), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
             if (broadcast.active) {
                 Spacer(modifier = Modifier.height(8.dp))
                 OutlinedButton(
                     onClick = onStop,
                     enabled = !actionLoading,
-                    colors = ButtonDefaults.outlinedButtonColors(contentColor = if (isSystemInDarkTheme()) Color(0xFFF87171) else Color(0xFFEF4444))
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = if (isSystemInDarkTheme()) BalanceNegativeDark else BalanceNegative)
                 ) {
                     if (actionLoading) {
                         CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
@@ -233,7 +236,7 @@ private fun BroadcastRow(
                         Icon(Icons.Default.Stop, contentDescription = null, modifier = Modifier.size(16.dp))
                     }
                     Spacer(modifier = Modifier.width(4.dp))
-                    Text("Stop")
+                    Text(stringResource(R.string.broadcasts_stop))
                 }
             }
         }
@@ -255,7 +258,7 @@ private fun BroadcastCreateScreen(
             .background(MaterialTheme.colorScheme.background)
     ) {
         TrevioHeader(
-            title = "Create Broadcast",
+            title = stringResource(R.string.broadcasts_create_title),
             onBack = { viewModel.hideForm() }
         )
 
@@ -273,7 +276,7 @@ private fun BroadcastCreateScreen(
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Text(
-                        state.formError,
+                        stringResource(state.formError!!),
                         color = MaterialTheme.colorScheme.onErrorContainer,
                         style = MaterialTheme.typography.bodySmall,
                         modifier = Modifier.padding(12.dp)
@@ -284,28 +287,28 @@ private fun BroadcastCreateScreen(
             OutlinedTextField(
                 value = state.formTitle,
                 onValueChange = { viewModel.updateFormTitle(it) },
-                label = { Text("Title") },
-                placeholder = { Text("Broadcast title...") },
+                label = { Text(stringResource(R.string.broadcasts_title_label)) },
+                placeholder = { Text(stringResource(R.string.broadcasts_title_placeholder)) },
                 modifier = Modifier.fillMaxWidth(),
                 singleLine = true,
                 shape = RoundedCornerShape(12.dp)
             )
 
-            Text("Priority", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Medium)
+            Text(stringResource(R.string.broadcasts_priority), style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Medium)
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 BroadcastPriority.entries.forEach { p ->
                     val label = when (p) {
-                        BroadcastPriority.CRITICAL -> "Critical"
-                        BroadcastPriority.MAINTENANCE -> "Maintenance"
-                        BroadcastPriority.INFO -> "Info"
+                        BroadcastPriority.CRITICAL -> stringResource(R.string.broadcasts_priority_critical)
+                        BroadcastPriority.MAINTENANCE -> stringResource(R.string.broadcasts_priority_maintenance)
+                        BroadcastPriority.INFO -> stringResource(R.string.broadcasts_priority_info)
                     }
                     val color = when (p) {
-                        BroadcastPriority.CRITICAL -> if (isSystemInDarkTheme()) Color(0xFFF87171) else Color(0xFFEF4444)
-                        BroadcastPriority.MAINTENANCE -> if (isSystemInDarkTheme()) Color(0xFFFBBF24) else Color(0xFFF59E0B)
-                        BroadcastPriority.INFO -> if (isSystemInDarkTheme()) Color(0xFF60A5FA) else Color(0xFF3B82F6)
+                        BroadcastPriority.CRITICAL -> if (isSystemInDarkTheme()) BalanceNegativeDark else BalanceNegative
+                        BroadcastPriority.MAINTENANCE -> if (isSystemInDarkTheme()) TrevioWarningDarkTheme else TrevioWarning
+                        BroadcastPriority.INFO -> if (isSystemInDarkTheme()) TrevioSecondaryDarkTheme else TrevioSecondary
                     }
                     FilterChip(
                         selected = state.formPriority == p,
@@ -320,13 +323,13 @@ private fun BroadcastCreateScreen(
                 }
             }
 
-            Text("Target Audience", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Medium)
+            Text(stringResource(R.string.broadcasts_target), style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Medium)
             Column {
                 BroadcastTargetType.entries.forEach { t ->
                     val label = when (t) {
-                        BroadcastTargetType.ALL -> "All Users"
-                        BroadcastTargetType.ALL_EXCEPT_BLOCKED -> "All (except blocked)"
-                        BroadcastTargetType.SPECIFIC -> "Specific Users"
+                        BroadcastTargetType.ALL -> stringResource(R.string.broadcasts_target_all)
+                        BroadcastTargetType.ALL_EXCEPT_BLOCKED -> stringResource(R.string.broadcasts_target_except_blocked)
+                        BroadcastTargetType.SPECIFIC -> stringResource(R.string.broadcasts_target_specific_users)
                     }
                     Row(
                         modifier = Modifier
@@ -343,7 +346,7 @@ private fun BroadcastCreateScreen(
             }
 
             if (state.formTargetType == BroadcastTargetType.SPECIFIC) {
-                Text("Select users:", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Medium)
+                Text(stringResource(R.string.broadcasts_select_users), style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Medium)
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -376,7 +379,7 @@ private fun BroadcastCreateScreen(
                 }
                 if (state.formTargetUids.isNotEmpty()) {
                     Text(
-                        "${state.formTargetUids.size} selected",
+                        stringResource(R.string.broadcasts_selected, state.formTargetUids.size),
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.primary
                     )
@@ -391,7 +394,7 @@ private fun BroadcastCreateScreen(
             var pendingStartDateMillis by remember { mutableStateOf<Long?>(null) }
             var pendingEndDateMillis by remember { mutableStateOf<Long?>(null) }
 
-            Text("Schedule", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Medium)
+            Text(stringResource(R.string.broadcasts_schedule), style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Medium)
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -399,7 +402,7 @@ private fun BroadcastCreateScreen(
                 OutlinedTextField(
                     value = state.formStartAt?.let { formatDate(it, true) } ?: "",
                     onValueChange = {},
-                    label = { Text("Start Date & Time") },
+                    label = { Text(stringResource(R.string.broadcasts_start_date_time)) },
                     modifier = Modifier
                         .weight(1f)
                         .clickable { showStartPicker = true },
@@ -415,7 +418,7 @@ private fun BroadcastCreateScreen(
                 OutlinedTextField(
                     value = state.formEndAt?.let { formatDate(it, true) } ?: "",
                     onValueChange = {},
-                    label = { Text("End (optional)") },
+                    label = { Text(stringResource(R.string.broadcasts_end_optional)) },
                     modifier = Modifier
                         .weight(1f)
                         .clickable { showEndPicker = true },
@@ -430,7 +433,7 @@ private fun BroadcastCreateScreen(
                 )
             }
             Text(
-                "Leave end empty to run until manually stopped",
+                stringResource(R.string.broadcasts_end_empty_hint),
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
             )
@@ -449,10 +452,10 @@ private fun BroadcastCreateScreen(
                                 showStartPicker = false
                                 showStartTimePicker = true
                             }
-                        ) { Text("Next") }
+                        ) { Text(stringResource(R.string.common_done)) }
                     },
                     dismissButton = {
-                        TextButton(onClick = { showStartPicker = false }) { Text("Cancel") }
+                        TextButton(onClick = { showStartPicker = false }) { Text(stringResource(R.string.common_cancel)) }
                     }
                 ) {
                     DatePicker(state = datePickerState)
@@ -480,12 +483,12 @@ private fun BroadcastCreateScreen(
                                 }
                                 showStartTimePicker = false
                             }
-                        ) { Text("OK") }
+                        ) { Text(stringResource(R.string.common_ok)) }
                     },
                     dismissButton = {
-                        TextButton(onClick = { showStartTimePicker = false }) { Text("Cancel") }
+                        TextButton(onClick = { showStartTimePicker = false }) { Text(stringResource(R.string.common_cancel)) }
                     },
-                    title = { Text("Select Time") },
+                    title = { Text(stringResource(R.string.broadcasts_select_time)) },
                     text = {
                         Box(modifier = Modifier.padding(16.dp)) {
                             TimePicker(state = timePickerState)
@@ -508,10 +511,10 @@ private fun BroadcastCreateScreen(
                                 showEndPicker = false
                                 showEndTimePicker = true
                             }
-                        ) { Text("Next") }
+                        ) { Text(stringResource(R.string.common_next)) }
                     },
                     dismissButton = {
-                        TextButton(onClick = { showEndPicker = false }) { Text("Cancel") }
+                        TextButton(onClick = { showEndPicker = false }) { Text(stringResource(R.string.common_cancel)) }
                     }
                 ) {
                     DatePicker(state = datePickerState)
@@ -539,12 +542,12 @@ private fun BroadcastCreateScreen(
                                 }
                                 showEndTimePicker = false
                             }
-                        ) { Text("OK") }
+                        ) { Text(stringResource(R.string.common_ok)) }
                     },
                     dismissButton = {
-                        TextButton(onClick = { showEndTimePicker = false }) { Text("Cancel") }
+                        TextButton(onClick = { showEndTimePicker = false }) { Text(stringResource(R.string.common_cancel)) }
                     },
-                    title = { Text("Select Time") },
+                    title = { Text(stringResource(R.string.broadcasts_select_time)) },
                     text = {
                         Box(modifier = Modifier.padding(16.dp)) {
                             TimePicker(state = timePickerState)
@@ -556,14 +559,14 @@ private fun BroadcastCreateScreen(
             OutlinedTextField(
                 value = state.formHtmlContent,
                 onValueChange = { viewModel.updateFormHtmlContent(it) },
-                label = { Text("HTML Content") },
+                label = { Text(stringResource(R.string.broadcasts_content)) },
                 modifier = Modifier.fillMaxWidth().heightIn(min = 120.dp, max = 200.dp),
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Ascii),
                 shape = RoundedCornerShape(12.dp)
             )
 
             if (state.formHtmlContent.isNotBlank()) {
-                Text("Preview:", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Medium)
+                Text(stringResource(R.string.broadcasts_preview), style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Medium)
                 AndroidHtmlPreview(
                     html = state.formHtmlContent,
                     modifier = Modifier.fillMaxWidth().heightIn(max = 200.dp)
@@ -577,7 +580,7 @@ private fun BroadcastCreateScreen(
                 horizontalArrangement = Arrangement.End,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                TextButton(onClick = { viewModel.hideForm() }) { Text("Cancel") }
+                TextButton(onClick = { viewModel.hideForm() }) { Text(stringResource(R.string.common_cancel)) }
                 Spacer(modifier = Modifier.width(8.dp))
                 Button(
                     onClick = { viewModel.submitBroadcast() },
@@ -594,7 +597,7 @@ private fun BroadcastCreateScreen(
                         Icon(Icons.AutoMirrored.Filled.Send, contentDescription = null, modifier = Modifier.size(16.dp))
                     }
                     Spacer(modifier = Modifier.width(4.dp))
-                    Text("Send Broadcast")
+                    Text(stringResource(R.string.broadcasts_send_broadcast))
                 }
             }
 
@@ -635,19 +638,19 @@ private fun BroadcastDetailScreen(
 
     val isDarkDetail = isSystemInDarkTheme()
     val priorityColor = when (broadcast.priority) {
-        BroadcastPriority.CRITICAL -> if (isDarkDetail) Color(0xFFF87171) else Color(0xFFEF4444)
-        BroadcastPriority.MAINTENANCE -> if (isDarkDetail) Color(0xFFFBBF24) else Color(0xFFF59E0B)
-        BroadcastPriority.INFO -> if (isDarkDetail) Color(0xFF60A5FA) else Color(0xFF3B82F6)
+        BroadcastPriority.CRITICAL -> if (isDarkDetail) BalanceNegativeDark else BalanceNegative
+        BroadcastPriority.MAINTENANCE -> if (isDarkDetail) TrevioWarningDarkTheme else TrevioWarning
+        BroadcastPriority.INFO -> if (isDarkDetail) TrevioSecondaryDarkTheme else TrevioSecondary
     }
     val priorityLabel = when (broadcast.priority) {
-        BroadcastPriority.CRITICAL -> "Critical"
-        BroadcastPriority.MAINTENANCE -> "Maintenance"
-        BroadcastPriority.INFO -> "Info"
+        BroadcastPriority.CRITICAL -> stringResource(R.string.broadcasts_priority_critical)
+        BroadcastPriority.MAINTENANCE -> stringResource(R.string.broadcasts_priority_maintenance)
+        BroadcastPriority.INFO -> stringResource(R.string.broadcasts_priority_info)
     }
     val targetLabel = when (broadcast.targetType) {
-        BroadcastTargetType.ALL -> "All Users"
-        BroadcastTargetType.ALL_EXCEPT_BLOCKED -> "All (except blocked)"
-        BroadcastTargetType.SPECIFIC -> "Specific (${broadcast.targetUids.size})"
+        BroadcastTargetType.ALL -> stringResource(R.string.broadcasts_target_all)
+        BroadcastTargetType.ALL_EXCEPT_BLOCKED -> stringResource(R.string.broadcasts_target_except_blocked)
+        BroadcastTargetType.SPECIFIC -> stringResource(R.string.broadcasts_target_specific) + " (${broadcast.targetUids.size})"
     }
 
     val readUids = remember(state.detailReads) { state.detailReads.map { it.uid }.toSet() }
@@ -670,7 +673,7 @@ private fun BroadcastDetailScreen(
             .background(MaterialTheme.colorScheme.background)
     ) {
         TrevioHeader(
-            title = "Broadcast Details",
+            title = stringResource(R.string.broadcasts_detail_title),
             onBack = { viewModel.hideDetail() }
         )
 
@@ -718,13 +721,13 @@ private fun BroadcastDetailScreen(
                         }
                         Spacer(modifier = Modifier.weight(1f))
                         if (broadcast.active) {
-                            val activeColor = if (isDarkDetail) Color(0xFF4ADE80) else Color(0xFF22C55E)
+                            val activeColor = if (isDarkDetail) BalancePositiveDark else BalancePositive
                             Surface(color = activeColor.copy(alpha = 0.1f), shape = RoundedCornerShape(6.dp)) {
-                                Text("Active", style = MaterialTheme.typography.labelSmall, color = activeColor, modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp))
+                                Text(stringResource(R.string.broadcasts_active), style = MaterialTheme.typography.labelSmall, color = activeColor, modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp))
                             }
                         } else {
                             Surface(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.05f), shape = RoundedCornerShape(6.dp)) {
-                                Text("Stopped", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp))
+                                Text(stringResource(R.string.broadcasts_stopped), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp))
                             }
                         }
                     }
@@ -732,19 +735,19 @@ private fun BroadcastDetailScreen(
                     Text(broadcast.title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                     Spacer(modifier = Modifier.height(4.dp))
                     Text(
-                        "Start: ${formatDate(broadcast.startAt, true)}",
+                        stringResource(R.string.broadcasts_start_label, formatDate(broadcast.startAt, true)),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                     if (broadcast.endAt != null) {
                         Text(
-                            "End: ${formatDate(broadcast.endAt, true)}",
+                            stringResource(R.string.broadcasts_end_label, formatDate(broadcast.endAt, true)),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
                     Text(
-                        "by ${broadcast.createdByName}",
+                        stringResource(R.string.broadcasts_created_by, broadcast.createdByName),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -764,16 +767,16 @@ private fun BroadcastDetailScreen(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    BroadcastStatCard("Target", targetUsers.size.toString(), Modifier.weight(1f))
-                    BroadcastStatCard("Read", readCount.toString(), Modifier.weight(1f))
-                    BroadcastStatCard("Unread", unreadCount.toString(), Modifier.weight(1f))
+                    BroadcastStatCard(stringResource(R.string.broadcasts_target), targetUsers.size.toString(), Modifier.weight(1f))
+                    BroadcastStatCard(stringResource(R.string.broadcasts_read), readCount.toString(), Modifier.weight(1f))
+                    BroadcastStatCard(stringResource(R.string.broadcasts_unread), unreadCount.toString(), Modifier.weight(1f))
                 }
             }
 
             // User read status list
             item {
                 Text(
-                    "User Read Status",
+                    stringResource(R.string.broadcasts_user_read_status),
                     style = MaterialTheme.typography.titleSmall,
                     fontWeight = FontWeight.SemiBold,
                     modifier = Modifier.padding(top = 4.dp)
@@ -820,7 +823,7 @@ private fun BroadcastDetailScreen(
                             )
                         }
                         if (hasRead) {
-                            val readColor = if (isDarkDetail) Color(0xFF4ADE80) else Color(0xFF22C55E)
+                            val readColor = if (isDarkDetail) BalancePositiveDark else BalancePositive
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 Icon(
                                     Icons.Default.CheckCircle,
@@ -830,13 +833,13 @@ private fun BroadcastDetailScreen(
                                 )
                                 Spacer(modifier = Modifier.width(4.dp))
                                 Text(
-                                    if (readAt != null && readAt > 0) formatDate(readAt, true) else "Read",
+                                    if (readAt != null && readAt > 0) formatDate(readAt, true) else stringResource(R.string.broadcasts_read),
                                     style = MaterialTheme.typography.labelSmall,
                                     color = readColor
                                 )
                             }
                         } else {
-                            val pendingColor = if (isDarkDetail) Color(0xFFFBBF24) else Color(0xFFF59E0B)
+                            val pendingColor = if (isDarkDetail) TrevioWarningDarkTheme else TrevioWarning
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 Icon(
                                     Icons.Default.Schedule,
@@ -846,7 +849,7 @@ private fun BroadcastDetailScreen(
                                 )
                                 Spacer(modifier = Modifier.width(4.dp))
                                 Text(
-                                    "Pending",
+                                    stringResource(R.string.broadcasts_pending),
                                     style = MaterialTheme.typography.labelSmall,
                                     color = pendingColor
                                 )
@@ -865,7 +868,7 @@ private fun BroadcastDetailScreen(
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
                             Icon(Icons.Default.People, contentDescription = null, modifier = Modifier.size(40.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f))
                             Spacer(modifier = Modifier.height(8.dp))
-                            Text("No target users found", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text(stringResource(R.string.broadcasts_no_target_users), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                     }
                 }

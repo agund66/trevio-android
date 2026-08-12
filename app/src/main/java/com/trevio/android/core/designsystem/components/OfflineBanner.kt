@@ -15,8 +15,10 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.trevio.android.R
 
 /**
  * A thin banner shown at the top of the screen when the device has no internet connection.
@@ -40,7 +42,7 @@ fun OfflineBanner(modifier: Modifier = Modifier) {
         )
         Spacer(modifier = Modifier.width(10.dp))
         Text(
-            text = "You're offline. Some data may be outdated.",
+            text = stringResource(R.string.offline_banner_message),
             style = MaterialTheme.typography.labelMedium,
             fontWeight = FontWeight.Medium,
             color = MaterialTheme.colorScheme.onErrorContainer

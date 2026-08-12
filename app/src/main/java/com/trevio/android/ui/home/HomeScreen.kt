@@ -1,5 +1,6 @@
 package com.trevio.android.ui.home
 
+import androidx.annotation.StringRes
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.isSystemInDarkTheme
@@ -27,15 +28,29 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.trevio.android.R
 import com.trevio.android.core.UserRefreshNotifier
 import com.trevio.android.core.designsystem.components.EmptyState
 import com.trevio.android.core.designsystem.components.TrevioCard
+import com.trevio.android.core.designsystem.theme.BalanceNegative
+import com.trevio.android.core.designsystem.theme.BalanceNegativeDark
+import com.trevio.android.core.designsystem.theme.BalancePositive
+import com.trevio.android.core.designsystem.theme.BalancePositiveDark
+import com.trevio.android.core.designsystem.theme.TemplateCasual
+import com.trevio.android.core.designsystem.theme.TemplateCasualDark
+import com.trevio.android.core.designsystem.theme.TemplateHousehold
+import com.trevio.android.core.designsystem.theme.TemplateHouseholdDark
+import com.trevio.android.core.designsystem.theme.TemplateTrip
+import com.trevio.android.core.designsystem.theme.TemplateTripDark
+import com.trevio.android.core.designsystem.theme.TemplateTurf
+import com.trevio.android.core.designsystem.theme.TemplateTurfDark
 import com.trevio.android.core.designsystem.theme.TrevioBorder
 import com.trevio.android.core.designsystem.theme.TrevioBorderDark
 
@@ -46,6 +61,7 @@ import com.trevio.android.domain.repository.AuthService
 import com.trevio.android.domain.repository.GroupService
 import com.trevio.android.ui.group.JoinGroupSheet
 import com.trevio.android.util.rememberCurrencyFormatter
+import com.trevio.android.util.toStringResId
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -68,7 +84,7 @@ class HomeViewModel @Inject constructor(
         val activeGroups: Int = 0,
         val userDisplayName: String = "",
         val isLoading: Boolean = true,
-        val error: String? = null,
+        @StringRes val error: Int? = null,
         val signedOut: Boolean = false
     )
 
@@ -108,7 +124,7 @@ class HomeViewModel @Inject constructor(
                 .onFailure { e ->
                     _state.value = _state.value.copy(
                         isLoading = false,
-                        error = e.message,
+                        error = e.toStringResId(),
                         userDisplayName = _state.value.userDisplayName
                     )
                 }
@@ -136,7 +152,7 @@ class HomeViewModel @Inject constructor(
                     )
                 }
                 .onFailure { e ->
-                    _state.value = _state.value.copy(error = e.message)
+                    _state.value = _state.value.copy(error = e.toStringResId())
                 }
         }
     }
@@ -201,9 +217,9 @@ fun HomeScreen(
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
                         Icon(Icons.Default.Warning, contentDescription = null, modifier = Modifier.size(48.dp), tint = MaterialTheme.colorScheme.error)
                         Spacer(modifier = Modifier.height(12.dp))
-                        Text("Failed to load groups", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                        Text(stringResource(R.string.home_failed_to_load), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                         Spacer(modifier = Modifier.height(4.dp))
-                        Text(errMsg, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text(stringResource(errMsg), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 }
             }
@@ -217,24 +233,23 @@ fun HomeScreen(
                 )
                 EmptyState(
                     icon = Icons.Default.Group,
-                    title = "No groups yet",
-                    message = "Create your first group to start splitting bills with friends. Perfect for trips, turf sessions, or casual splits!",
-                    actionText = "Create Group",
+                    title = stringResource(R.string.home_no_groups_yet),
+                    message = stringResource(R.string.home_no_groups_message),
+                    actionText = stringResource(R.string.home_create_group),
                     onAction = { navController.navigate(TrevioRoute.CreateGroup.route) }
                 )
             }
         } else {
+            Column(modifier = Modifier.fillMaxSize()) {
+                HomeHeader(
+                    displayName = state.userDisplayName,
+                    onNotificationsClick = { navController.navigate(TrevioRoute.Notifications.route) }
+                )
             LazyColumn(
+                modifier = Modifier.weight(1f),
                 contentPadding = PaddingValues(bottom = 100.dp),
                 verticalArrangement = Arrangement.spacedBy(0.dp)
             ) {
-                item {
-                    HomeHeader(
-                        displayName = state.userDisplayName,
-                        onNotificationsClick = { navController.navigate(TrevioRoute.Notifications.route) }
-                    )
-                }
-
                 item {
                     BalanceCard(
                         totalOwed = state.totalOwed,
@@ -255,12 +270,12 @@ fun HomeScreen(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text(
-                            text = "Your Groups",
+                            text = stringResource(R.string.home_your_groups),
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.SemiBold
                         )
                         Text(
-                            text = "${state.groups.size} active",
+                            text = stringResource(R.string.home_active_count, state.groups.size),
                             style = MaterialTheme.typography.labelMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -284,12 +299,13 @@ fun HomeScreen(
                             .fillMaxWidth()
                             .padding(horizontal = 16.dp, vertical = 4.dp)
                     ) {
-                        Text("View All Groups")
+                        Text(stringResource(R.string.home_view_all_groups))
                         Spacer(modifier = Modifier.width(4.dp))
                         Icon(Icons.AutoMirrored.Filled.ArrowForward, contentDescription = null, modifier = Modifier.size(16.dp))
                     }
                 }
             }
+            } // end Column
         }
 
         Column(
@@ -301,15 +317,15 @@ fun HomeScreen(
         ) {
             ExtendedFloatingActionButton(
                 onClick = { showJoinSheet = true },
-                icon = { Icon(Icons.Default.GroupAdd, contentDescription = null) },
-                text = { Text("Join Group") },
+                icon = { Icon(Icons.Default.GroupAdd, contentDescription = stringResource(R.string.home_join_group)) },
+                text = { Text(stringResource(R.string.home_join_group)) },
                 containerColor = MaterialTheme.colorScheme.secondaryContainer,
                 contentColor = MaterialTheme.colorScheme.onSecondaryContainer
             )
             ExtendedFloatingActionButton(
                 onClick = { navController.navigate(TrevioRoute.CreateGroup.route) },
-                icon = { Icon(Icons.Default.Add, contentDescription = null) },
-                text = { Text("New Group") },
+                icon = { Icon(Icons.Default.Add, contentDescription = stringResource(R.string.home_new_group)) },
+                text = { Text(stringResource(R.string.home_new_group)) },
                 containerColor = MaterialTheme.colorScheme.primary,
                 contentColor = MaterialTheme.colorScheme.onPrimary
             )
@@ -349,7 +365,7 @@ private fun HomeHeader(
     ) {
         Column(modifier = Modifier.weight(1f)) {
             Text(
-                text = "Welcome back,",
+                text = stringResource(R.string.home_welcome_back),
                 style = MaterialTheme.typography.bodySmall,
                 color = Color.White.copy(alpha = 0.8f)
             )
@@ -364,7 +380,7 @@ private fun HomeHeader(
             )
         }
         IconButton(onClick = onNotificationsClick) {
-            Icon(Icons.Outlined.Notifications, contentDescription = "Notifications", tint = Color.White)
+            Icon(Icons.Outlined.Notifications, contentDescription = stringResource(R.string.home_notifications), tint = Color.White)
         }
     }
 }
@@ -379,8 +395,8 @@ private fun BalanceCard(
     formatBase: (Double) -> String
 ) {
     val isDark = isSystemInDarkTheme()
-    val greenColor = if (isDark) Color(0xFF4ADE80) else Color(0xFF22C55E)
-    val redColor = if (isDark) Color(0xFFF87171) else Color(0xFFEF4444)
+    val greenColor = if (isDark) BalancePositiveDark else BalancePositive
+    val redColor = if (isDark) BalanceNegativeDark else BalanceNegative
     val netColor = if (netBalance >= 0) greenColor else redColor
 
     TrevioCard(
@@ -397,7 +413,7 @@ private fun BalanceCard(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = "Total Balance",
+                    text = stringResource(R.string.home_total_balance),
                     style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -406,7 +422,7 @@ private fun BalanceCard(
                     shape = RoundedCornerShape(8.dp)
                 ) {
                     Text(
-                        text = if (netBalance >= 0) "you're owed" else "you owe",
+                        text = if (netBalance >= 0) stringResource(R.string.home_youre_owed) else stringResource(R.string.home_you_owe),
                         style = MaterialTheme.typography.labelSmall,
                         color = netColor,
                         fontWeight = FontWeight.SemiBold,
@@ -429,19 +445,19 @@ private fun BalanceCard(
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
                 BalanceColumn(
-                    label = "You'll get",
+                    label = stringResource(R.string.home_youll_get),
                     amount = totalOwed,
                     color = greenColor,
                     formatBase = formatBase
                 )
                 BalanceColumn(
-                    label = "You'll pay",
+                    label = stringResource(R.string.home_youll_pay),
                     amount = totalOwing,
                     color = redColor,
                     formatBase = formatBase
                 )
                 BalanceColumn(
-                    label = "Total Spent",
+                    label = stringResource(R.string.home_total_spent),
                     amount = totalExpenses,
                     color = MaterialTheme.colorScheme.onSurface,
                     formatBase = formatBase
@@ -450,7 +466,7 @@ private fun BalanceCard(
             if (activeGroups > 0) {
                 Spacer(modifier = Modifier.height(8.dp))
                 Text(
-                    text = "Across $activeGroups active ${if (activeGroups == 1) "group" else "groups"}",
+                    text = stringResource(R.string.home_across_groups, activeGroups, if (activeGroups == 1) stringResource(R.string.home_group) else stringResource(R.string.home_groups)),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -493,10 +509,10 @@ private fun templateIcon(template: GroupTemplate): ImageVector = when (template)
 private fun templateColorAdaptive(template: GroupTemplate): Color {
     val isDark = isSystemInDarkTheme()
     return when (template) {
-        GroupTemplate.TRIP -> if (isDark) Color(0xFF818CF8) else Color(0xFF6366F1)
-        GroupTemplate.TURF -> if (isDark) Color(0xFF4ADE80) else Color(0xFF22C55E)
-        GroupTemplate.CASUAL -> if (isDark) Color(0xFFFBBF24) else Color(0xFFF59E0B)
-        GroupTemplate.HOUSEHOLD -> if (isDark) Color(0xFF2DD4BF) else Color(0xFF0D9488)
+        GroupTemplate.TRIP -> if (isDark) TemplateTripDark else TemplateTrip
+        GroupTemplate.TURF -> if (isDark) TemplateTurfDark else TemplateTurf
+        GroupTemplate.CASUAL -> if (isDark) TemplateCasualDark else TemplateCasual
+        GroupTemplate.HOUSEHOLD -> if (isDark) TemplateHouseholdDark else TemplateHousehold
     }
 }
 
@@ -509,17 +525,17 @@ private fun GroupCardItem(
     val icon = templateIcon(group.template)
     val accentColor = templateColorAdaptive(group.template)
     val balanceColor = when {
-        group.yourBalance > 0.01 -> if (isSystemInDarkTheme()) Color(0xFF4ADE80) else Color(0xFF22C55E)
-        group.yourBalance < -0.01 -> if (isSystemInDarkTheme()) Color(0xFFF87171) else Color(0xFFEF4444)
+        group.yourBalance > 0.01 -> if (isSystemInDarkTheme()) BalancePositiveDark else BalancePositive
+        group.yourBalance < -0.01 -> if (isSystemInDarkTheme()) BalanceNegativeDark else BalanceNegative
         else -> MaterialTheme.colorScheme.onSurfaceVariant
     }
     val balanceText = when {
         group.template == GroupTemplate.HOUSEHOLD -> {
-            if (group.totalExpenses > 0) "${formatBase(group.totalExpenses)} spent" else "No entries yet"
+            if (group.totalExpenses > 0) stringResource(R.string.group_item_spent, formatBase(group.totalExpenses)) else stringResource(R.string.group_item_no_entries)
         }
-        group.yourBalance > 0.01 -> "you'll get ${formatBase(group.yourBalance)}"
-        group.yourBalance < -0.01 -> "you'll pay ${formatBase(-group.yourBalance)}"
-        else -> "settled up"
+        group.yourBalance > 0.01 -> stringResource(R.string.group_item_owes_you, formatBase(group.yourBalance))
+        group.yourBalance < -0.01 -> stringResource(R.string.group_item_you_owe, formatBase(-group.yourBalance))
+        else -> stringResource(R.string.group_item_settled_up)
     }
 
     TrevioCard(
@@ -559,7 +575,7 @@ private fun GroupCardItem(
                 )
                 Spacer(modifier = Modifier.height(2.dp))
                 Text(
-                    text = "${group.memberCount} members · ${formatBase(group.totalExpenses)} total",
+                    text = stringResource(R.string.home_members_total, group.memberCount, formatBase(group.totalExpenses)),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )

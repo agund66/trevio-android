@@ -1,14 +1,17 @@
 package com.trevio.android.ui.household
 
+import androidx.annotation.StringRes
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.SavedStateHandle
+import com.trevio.android.R
 import com.trevio.android.domain.model.DailySummary
 import com.trevio.android.domain.model.Expense
 import com.trevio.android.domain.model.HouseholdGamification
 import com.trevio.android.domain.model.Member
 import com.trevio.android.domain.model.MonthlyReport
+import com.trevio.android.domain.model.LocalizedString
 import com.trevio.android.domain.model.SplitType
 import com.trevio.android.domain.model.TransactionType
 import com.trevio.android.domain.repository.AuthService
@@ -17,6 +20,7 @@ import com.trevio.android.domain.repository.GroupInfo
 import com.trevio.android.domain.repository.GroupService
 import com.trevio.android.domain.repository.ExchangeRateService
 import com.trevio.android.domain.repository.SettlementService
+import com.trevio.android.util.AppConstants
 import com.trevio.android.util.CurrencyConverter
 import com.trevio.android.util.FormatUtils
 import com.trevio.android.util.HouseholdCategories
@@ -25,6 +29,7 @@ import com.trevio.android.util.computeGamification
 import com.trevio.android.util.computeMonthlyReport
 import com.trevio.android.util.computeCategoryUsageCount
 import com.trevio.android.util.suggestDescriptions
+import com.trevio.android.util.toStringResId
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -43,16 +48,17 @@ data class HouseholdState(
     val gamification: HouseholdGamification? = null,
     val categoryUsage: Map<String, Int> = emptyMap(),
     val currentUserId: String? = null,
-    val userCurrency: String = "INR",
+    val userCurrency: String = com.trevio.android.util.AppConstants.BASE_CURRENCY,
     val currencySymbol: String = "₹",
     val convertedBudget: Double? = null,
+    val exchangeRates: Map<String, Double> = emptyMap(),
     val selectedDate: Long = System.currentTimeMillis(),
     val selectedYear: Int = Calendar.getInstance().get(Calendar.YEAR),
     val selectedMonth: Int = Calendar.getInstance().get(Calendar.MONTH),
     val isSaving: Boolean = false,
     val saveSuccess: Boolean = false,
-    val lastSavedMessage: String? = null,
-    val error: String? = null
+    val lastSavedMessage: LocalizedString? = null,
+    @StringRes val error: Int? = null
 )
 
 @HiltViewModel
@@ -84,7 +90,7 @@ class HouseholdViewModel @Inject constructor(
 
                 // Load user's default currency
                 val user = authService.getCurrentUser()
-                val userCurrency = user?.defaultCurrency ?: "INR"
+                val userCurrency = user?.defaultCurrency ?: com.trevio.android.util.AppConstants.BASE_CURRENCY
                 val currencySymbol = CurrencyConverter.getCurrencySymbol(userCurrency)
 
                 // Load exchange rates
@@ -92,15 +98,22 @@ class HouseholdViewModel @Inject constructor(
                 val rates = ratesResult.getOrNull()?.rates ?: emptyMap()
 
                 // Load all expenses (large page size to get everything for household)
-                val expensesResult = expenseService.getGroupExpenses(groupId, pageSize = 1000, lastExpenseId = null)
+                val expensesResult = expenseService.getGroupExpenses(groupId, pageSize = AppConstants.HOUSEHOLD_PAGE_SIZE, lastExpenseId = null)
                 val rawExpenses = expensesResult.getOrNull()?.items ?: emptyList()
 
-                // Convert each expense's amount to the viewer's currency
+                // Convert each expense's amount to the viewer's currency for display.
+                // Preserve the original amount and currency so edits can save back
+                // in the original currency instead of overwriting with the display currency.
                 val convertedExpenses = rawExpenses.map { expense ->
                     val convertedAmount = CurrencyConverter.convertCurrency(
                         expense.amount, expense.currency, userCurrency, rates
                     )
-                    expense.copy(amount = convertedAmount, currency = userCurrency)
+                    expense.copy(
+                        amount = convertedAmount,
+                        currency = userCurrency,
+                        originalAmount = expense.amount,
+                        originalCurrency = expense.currency
+                    )
                 }
 
                 // Convert budget from INR base to user's currency for display/analytics
@@ -139,12 +152,13 @@ class HouseholdViewModel @Inject constructor(
                     userCurrency = userCurrency,
                     currencySymbol = currencySymbol,
                     convertedBudget = budgetInUserCurrency,
+                    exchangeRates = rates,
                     selectedDate = _state.value.selectedDate,
                     selectedYear = _state.value.selectedYear,
                     selectedMonth = _state.value.selectedMonth
                 )
             } catch (e: Exception) {
-                _state.value = _state.value.copy(isLoading = false, error = e.message)
+                _state.value = _state.value.copy(isLoading = false, error = e.toStringResId())
             }
         }
     }
@@ -181,7 +195,7 @@ class HouseholdViewModel @Inject constructor(
             try {
                 val effectivePaidBy = paidBy ?: _state.value.currentUserId ?: ""
                 if (effectivePaidBy.isBlank()) {
-                    _state.value = _state.value.copy(isSaving = false, error = "Authentication required")
+                    _state.value = _state.value.copy(isSaving = false, error = R.string.error_authentication_required)
                     return@launch
                 }
                 val effectiveDescription = description.ifBlank {
@@ -207,26 +221,34 @@ class HouseholdViewModel @Inject constructor(
                 )
 
                 if (result.isSuccess) {
-                    val label = HouseholdCategories.getCategoryLabel(category)
-                    val typeLabel = if (transactionType == TransactionType.INCOME) "Received" else "Logged"
+                    val labelResId = HouseholdCategories.getCategoryLabelResId(category)
+                    val typeResId = if (transactionType == TransactionType.INCOME) R.string.entry_type_received else R.string.entry_type_logged
                     val symbol = _state.value.currencySymbol
                     _state.value = _state.value.copy(
                         isSaving = false,
                         saveSuccess = true,
-                        lastSavedMessage = "✓ $typeLabel $symbol${FormatUtils.formatAmount(amount)} · $label"
+                        lastSavedMessage = LocalizedString(
+                            R.string.entry_logged_msg,
+                            listOf(
+                                LocalizedString(typeResId),
+                                symbol,
+                                FormatUtils.formatAmount(amount),
+                                LocalizedString(labelResId)
+                            )
+                        )
                     )
                     // Reload data to reflect the new entry
                     loadData()
                 } else {
                     _state.value = _state.value.copy(
                         isSaving = false,
-                        error = result.exceptionOrNull()?.message ?: "Failed to save"
+                        error = R.string.error_failed_to_save
                     )
                 }
             } catch (e: Exception) {
                 _state.value = _state.value.copy(
                     isSaving = false,
-                    error = e.message
+                    error = e.toStringResId()
                 )
             }
         }
@@ -250,7 +272,7 @@ class HouseholdViewModel @Inject constructor(
             _state.value = _state.value.copy(isSaving = true, saveSuccess = false, error = null)
             try {
                 if (paidBy.isBlank()) {
-                    _state.value = _state.value.copy(isSaving = false, error = "Authentication required")
+                    _state.value = _state.value.copy(isSaving = false, error = R.string.error_authentication_required)
                     return@launch
                 }
                 val currency = _state.value.userCurrency
@@ -279,17 +301,17 @@ class HouseholdViewModel @Inject constructor(
                     _state.value = _state.value.copy(
                         isSaving = false,
                         saveSuccess = true,
-                        lastSavedMessage = "✓ Entry saved"
+                        lastSavedMessage = LocalizedString(R.string.entry_saved_msg)
                     )
                     loadData()
                 } else {
                     _state.value = _state.value.copy(
                         isSaving = false,
-                        error = result.exceptionOrNull()?.message ?: "Failed to save"
+                        error = R.string.error_failed_to_save
                     )
                 }
             } catch (e: Exception) {
-                _state.value = _state.value.copy(isSaving = false, error = e.message)
+                _state.value = _state.value.copy(isSaving = false, error = e.toStringResId())
             }
         }
     }
@@ -312,20 +334,41 @@ class HouseholdViewModel @Inject constructor(
             _state.value = _state.value.copy(isSaving = true, error = null)
             try {
                 if (paidBy.isBlank()) {
-                    _state.value = _state.value.copy(isSaving = false, error = "Authentication required")
+                    _state.value = _state.value.copy(isSaving = false, error = R.string.error_authentication_required)
                     return@launch
                 }
-                val currency = _state.value.userCurrency
+                val userCurrency = _state.value.userCurrency
                 val effectiveDescription = description.ifBlank {
                     HouseholdCategories.getCategoryLabel(category)
+                }
+
+                // Find the original expense to preserve its currency.
+                // The displayed amount was converted to the user's currency;
+                // convert back to the original currency before saving so
+                // we don't overwrite the stored currency or corrupt the
+                // base amount.
+                val originalExpense = _state.value.expenses.find { it.expenseId == expenseId }
+                val originalCurrency = originalExpense?.originalCurrency?.takeIf { it.isNotBlank() }
+                    ?: originalExpense?.currency?.takeIf { it.isNotBlank() }
+                    ?: userCurrency
+                val originalAmount = originalExpense?.originalAmount?.takeIf { it > 0 }
+                    ?: originalExpense?.amount
+                    ?: amount
+
+                // Convert the edited display amount back to the original currency
+                val rates = _state.value.exchangeRates
+                val amountToSave = if (userCurrency != originalCurrency && rates.isNotEmpty()) {
+                    CurrencyConverter.convertCurrency(amount, userCurrency, originalCurrency, rates)
+                } else {
+                    amount
                 }
 
                 val result = expenseService.updateExpense(
                     groupId = groupId,
                     expenseId = expenseId,
                     description = effectiveDescription,
-                    amount = amount,
-                    currency = currency,
+                    amount = amountToSave,
+                    currency = originalCurrency,
                     paidBy = paidBy,
                     splitType = SplitType.EQUAL,
                     splits = emptyMap(),
@@ -338,16 +381,16 @@ class HouseholdViewModel @Inject constructor(
                 )
 
                 if (result.isSuccess) {
-                    _state.value = _state.value.copy(isSaving = false, lastSavedMessage = "✓ Entry updated")
+                    _state.value = _state.value.copy(isSaving = false, lastSavedMessage = LocalizedString(R.string.entry_updated_msg))
                     loadData()
                 } else {
                     _state.value = _state.value.copy(
                         isSaving = false,
-                        error = result.exceptionOrNull()?.message ?: "Failed to update"
+                        error = R.string.error_failed_to_update
                     )
                 }
             } catch (e: Exception) {
-                _state.value = _state.value.copy(isSaving = false, error = e.message)
+                _state.value = _state.value.copy(isSaving = false, error = e.toStringResId())
             }
         }
     }
@@ -362,16 +405,16 @@ class HouseholdViewModel @Inject constructor(
             try {
                 val result = expenseService.deleteExpense(groupId, expenseId)
                 if (result.isSuccess) {
-                    _state.value = _state.value.copy(isSaving = false, lastSavedMessage = "✓ Entry deleted")
+                    _state.value = _state.value.copy(isSaving = false, lastSavedMessage = LocalizedString(R.string.entry_deleted_msg))
                     loadData()
                 } else {
                     _state.value = _state.value.copy(
                         isSaving = false,
-                        error = result.exceptionOrNull()?.message ?: "Failed to delete"
+                        error = R.string.error_failed_to_delete
                     )
                 }
             } catch (e: Exception) {
-                _state.value = _state.value.copy(isSaving = false, error = e.message)
+                _state.value = _state.value.copy(isSaving = false, error = e.toStringResId())
             }
         }
     }

@@ -10,6 +10,7 @@ import com.trevio.android.domain.model.PaginatedResult
 import com.trevio.android.domain.repository.GroupInfo
 import com.trevio.android.domain.repository.GroupService
 import com.trevio.android.domain.model.SplitEntry
+import com.trevio.android.util.AppConstants
 import com.trevio.android.util.Calculations
 import com.trevio.android.util.DateUtils
 import com.trevio.android.util.ErrorMessages
@@ -42,7 +43,7 @@ class FirebaseGroupServiceImpl @Inject constructor(
             if (name.isBlank()) return Result.failure(Exception(ErrorMessages.GROUP_NAME_REQUIRED))
 
             val userDoc = firestore.collection("users").document(uid).get().await()
-            val userCurrency = userDoc.getString("defaultCurrency") ?: "INR"
+            val userCurrency = userDoc.getString("defaultCurrency") ?: AppConstants.BASE_CURRENCY
 
             val now = System.currentTimeMillis()
             val inviteCode = Calculations.generateInviteCode()
@@ -312,17 +313,26 @@ class FirebaseGroupServiceImpl @Inject constructor(
             if (!memberDoc.exists()) return Result.failure(Exception("You are not a member of this group"))
 
             val memberData = memberDoc.data
+            val now = System.currentTimeMillis()
+            val batch = firestore.batch()
+
             if (memberData?.get("role") == MemberRole.ADMIN) {
                 val activeMembers = groupDoc.reference.collection("members")
                     .whereEqualTo("status", MemberStatus.ACTIVE).get().await()
                 if (activeMembers.size() <= 1) {
                     return Result.failure(Exception("Admin cannot leave. Transfer admin role or delete the group."))
                 }
+                // Auto-transfer admin role to the longest-joined active member
+                val otherActiveMembers = activeMembers.documents
+                    .filter { it.id != uid }
+                    .sortedBy { (it.data?.get("joinedAt") as? Long) ?: Long.MAX_VALUE }
+                if (otherActiveMembers.isNotEmpty()) {
+                    val newAdmin = otherActiveMembers[0]
+                    batch.update(newAdmin.reference, mapOf("role" to MemberRole.ADMIN, "updatedAt" to now))
+                }
             }
 
-            val now = System.currentTimeMillis()
-            val batch = firestore.batch()
-            batch.update(memberDoc.reference, mapOf("status" to "left"))
+            batch.update(memberDoc.reference, mapOf("status" to "left", "role" to "member"))
             batch.update(groupDoc.reference, mapOf(
                 "memberCount" to FieldValue.increment(-1),
                 "updatedAt" to now
@@ -376,7 +386,7 @@ class FirebaseGroupServiceImpl @Inject constructor(
                     name = data["name"] as? String ?: "",
                     description = data["description"] as? String ?: "",
                     template = GroupTemplate.valueOf((data["template"] as? String ?: "casual").uppercase()),
-                    currency = data["currency"] as? String ?: "INR",
+                    currency = data["currency"] as? String ?: AppConstants.BASE_CURRENCY,
                     createdBy = data["createdBy"] as? String ?: "",
                     inviteCode = data["inviteCode"] as? String ?: "",
                     memberCount = (data["memberCount"] as? Number)?.toInt() ?: 0,
@@ -414,7 +424,7 @@ class FirebaseGroupServiceImpl @Inject constructor(
                     name = data["name"] as? String ?: "",
                     description = data["description"] as? String ?: "",
                     template = GroupTemplate.valueOf((data["template"] as? String ?: "casual").uppercase()),
-                    currency = data["currency"] as? String ?: "INR",
+                    currency = data["currency"] as? String ?: AppConstants.BASE_CURRENCY,
                     inviteCode = data["inviteCode"] as? String ?: "",
                     createdBy = data["createdBy"] as? String ?: "",
                     memberCount = (data["memberCount"] as? Number)?.toInt() ?: 0,
@@ -469,6 +479,8 @@ class FirebaseGroupServiceImpl @Inject constructor(
                 val data = doc.data ?: emptyMap()
                 val userId = data["userId"] as? String ?: ""
                 val userData = userMap[userId]
+                @Suppress("UNCHECKED_CAST")
+                val activityData = data["data"] as? Map<String, Any>
                 activities.add(
                     Activity(
                         activityId = doc.id,
@@ -477,7 +489,8 @@ class FirebaseGroupServiceImpl @Inject constructor(
                         userId = userId,
                         userName = userData?.get("displayName") as? String ?: "Someone",
                         userPhotoURL = userData?.get("photoURL") as? String ?: "",
-                        createdAt = DateUtils.toMillis(data["createdAt"]) ?: 0
+                        createdAt = DateUtils.toMillis(data["createdAt"]) ?: 0,
+                        data = activityData
                     )
                 )
             }

@@ -4,6 +4,8 @@ import android.app.PendingIntent
 import android.content.Intent
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
+import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.messaging.FirebaseMessagingService
 import com.google.firebase.messaging.RemoteMessage
 import com.trevio.android.MainActivity
@@ -26,7 +28,7 @@ class TrevioMessagingService : FirebaseMessagingService() {
 
         val title = message.notification?.title
             ?: message.data["title"]
-            ?: "Trevio"
+            ?: getString(R.string.app_name)
 
         val body = message.notification?.body
             ?: message.data["body"]
@@ -76,5 +78,23 @@ class TrevioMessagingService : FirebaseMessagingService() {
     override fun onNewToken(token: String) {
         super.onNewToken(token)
         Logger.i(tag = "FCM", message = "New FCM token registered")
+        try {
+            val uid = FirebaseAuth.getInstance().currentUser?.uid ?: return
+            FirebaseFirestore.getInstance().collection("users").document(uid)
+                .update(
+                    mapOf(
+                        "fcmToken" to token,
+                        "updatedAt" to System.currentTimeMillis()
+                    )
+                )
+                .addOnSuccessListener {
+                    Logger.i(tag = "FCM", message = "FCM token persisted to Firestore")
+                }
+                .addOnFailureListener { e ->
+                    Logger.e(tag = "FCM", message = "Failed to persist FCM token: ${e.message}")
+                }
+        } catch (e: Exception) {
+            Logger.e(tag = "FCM", message = "Error persisting FCM token: ${e.message}")
+        }
     }
 }

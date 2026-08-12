@@ -2,6 +2,7 @@ package com.trevio.android.util
 
 import com.google.common.truth.Truth.assertThat
 import com.google.firebase.Timestamp
+import com.trevio.android.R
 import com.trevio.android.domain.model.BillItem
 import com.trevio.android.domain.model.CategoryBreakdown
 import com.trevio.android.domain.model.DailySummary
@@ -11,6 +12,7 @@ import com.trevio.android.domain.model.Group
 import com.trevio.android.domain.model.GroupTemplate
 import com.trevio.android.domain.model.HouseholdGamification
 import com.trevio.android.domain.model.ItemizedSplitData
+import com.trevio.android.domain.model.LocalizedString
 import com.trevio.android.domain.model.MemberContribution
 import com.trevio.android.domain.model.MonthComparison
 import com.trevio.android.domain.model.MonthlyReport
@@ -238,19 +240,19 @@ class HouseholdModelsTest {
         val gamification = HouseholdGamification(
             loggingStreak = 7,
             streakStartDate = 1704067200000L,
-            monthlyBadge = "Budget Master",
+            monthlyBadge = LocalizedString(R.string.badge_budget_master),
             participationToday = 66.6,
             membersLoggedToday = 2,
             totalMembers = 3,
-            insightMessage = "Great job staying on track!"
+            insightMessageText = LocalizedString(R.string.insight_budget_exceeded, listOf("₹500"))
         )
         assertThat(gamification.loggingStreak).isEqualTo(7)
         assertThat(gamification.streakStartDate).isEqualTo(1704067200000L)
-        assertThat(gamification.monthlyBadge).isEqualTo("Budget Master")
+        assertThat(gamification.monthlyBadge).isEqualTo(LocalizedString(R.string.badge_budget_master))
         assertThat(gamification.participationToday).isEqualTo(66.6)
         assertThat(gamification.membersLoggedToday).isEqualTo(2)
         assertThat(gamification.totalMembers).isEqualTo(3)
-        assertThat(gamification.insightMessage).isEqualTo("Great job staying on track!")
+        assertThat(gamification.insightMessageText).isEqualTo(LocalizedString(R.string.insight_budget_exceeded, listOf("₹500")))
     }
 
     @Test
@@ -262,7 +264,7 @@ class HouseholdModelsTest {
         assertThat(gamification.participationToday).isEqualTo(0.0)
         assertThat(gamification.membersLoggedToday).isEqualTo(0)
         assertThat(gamification.totalMembers).isEqualTo(0)
-        assertThat(gamification.insightMessage).isNull()
+        assertThat(gamification.insightMessageText).isNull()
     }
 
     @Test

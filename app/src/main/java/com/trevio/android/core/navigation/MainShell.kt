@@ -30,8 +30,11 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.annotation.StringRes
+import com.trevio.android.R
 import androidx.navigation.NavGraphBuilder
 import androidx.navigation.NavHostController
 import androidx.navigation.NavType
@@ -91,18 +94,18 @@ class MainShellViewModel @Inject constructor(
 
 data class BottomNavItem(
     val route: String,
-    val label: String,
+    @StringRes val labelResId: Int,
     val selectedIcon: ImageVector,
     val unselectedIcon: ImageVector
 )
 
 val baseBottomNavItems = listOf(
-    BottomNavItem(TrevioRoute.Home.route, "Home", Icons.Filled.Home, Icons.Outlined.Home),
-    BottomNavItem(TrevioRoute.Groups.route, "Groups", Icons.Filled.Group, Icons.Outlined.Group),
-    BottomNavItem(TrevioRoute.Profile.route, "Profile", Icons.Filled.Person, Icons.Outlined.Person)
+    BottomNavItem(TrevioRoute.Home.route, R.string.nav_home, Icons.Filled.Home, Icons.Outlined.Home),
+    BottomNavItem(TrevioRoute.Groups.route, R.string.nav_groups, Icons.Filled.Group, Icons.Outlined.Group),
+    BottomNavItem(TrevioRoute.Profile.route, R.string.nav_profile, Icons.Filled.Person, Icons.Outlined.Person)
 )
 
-val adminNavItem = BottomNavItem(TrevioRoute.Admin.route, "Dashboard", Icons.Filled.Shield, Icons.Outlined.Shield)
+val adminNavItem = BottomNavItem(TrevioRoute.Admin.route, R.string.nav_dashboard, Icons.Filled.Shield, Icons.Outlined.Shield)
 
 @Composable
 fun MainShell(
@@ -156,12 +159,12 @@ fun MainShell(
                             icon = {
                                 Icon(
                                     imageVector = if (currentRoute == item.route) item.selectedIcon else item.unselectedIcon,
-                                    contentDescription = item.label
+                                    contentDescription = stringResource(item.labelResId)
                                 )
                             },
                             label = {
                                 Text(
-                                    item.label,
+                                    stringResource(item.labelResId),
                                     fontWeight = if (currentRoute == item.route) FontWeight.SemiBold else FontWeight.Normal,
                                     style = MaterialTheme.typography.labelSmall
                                 )

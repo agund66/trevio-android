@@ -1,5 +1,6 @@
 package com.trevio.android.ui.support
 
+import androidx.annotation.StringRes
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -21,6 +22,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
@@ -30,7 +32,10 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.navigation.NavController
 import com.trevio.android.core.designsystem.components.LoadingIndicator
+import com.trevio.android.core.designsystem.components.formatRelativeTimeText
+import com.trevio.android.core.designsystem.theme.*
 import com.trevio.android.core.navigation.TrevioRouteSupport
+import com.trevio.android.R
 import com.trevio.android.domain.model.HelpArticle
 import com.trevio.android.domain.model.SupportCategory
 import com.trevio.android.domain.model.SupportMessage
@@ -40,6 +45,7 @@ import com.trevio.android.domain.model.SupportTicket
 import com.trevio.android.domain.model.SupportTicketContext
 import com.trevio.android.domain.repository.SupportService
 import com.trevio.android.util.DateUtils
+import com.trevio.android.util.toStringResId
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -57,7 +63,7 @@ class SupportViewModel @Inject constructor(
     data class State(
         val isLoading: Boolean = true,
         val articles: List<HelpArticle> = emptyList(),
-        val error: String? = null
+        @StringRes val error: Int? = null
     )
 
     private val _state = MutableStateFlow(State())
@@ -70,7 +76,7 @@ class SupportViewModel @Inject constructor(
         viewModelScope.launch {
             supportService.getHelpArticles()
                 .onSuccess { articles -> _state.value = State(isLoading = false, articles = articles) }
-                .onFailure { e -> _state.value = State(isLoading = false, error = e.message) }
+                .onFailure { e -> _state.value = State(isLoading = false, error = e.toStringResId()) }
         }
     }
 }
@@ -81,7 +87,7 @@ class CreateTicketViewModel @Inject constructor(
 ) : ViewModel() {
     data class State(
         val isSubmitting: Boolean = false,
-        val error: String? = null,
+        @StringRes val error: Int? = null,
         val createdTicketId: String? = null
     )
 
@@ -98,7 +104,7 @@ class CreateTicketViewModel @Inject constructor(
         viewModelScope.launch {
             supportService.createTicket(subject, description, category, context)
                 .onSuccess { id -> _state.value = State(isSubmitting = false, createdTicketId = id) }
-                .onFailure { e -> _state.value = State(isSubmitting = false, error = e.message) }
+                .onFailure { e -> _state.value = State(isSubmitting = false, error = e.toStringResId()) }
         }
     }
 }
@@ -112,7 +118,7 @@ class MyTicketsViewModel @Inject constructor(
         val tickets: List<SupportTicket> = emptyList(),
         val hasMore: Boolean = false,
         val loadingMore: Boolean = false,
-        val error: String? = null
+        @StringRes val error: Int? = null
     )
 
     private val _state = MutableStateFlow(State())
@@ -125,7 +131,7 @@ class MyTicketsViewModel @Inject constructor(
         viewModelScope.launch {
             supportService.getMyTickets(20, null)
                 .onSuccess { result -> _state.value = State(isLoading = false, tickets = result.items, hasMore = result.hasMore) }
-                .onFailure { e -> _state.value = State(isLoading = false, error = e.message) }
+                .onFailure { e -> _state.value = State(isLoading = false, error = e.toStringResId()) }
         }
     }
 
@@ -158,7 +164,7 @@ class TicketDetailViewModel @Inject constructor(
         val ticket: SupportTicket? = null,
         val messages: List<SupportMessage> = emptyList(),
         val isSending: Boolean = false,
-        val error: String? = null
+        @StringRes val error: Int? = null
     )
 
     private val _state = MutableStateFlow(State())
@@ -172,7 +178,7 @@ class TicketDetailViewModel @Inject constructor(
 
             val ticket = ticketResult.getOrNull()
             val messages = messagesResult.getOrNull() ?: emptyList()
-            val error = ticketResult.exceptionOrNull()?.message ?: messagesResult.exceptionOrNull()?.message
+            val error = if (ticketResult.isFailure || messagesResult.isFailure) (ticketResult.exceptionOrNull() ?: messagesResult.exceptionOrNull())?.toStringResId() ?: R.string.common_failed else null
 
             _state.value = State(
                 isLoading = false,
@@ -206,7 +212,7 @@ class TicketDetailViewModel @Inject constructor(
                         }
                 }
                 .onFailure { e ->
-                    _state.value = _state.value.copy(isSending = false, error = e.message)
+                    _state.value = _state.value.copy(isSending = false, error = e.toStringResId())
                 }
         }
     }
@@ -249,10 +255,10 @@ fun SupportScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Help & Support", fontWeight = FontWeight.SemiBold) },
+                title = { Text(stringResource(R.string.support_help_support), fontWeight = FontWeight.SemiBold) },
                 navigationIcon = {
                     IconButton(onClick = { navController.popBackStack() }) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back")
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, stringResource(R.string.support_back))
                     }
                 }
             )
@@ -272,7 +278,7 @@ fun SupportScreen(
             ) {
                 QuickActionCard(
                     icon = Icons.Filled.Edit,
-                    label = "Report Issue",
+                    label = stringResource(R.string.support_report_issue),
                     modifier = Modifier.weight(1f),
                     onClick = {
                         navController.navigate(
@@ -282,7 +288,7 @@ fun SupportScreen(
                 )
                 QuickActionCard(
                     icon = Icons.Filled.Receipt,
-                    label = "My Tickets",
+                    label = stringResource(R.string.support_my_tickets),
                     modifier = Modifier.weight(1f),
                     onClick = { navController.navigate(TrevioRouteSupport.MyTickets.route) }
                 )
@@ -292,8 +298,8 @@ fun SupportScreen(
             OutlinedTextField(
                 value = searchQuery,
                 onValueChange = { searchQuery = it },
-                placeholder = { Text("Search articles...") },
-                leadingIcon = { Icon(Icons.Filled.Search, "Search") },
+                placeholder = { Text(stringResource(R.string.support_search_articles)) },
+                leadingIcon = { Icon(Icons.Filled.Search, stringResource(R.string.common_search)) },
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = 16.dp, vertical = 4.dp),
@@ -313,7 +319,7 @@ fun SupportScreen(
                         FilterChip(
                             selected = activeCategory == "all",
                             onClick = { activeCategory = "all" },
-                            label = { Text("All") }
+                            label = { Text(stringResource(R.string.admin_support_filter_all)) }
                         )
                     }
                     items(articleCategories) { cat ->
@@ -331,7 +337,7 @@ fun SupportScreen(
                 state.isLoading -> LoadingIndicator()
                 state.error != null -> {
                     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                        Text("Error: ${state.error}", color = MaterialTheme.colorScheme.error)
+                        Text(stringResource(state.error!!), color = MaterialTheme.colorScheme.error)
                     }
                 }
                 else -> {
@@ -345,7 +351,7 @@ fun SupportScreen(
                     if (filtered.isEmpty()) {
                         Box(Modifier.fillMaxSize().padding(32.dp), contentAlignment = Alignment.Center) {
                             Text(
-                                "No articles found. Try reporting your issue directly.",
+                                stringResource(R.string.support_no_articles_msg),
                                 style = MaterialTheme.typography.bodyMedium,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
@@ -440,10 +446,10 @@ fun HelpArticleDetailScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Article", fontWeight = FontWeight.SemiBold) },
+                title = { Text(stringResource(R.string.support_article), fontWeight = FontWeight.SemiBold) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back")
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, stringResource(R.string.support_back))
                     }
                 }
             )
@@ -493,7 +499,7 @@ fun HelpArticleDetailScreen(
             ) {
                 Icon(Icons.Filled.Edit, contentDescription = null, modifier = Modifier.size(18.dp))
                 Spacer(Modifier.width(8.dp))
-                Text("Still need help? Report an issue")
+                Text(stringResource(R.string.support_still_need_help))
             }
         }
     }
@@ -528,23 +534,23 @@ fun CreateTicketScreen(
     }
 
     val categories = listOf(
-        SupportCategory.CALCULATION to "Balance & Calculations" to "Balance looks wrong, split issues",
-        SupportCategory.SETTLEMENT to "Settlement Issue" to "Payment recording, settlement not updating",
-        SupportCategory.EXPENSE to "Expense Issue" to "Can't add/edit/delete expense",
-        SupportCategory.GROUP_ACCESS to "Group Access" to "Can't join, create, or access a group",
-        SupportCategory.PAYMENT_INFO to "Payment Info" to "UPI ID or phone number issues",
-        SupportCategory.ACCOUNT to "Account Issue" to "Profile, currency, or account settings",
-        SupportCategory.BUG to "Bug / Crash" to "App crashing, data not loading",
-        SupportCategory.OTHER to "Other" to "Something else entirely"
+        SupportCategory.CALCULATION to stringResource(R.string.support_category_calculation) to stringResource(R.string.support_category_calculation_desc),
+        SupportCategory.SETTLEMENT to stringResource(R.string.support_category_settlement) to stringResource(R.string.support_category_settlement_desc),
+        SupportCategory.EXPENSE to stringResource(R.string.support_category_expense) to stringResource(R.string.support_category_expense_desc),
+        SupportCategory.GROUP_ACCESS to stringResource(R.string.support_category_group_access) to stringResource(R.string.support_category_group_access_desc),
+        SupportCategory.PAYMENT_INFO to stringResource(R.string.support_category_payment_info) to stringResource(R.string.support_category_payment_info_desc),
+        SupportCategory.ACCOUNT to stringResource(R.string.support_category_account) to stringResource(R.string.support_category_account_desc),
+        SupportCategory.BUG to stringResource(R.string.support_category_bug_crash) to stringResource(R.string.support_category_bug_crash_desc),
+        SupportCategory.OTHER to stringResource(R.string.support_category_other) to stringResource(R.string.support_category_other_desc)
     )
 
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Report an Issue", fontWeight = FontWeight.SemiBold) },
+                title = { Text(stringResource(R.string.support_report_issue), fontWeight = FontWeight.SemiBold) },
                 navigationIcon = {
                     IconButton(onClick = { navController.popBackStack() }) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back")
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, stringResource(R.string.support_back))
                     }
                 }
             )
@@ -564,14 +570,14 @@ fun CreateTicketScreen(
                     colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)
                 ) {
                     Text(
-                        "📍 Context: ${contextGroupName ?: contextGroupId ?: "Group"}${if (contextScreen != null) " • $contextScreen" else ""}",
+                        stringResource(R.string.support_context_label, (contextGroupName ?: contextGroupId ?: stringResource(R.string.common_group)) + if (contextScreen != null) " • $contextScreen" else ""),
                         modifier = Modifier.padding(12.dp),
                         style = MaterialTheme.typography.bodySmall
                     )
                 }
             }
 
-            Text("What type of issue?", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
+            Text(stringResource(R.string.support_what_type), style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
             Spacer(Modifier.height(8.dp))
 
             // Category chips — FlowRow wraps them nicely
@@ -597,7 +603,7 @@ fun CreateTicketScreen(
             OutlinedTextField(
                 value = subject,
                 onValueChange = { subject = it },
-                label = { Text("Subject") },
+                label = { Text(stringResource(R.string.support_subject)) },
                 modifier = Modifier.fillMaxWidth(),
                 singleLine = true,
                 shape = RoundedCornerShape(12.dp)
@@ -608,7 +614,7 @@ fun CreateTicketScreen(
             OutlinedTextField(
                 value = description,
                 onValueChange = { description = it },
-                label = { Text("Describe the issue") },
+                label = { Text(stringResource(R.string.support_describe_issue)) },
                 modifier = Modifier.fillMaxWidth().heightIn(min = 120.dp),
                 shape = RoundedCornerShape(12.dp),
                 keyboardOptions = KeyboardOptions(
@@ -617,7 +623,7 @@ fun CreateTicketScreen(
                 ),
                 supportingText = {
                     Text(
-                        "${description.length}/2000 characters",
+                        stringResource(R.string.support_characters_count, description.length),
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -626,7 +632,7 @@ fun CreateTicketScreen(
             )
             if (description.isNotBlank() && description.trim().length < 10) {
                 Text(
-                    "Please describe your issue (at least 10 characters)",
+                    stringResource(R.string.support_min_description),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.error,
                     modifier = Modifier.padding(top = 4.dp)
@@ -635,7 +641,7 @@ fun CreateTicketScreen(
 
             state.error?.let { err ->
                 Spacer(Modifier.height(8.dp))
-                Text("Error: $err", color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
+                Text(stringResource(err), color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
             }
 
             Spacer(Modifier.height(16.dp))
@@ -660,7 +666,7 @@ fun CreateTicketScreen(
                 } else {
                     Icon(Icons.AutoMirrored.Filled.Send, contentDescription = null, modifier = Modifier.size(18.dp))
                     Spacer(Modifier.width(8.dp))
-                    Text("Submit Issue")
+                    Text(stringResource(R.string.support_submit))
                 }
             }
         }
@@ -680,17 +686,17 @@ fun MyTicketsScreen(navController: NavController) {
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("My Tickets", fontWeight = FontWeight.SemiBold) },
+                title = { Text(stringResource(R.string.support_my_tickets), fontWeight = FontWeight.SemiBold) },
                 navigationIcon = {
                     IconButton(onClick = { navController.popBackStack() }) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back")
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, stringResource(R.string.support_back))
                     }
                 },
                 actions = {
                     IconButton(onClick = {
                         navController.navigate(TrevioRouteSupport.CreateTicket.route)
                     }) {
-                        Icon(Icons.Filled.Add, "New Ticket")
+                        Icon(Icons.Filled.Add, stringResource(R.string.support_new_ticket))
                     }
                 }
             )
@@ -700,7 +706,7 @@ fun MyTicketsScreen(navController: NavController) {
             state.isLoading -> LoadingIndicator(modifier = Modifier.padding(padding))
             state.error != null -> {
                 Box(Modifier.fillMaxSize().padding(padding), contentAlignment = Alignment.Center) {
-                    Text("Error: ${state.error}", color = MaterialTheme.colorScheme.error)
+                    Text(stringResource(state.error!!), color = MaterialTheme.colorScheme.error)
                 }
             }
             state.tickets.isEmpty() -> {
@@ -711,14 +717,14 @@ fun MyTicketsScreen(navController: NavController) {
                 ) {
                     Icon(Icons.Filled.Receipt, contentDescription = null, modifier = Modifier.size(64.dp), tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.5f))
                     Spacer(Modifier.height(16.dp))
-                    Text("No tickets yet", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                    Text(stringResource(R.string.support_no_tickets), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
                     Spacer(Modifier.height(8.dp))
-                    Text("When you report an issue, it will appear here", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(stringResource(R.string.support_no_tickets_msg), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     Spacer(Modifier.height(24.dp))
                     Button(onClick = { navController.navigate(TrevioRouteSupport.CreateTicket.route) }) {
                         Icon(Icons.Filled.Add, contentDescription = null, modifier = Modifier.size(18.dp))
                         Spacer(Modifier.width(8.dp))
-                        Text("Report an Issue")
+                        Text(stringResource(R.string.support_report_issue))
                     }
                 }
             }
@@ -801,7 +807,7 @@ private fun TicketListItem(ticket: SupportTicket, onClick: () -> Unit) {
                         overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
                     )
                     if (ticket.unreadByUser) {
-                        Badge { Text("NEW", style = MaterialTheme.typography.labelSmall) }
+                        Badge { Text(stringResource(R.string.common_new), style = MaterialTheme.typography.labelSmall) }
                     }
                 }
                 Spacer(Modifier.height(4.dp))
@@ -819,11 +825,11 @@ private fun TicketListItem(ticket: SupportTicket, onClick: () -> Unit) {
                 ) {
                     AssistChip(
                         onClick = {},
-                        label = { Text(ticket.status.name.replace("_", " "), style = MaterialTheme.typography.labelSmall) },
+                        label = { Text(stringResource(ticket.status.toStringResId()), style = MaterialTheme.typography.labelSmall) },
                         colors = AssistChipDefaults.assistChipColors(labelColor = statusColor)
                     )
                     Text(
-                        DateUtils.formatRelativeTime(ticket.updatedAt),
+                        formatRelativeTimeText(ticket.updatedAt),
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -864,10 +870,10 @@ fun TicketDetailScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Ticket", fontWeight = FontWeight.SemiBold) },
+                title = { Text(stringResource(R.string.support_ticket), fontWeight = FontWeight.SemiBold) },
                 navigationIcon = {
                     IconButton(onClick = { navController.popBackStack() }) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back")
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, stringResource(R.string.support_back))
                     }
                 }
             )
@@ -879,7 +885,7 @@ fun TicketDetailScreen(
                         // Closed ticket notice
                         if (state.ticket!!.status == SupportStatus.CLOSED) {
                             Text(
-                                "This ticket is closed. Send a message to reopen it.",
+                                stringResource(R.string.support_closed_notice),
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .padding(horizontal = 16.dp, vertical = 6.dp),
@@ -891,7 +897,7 @@ fun TicketDetailScreen(
                         // Error
                         state.error?.let { err ->
                             Text(
-                                "Error: $err",
+                                stringResource(err),
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .padding(horizontal = 16.dp, vertical = 4.dp),
@@ -911,8 +917,8 @@ fun TicketDetailScreen(
                                 placeholder = {
                                     Text(
                                         if (state.ticket!!.status == SupportStatus.CLOSED)
-                                            "Send a message to reopen..."
-                                        else "Type your reply..."
+                                            stringResource(R.string.support_reopen_message)
+                                        else stringResource(R.string.support_type_reply)
                                     )
                                 },
                                 modifier = Modifier.weight(1f),
@@ -932,7 +938,7 @@ fun TicketDetailScreen(
                                 if (state.isSending) {
                                     CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
                                 } else {
-                                    Icon(Icons.AutoMirrored.Filled.Send, "Send", tint = MaterialTheme.colorScheme.primary)
+                                    Icon(Icons.AutoMirrored.Filled.Send, stringResource(R.string.support_send_message), tint = MaterialTheme.colorScheme.primary)
                                 }
                             }
                         }
@@ -949,7 +955,7 @@ fun TicketDetailScreen(
         val ticket = state.ticket
         if (ticket == null) {
             Box(Modifier.fillMaxSize().padding(padding), contentAlignment = Alignment.Center) {
-                Text("Ticket not found")
+                Text(stringResource(R.string.support_ticket_not_found))
             }
             return@Scaffold
         }
@@ -977,7 +983,7 @@ fun TicketDetailScreen(
                         )
                         AssistChip(
                             onClick = {},
-                            label = { Text(ticket.status.name.replace("_", " ")) }
+                            label = { Text(stringResource(ticket.status.toStringResId())) }
                         )
                     }
                     Spacer(Modifier.height(8.dp))
@@ -988,7 +994,7 @@ fun TicketDetailScreen(
                     )
                     Spacer(Modifier.height(8.dp))
                     Text(
-                        "Category: ${ticket.category.name.replace("_", " ")}",
+                        stringResource(R.string.support_category_label, stringResource(ticket.category.toStringResId())),
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -1036,7 +1042,7 @@ private fun MessageBubble(message: SupportMessage) {
             Column(modifier = Modifier.padding(12.dp)) {
                 if (!isUser) {
                     Text(
-                        "Support Team",
+                        stringResource(R.string.support_team),
                         style = MaterialTheme.typography.labelSmall,
                         fontWeight = FontWeight.SemiBold,
                         color = MaterialTheme.colorScheme.primary

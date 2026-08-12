@@ -16,11 +16,13 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
 import android.app.Activity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.trevio.android.R
+import com.trevio.android.core.designsystem.theme.*
 import androidx.credentials.CredentialManager
 import androidx.credentials.GetCredentialRequest
 import androidx.credentials.GetCredentialResponse
@@ -51,9 +53,10 @@ class AuthViewModel @Inject constructor(
         data object Idle : AuthState()
         data object Loading : AuthState()
         data object NeedsTnC : AuthState()
+        data object NeedsPhone : AuthState()
         data object Authenticated : AuthState()
         data object Blocked : AuthState()
-        data class Error(val message: String) : AuthState()
+        data class Error(@androidx.annotation.StringRes val messageResId: Int, val detail: String? = null) : AuthState()
     }
 
     private val _state = MutableStateFlow<AuthState>(AuthState.Idle)
@@ -70,17 +73,19 @@ class AuthViewModel @Inject constructor(
                     _state.value = AuthState.Blocked
                 } else if (user != null && !user.acceptedTnC) {
                     _state.value = AuthState.NeedsTnC
+                } else if (user != null && user.phoneNumber.isBlank()) {
+                    _state.value = AuthState.NeedsPhone
                 } else {
                     _state.value = AuthState.Authenticated
                 }
             }.onFailure { e ->
-                _state.value = AuthState.Error(e.message ?: "Sign-in failed")
+                _state.value = AuthState.Error(R.string.auth_error, e.message)
             }
         }
     }
 
-    fun setError(message: String) {
-        _state.value = AuthState.Error(message)
+    fun setError(@androidx.annotation.StringRes messageResId: Int, detail: String? = null) {
+        _state.value = AuthState.Error(messageResId, detail)
     }
 
     fun signInWithGoogleWeb(activity: Activity) {
@@ -94,11 +99,13 @@ class AuthViewModel @Inject constructor(
                     _state.value = AuthState.Blocked
                 } else if (user != null && !user.acceptedTnC) {
                     _state.value = AuthState.NeedsTnC
+                } else if (user != null && user.phoneNumber.isBlank()) {
+                    _state.value = AuthState.NeedsPhone
                 } else {
                     _state.value = AuthState.Authenticated
                 }
             }.onFailure { e ->
-                _state.value = AuthState.Error(e.message ?: "Sign-in failed")
+                _state.value = AuthState.Error(R.string.auth_error, e.message)
             }
         }
     }
@@ -111,6 +118,7 @@ fun AuthScreen(
 ) {
     val state by viewModel.state.collectAsState()
     val context = LocalContext.current
+    val webClientId = stringResource(R.string.default_web_client_id)
     val coroutineScope = rememberCoroutineScope()
     val credentialManager = remember { CredentialManager.create(context) }
 
@@ -121,13 +129,18 @@ fun AuthScreen(
                     popUpTo(0) { inclusive = true }
                 }
             }
+            is AuthViewModel.AuthState.NeedsPhone -> {
+                navController.navigate(TrevioRoute.PhoneSetup.route) {
+                    popUpTo(0) { inclusive = true }
+                }
+            }
             is AuthViewModel.AuthState.Authenticated -> {
                 navController.navigate(TrevioRoute.Main.route) {
                     popUpTo(0) { inclusive = true }
                 }
             }
             is AuthViewModel.AuthState.Blocked -> {
-                viewModel.setError("Your account has been blocked. Please contact support.")
+                viewModel.setError(R.string.auth_blocked)
             }
             else -> {}
         }
@@ -136,7 +149,7 @@ fun AuthScreen(
     fun launchGoogleSignIn() {
         val googleIdOption = GetGoogleIdOption.Builder()
             .setFilterByAuthorizedAccounts(false)
-            .setServerClientId(context.getString(R.string.default_web_client_id))
+            .setServerClientId(webClientId)
             .build()
 
         val request = GetCredentialRequest.Builder()
@@ -155,12 +168,12 @@ fun AuthScreen(
                 if (activity != null) {
                     viewModel.signInWithGoogleWeb(activity)
                 } else {
-                    viewModel.setError("No Google accounts found. Please add a Google account in Settings.")
+                    viewModel.setError(R.string.auth_no_account)
                 }
             } catch (e: GetCredentialException) {
-                viewModel.setError("Sign-in failed: ${e.message}")
+                viewModel.setError(R.string.auth_error, e.message)
             } catch (e: Exception) {
-                viewModel.setError("Sign-in failed: ${e.message}")
+                viewModel.setError(R.string.auth_error, e.message)
             }
         }
     }
@@ -194,30 +207,30 @@ fun AuthScreen(
             ) {
                 Image(
                     painter = painterResource(R.drawable.ic_trevio_logo),
-                    contentDescription = "Trevio",
+                    contentDescription = stringResource(R.string.app_name),
                     modifier = Modifier.size(72.dp)
                 )
             }
             Spacer(modifier = Modifier.height(24.dp))
             Text(
-                text = "Trevio",
+                text = stringResource(R.string.app_name),
                 style = MaterialTheme.typography.headlineMedium,
                 fontWeight = FontWeight.Bold,
                 color = Color.White
             )
             Spacer(modifier = Modifier.height(8.dp))
             Text(
-                text = "Split bills. Simplify life.",
+                text = stringResource(R.string.auth_tagline),
                 style = MaterialTheme.typography.bodyLarge,
                 color = Color.White.copy(alpha = 0.85f)
             )
 
             Spacer(modifier = Modifier.height(32.dp))
-            FeaturePoint("Track expenses with groups")
+            FeaturePoint(stringResource(R.string.auth_feature_track))
             Spacer(modifier = Modifier.height(8.dp))
-            FeaturePoint("Split bills with friends instantly")
+            FeaturePoint(stringResource(R.string.auth_feature_split))
             Spacer(modifier = Modifier.height(8.dp))
-            FeaturePoint("Settle up via UPI with one tap")
+            FeaturePoint(stringResource(R.string.auth_feature_settle))
 
             Spacer(modifier = Modifier.height(40.dp))
             if (state is AuthViewModel.AuthState.Loading) {
@@ -234,7 +247,7 @@ fun AuthScreen(
                     )
                 ) {
                     Text(
-                        text = "Continue with Google",
+                        text = stringResource(R.string.auth_sign_in),
                         color = MaterialTheme.colorScheme.primary,
                         fontWeight = FontWeight.SemiBold,
                         style = MaterialTheme.typography.titleMedium
@@ -243,7 +256,7 @@ fun AuthScreen(
             }
             Spacer(modifier = Modifier.height(16.dp))
             Text(
-                text = "By continuing, you agree to our Terms & Conditions",
+                text = stringResource(R.string.auth_terms_notice),
                 style = MaterialTheme.typography.bodySmall,
                 color = Color.White.copy(alpha = 0.7f),
                 textAlign = TextAlign.Center
@@ -255,7 +268,13 @@ fun AuthScreen(
                     shape = RoundedCornerShape(12.dp)
                 ) {
                     Text(
-                        text = (state as AuthViewModel.AuthState.Error).message,
+                        text = buildString {
+                            append(stringResource((state as AuthViewModel.AuthState.Error).messageResId))
+                            (state as AuthViewModel.AuthState.Error).detail?.takeIf { it.isNotBlank() }?.let {
+                                append(": ")
+                                append(it)
+                            }
+                        },
                         color = Color.White,
                         style = MaterialTheme.typography.bodySmall,
                         textAlign = TextAlign.Center,
@@ -307,11 +326,11 @@ private fun handleCredentialResponse(
                 val googleIdTokenCredential = GoogleIdTokenCredential.createFrom(credential.data)
                 viewModel.signInWithGoogle(googleIdTokenCredential.idToken)
             } catch (e: GoogleIdTokenParsingException) {
-                viewModel.setError("Failed to parse sign-in token")
+                viewModel.setError(R.string.auth_error_parse)
             }
         }
         else -> {
-            viewModel.setError("Unexpected credential type: ${credential.type}")
+            viewModel.setError(R.string.auth_error, credential.type)
         }
     }
 }

@@ -16,6 +16,7 @@ import com.trevio.android.domain.model.SplitType
 import com.trevio.android.domain.model.TransactionType
 import com.trevio.android.domain.repository.ExpenseService
 import com.trevio.android.domain.repository.ExchangeRateService
+import com.trevio.android.util.AppConstants
 import com.trevio.android.util.Calculations
 import com.trevio.android.util.DateUtils
 import com.trevio.android.util.ErrorMessages
@@ -60,6 +61,11 @@ class FirebaseExpenseServiceImpl @Inject constructor(
             val groupRef = firestore.collection("groups").document(groupId)
             val groupDoc = groupRef.get().await()
             if (!groupDoc.exists()) return Result.failure(Exception(ErrorMessages.GROUP_NOT_FOUND))
+
+            // Reject expense creation in archived groups
+            if (groupDoc.getBoolean("archived") == true) {
+                return Result.failure(Exception("Cannot add expenses to an archived group"))
+            }
 
             val memberDoc = groupRef.collection("members").document(uid).get().await()
             if (!memberDoc.exists()) return Result.failure(Exception("You are not a member of this group"))
@@ -228,6 +234,14 @@ class FirebaseExpenseServiceImpl @Inject constructor(
             if (groupId.isBlank() || expenseId.isBlank()) return Result.failure(Exception("Group ID and Expense ID are required"))
 
             val groupRef = firestore.collection("groups").document(groupId)
+            val groupDoc = groupRef.get().await()
+            if (!groupDoc.exists()) return Result.failure(Exception(ErrorMessages.GROUP_NOT_FOUND))
+
+            // Reject expense edits in archived groups
+            if (groupDoc.getBoolean("archived") == true) {
+                return Result.failure(Exception("Cannot edit expenses in an archived group"))
+            }
+
             val expenseRef = groupRef.collection("expenses").document(expenseId)
             val expenseDoc = expenseRef.get().await()
             if (!expenseDoc.exists()) return Result.failure(Exception(ErrorMessages.EXPENSE_NOT_FOUND))
@@ -242,7 +256,6 @@ class FirebaseExpenseServiceImpl @Inject constructor(
             if (!isCreator && !isAdmin) return Result.failure(Exception("Only the expense creator or group admin can edit this expense"))
 
             // Check if household group
-            val groupDoc = groupRef.get().await()
             val templateStr = groupDoc.getString("template") ?: "casual"
             val isHousehold = templateStr.equals("household", ignoreCase = true)
 
@@ -257,10 +270,12 @@ class FirebaseExpenseServiceImpl @Inject constructor(
             updateData["note"] = note
             updateData["transactionType"] = transactionType.toStorageString()
 
-            val oldCurrency = oldExpense["currency"] as? String ?: "INR"
+            val oldCurrency = oldExpense["currency"] as? String ?: AppConstants.BASE_CURRENCY
             val newCurrency = if (currency.isNotBlank()) currency else oldCurrency
             if (newCurrency != oldCurrency) {
-                val newRate = exchangeRateService.getRateToBase(newCurrency).getOrDefault(1.0)
+                val rateResult = exchangeRateService.getRateToBase(newCurrency)
+                val newRate = rateResult.getOrNull()
+                    ?: return Result.failure(Exception("Failed to get exchange rate for currency: $newCurrency"))
                 updateData["exchangeRateToBase"] = newRate
             }
 
@@ -443,7 +458,7 @@ class FirebaseExpenseServiceImpl @Inject constructor(
                     expenseId = doc.id,
                     description = data["description"] as? String ?: "",
                     amount = (data["amount"] as? Number)?.toDouble() ?: 0.0,
-                    currency = data["currency"] as? String ?: "INR",
+                    currency = data["currency"] as? String ?: AppConstants.BASE_CURRENCY,
                     paidBy = data["paidBy"] as? String ?: "",
                     splitType = SplitType.valueOf((data["splitType"] as? String ?: "equal").uppercase()),
                     splits = splitsRaw.mapValues { (_, v) ->

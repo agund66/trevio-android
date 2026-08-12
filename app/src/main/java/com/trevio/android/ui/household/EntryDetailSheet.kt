@@ -21,10 +21,13 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.trevio.android.R
+import com.trevio.android.core.designsystem.theme.*
 import com.trevio.android.domain.model.Expense
 import com.trevio.android.domain.model.Member
 import com.trevio.android.domain.model.TransactionType
@@ -69,13 +72,13 @@ fun EntryDetailSheet(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = "Entry Details",
+                    text = stringResource(R.string.entry_detail_title),
                     fontSize = 18.sp,
                     fontWeight = FontWeight.SemiBold,
                     color = MaterialTheme.colorScheme.onSurface
                 )
                 IconButton(onClick = onDismiss) {
-                    Icon(Icons.Default.Close, contentDescription = "Close")
+                    Icon(Icons.Default.Close, contentDescription = stringResource(R.string.entry_detail_close))
                 }
             }
 
@@ -89,21 +92,21 @@ fun EntryDetailSheet(
             ) {
                 Surface(
                     shape = RoundedCornerShape(16.dp),
-                    color = (category?.color ?: Color.Gray).copy(alpha = 0.15f),
+                    color = (category?.color ?: CategoryFallback).copy(alpha = 0.15f),
                     modifier = Modifier.size(56.dp)
                 ) {
                     Box(contentAlignment = Alignment.Center) {
                         Icon(
                             imageVector = category?.icon ?: Icons.Default.Category,
-                            contentDescription = "Category",
+                            contentDescription = stringResource(R.string.entry_detail_category),
                             modifier = Modifier.size(28.dp),
-                            tint = category?.color ?: Color.Gray
+                            tint = category?.color ?: CategoryFallback
                         )
                     }
                 }
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
-                        text = category?.label ?: "Other",
+                        text = category?.labelResId?.let { stringResource(it) } ?: stringResource(R.string.entry_detail_other),
                         fontSize = 13.sp,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -111,18 +114,18 @@ fun EntryDetailSheet(
                         text = "${if (isIncome) "+" else "-"}$currencySymbol${FormatUtils.formatAmount(entry.amount)}",
                         fontSize = 28.sp,
                         fontWeight = FontWeight.Bold,
-                        color = if (isIncome) Color(0xFF22C55E) else MaterialTheme.colorScheme.onSurface
+                        color = if (isIncome) BalancePositive else MaterialTheme.colorScheme.onSurface
                     )
                 }
                 Surface(
                     shape = RoundedCornerShape(20.dp),
-                    color = if (isIncome) Color(0xFF22C55E).copy(alpha = 0.12f) else Color(0xFFEF4444).copy(alpha = 0.12f)
+                    color = if (isIncome) BalancePositive.copy(alpha = 0.12f) else BalanceNegative.copy(alpha = 0.12f)
                 ) {
                     Text(
-                        text = if (isIncome) "Received" else "Spent",
+                        text = if (isIncome) stringResource(R.string.entry_detail_received) else stringResource(R.string.entry_detail_spent),
                         fontSize = 12.sp,
                         fontWeight = FontWeight.SemiBold,
-                        color = if (isIncome) Color(0xFF16A34A) else Color(0xFFDC2626),
+                        color = if (isIncome) TrevioSuccess else TrevioError,
                         modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
                     )
                 }
@@ -131,10 +134,11 @@ fun EntryDetailSheet(
             Spacer(modifier = Modifier.height(24.dp))
 
             // Description (if different from category label)
-            if (entry.description.isNotBlank() && entry.description != (category?.label ?: "")) {
+            val categoryLabel = category?.labelResId?.let { stringResource(it) } ?: ""
+            if (entry.description.isNotBlank() && entry.description != categoryLabel) {
                 DetailRow(
                     icon = Icons.Default.Notes,
-                    label = "Description",
+                    label = stringResource(R.string.entry_detail_description),
                     value = entry.description
                 )
                 Spacer(modifier = Modifier.height(12.dp))
@@ -143,8 +147,8 @@ fun EntryDetailSheet(
             // Paid by
             DetailRow(
                 icon = Icons.Default.Person,
-                label = "Paid by",
-                value = payer?.displayName ?: "Someone"
+                label = stringResource(R.string.entry_detail_paid_by),
+                value = payer?.displayName ?: stringResource(R.string.entry_detail_someone)
             )
 
             Spacer(modifier = Modifier.height(12.dp))
@@ -152,7 +156,7 @@ fun EntryDetailSheet(
             // Date
             DetailRow(
                 icon = Icons.Default.CalendarMonth,
-                label = "Date & time",
+                label = stringResource(R.string.entry_detail_date),
                 value = if (entry.date > 0) dateTimeFormat.format(Date(entry.date)) else "—"
             )
 
@@ -161,7 +165,7 @@ fun EntryDetailSheet(
                 Spacer(modifier = Modifier.height(12.dp))
                 DetailRow(
                     icon = Icons.Default.Notes,
-                    label = "Note",
+                    label = stringResource(R.string.entry_detail_note),
                     value = entry.note
                 )
             }
@@ -179,9 +183,9 @@ fun EntryDetailSheet(
                     shape = RoundedCornerShape(12.dp),
                     contentPadding = PaddingValues(vertical = 14.dp)
                 ) {
-                    Icon(Icons.Default.Edit, contentDescription = "Edit", modifier = Modifier.size(18.dp))
+                    Icon(Icons.Default.Edit, contentDescription = stringResource(R.string.entry_detail_edit), modifier = Modifier.size(18.dp))
                     Spacer(modifier = Modifier.width(8.dp))
-                    Text("Edit", fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
+                    Text(stringResource(R.string.entry_detail_edit), fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
                 }
                 OutlinedButton(
                     onClick = { showDeleteConfirm = true },
@@ -189,7 +193,7 @@ fun EntryDetailSheet(
                     colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error),
                     contentPadding = PaddingValues(vertical = 14.dp, horizontal = 20.dp)
                 ) {
-                    Icon(Icons.Default.Delete, contentDescription = "Delete", modifier = Modifier.size(18.dp))
+                    Icon(Icons.Default.Delete, contentDescription = stringResource(R.string.entry_detail_delete), modifier = Modifier.size(18.dp))
                 }
             }
 
@@ -200,21 +204,21 @@ fun EntryDetailSheet(
                     colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.3f))
                 ) {
                     Column(modifier = Modifier.padding(16.dp)) {
-                        Text("Delete this entry?", fontSize = 15.sp, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurface)
-                        Text("This cannot be undone.", fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text(stringResource(R.string.entry_detail_delete_confirm), fontSize = 15.sp, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurface)
+                        Text(stringResource(R.string.entry_detail_cannot_undo), fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         Spacer(modifier = Modifier.height(12.dp))
                         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                             OutlinedButton(
                                 onClick = { showDeleteConfirm = false },
                                 shape = RoundedCornerShape(10.dp),
                                 modifier = Modifier.weight(1f)
-                            ) { Text("Cancel") }
+                            ) { Text(stringResource(R.string.common_cancel)) }
                             Button(
                                 onClick = { showDeleteConfirm = false; onDelete() },
                                 shape = RoundedCornerShape(10.dp),
                                 colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error),
                                 modifier = Modifier.weight(1f)
-                            ) { Text("Delete") }
+                            ) { Text(stringResource(R.string.common_delete)) }
                         }
                     }
                 }

@@ -6,6 +6,7 @@ import com.google.firebase.firestore.Query
 import com.trevio.android.domain.model.PaginatedResult
 import com.trevio.android.domain.model.User
 import com.trevio.android.domain.repository.AdminService
+import com.trevio.android.util.AppConstants
 import com.trevio.android.util.ErrorMessages
 import com.trevio.android.util.friendlyNetworkMessage
 import kotlinx.coroutines.tasks.await
@@ -51,7 +52,7 @@ class FirebaseAdminServiceImpl @Inject constructor(
                     lastName = data["lastName"] as? String ?: "",
                     username = data["username"] as? String ?: "",
                     photoURL = data["photoURL"] as? String ?: "",
-                    defaultCurrency = data["defaultCurrency"] as? String ?: "INR",
+                    defaultCurrency = data["defaultCurrency"] as? String ?: AppConstants.BASE_CURRENCY,
                     acceptedTnC = data["acceptedTnC"] as? Boolean ?: false,
                     role = data["role"] as? String ?: "user",
                     blocked = data["blocked"] as? Boolean ?: false,

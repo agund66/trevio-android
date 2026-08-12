@@ -14,15 +14,19 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.trevio.android.R
+import com.trevio.android.core.designsystem.theme.*
 import com.trevio.android.domain.model.Expense
 import com.trevio.android.domain.model.Member
 import com.trevio.android.domain.model.TransactionType
 import com.trevio.android.util.HouseholdCategories
 import com.trevio.android.util.HouseholdCategory
+import com.trevio.android.util.AppConstants
 import com.trevio.android.util.MemberStatus
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
@@ -66,13 +70,13 @@ fun EditEntrySheet(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = "Edit Entry",
+                    text = stringResource(R.string.edit_entry_title),
                     fontSize = 18.sp,
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.onSurface
                 )
                 IconButton(onClick = onDismiss) {
-                    Icon(Icons.Default.Close, contentDescription = "Close")
+                    Icon(Icons.Default.Close, contentDescription = stringResource(R.string.edit_entry_close))
                 }
             }
 
@@ -87,20 +91,20 @@ fun EditEntrySheet(
                     .padding(3.dp)
             ) {
                 ToggleItem(
-                    text = "Spent",
+                    text = stringResource(R.string.edit_entry_spent),
                     selected = !isIncome,
                     onClick = {
                         isIncome = false
                         // Reset category if current is an income category
                         if (HouseholdCategories.getCategory(selectedCategory)?.isIncome == true) {
-                            selectedCategory = "other"
+                            selectedCategory = AppConstants.DEFAULT_CATEGORY
                         }
                     },
                     modifier = Modifier.weight(1f),
                     selectedColor = MaterialTheme.colorScheme.error
                 )
                 ToggleItem(
-                    text = "Received",
+                    text = stringResource(R.string.edit_entry_received),
                     selected = isIncome,
                     onClick = {
                         isIncome = true
@@ -124,7 +128,7 @@ fun EditEntrySheet(
                     val parts = filtered.split(".")
                     amountText = if (parts.size <= 2) filtered else parts[0] + "." + parts.drop(1).joinToString("")
                 },
-                label = { Text("Amount") },
+                label = { Text(stringResource(R.string.edit_entry_amount)) },
                 prefix = { Text(currencySymbol) },
                 modifier = Modifier.fillMaxWidth(),
                 singleLine = true,
@@ -139,7 +143,7 @@ fun EditEntrySheet(
             OutlinedTextField(
                 value = description,
                 onValueChange = { if (it.length <= 500) description = it },
-                label = { Text("Description (optional)") },
+                label = { Text(stringResource(R.string.edit_entry_description)) },
                 modifier = Modifier.fillMaxWidth(),
                 singleLine = true,
                 shape = RoundedCornerShape(12.dp)
@@ -149,7 +153,7 @@ fun EditEntrySheet(
 
             // Category
             Text(
-                text = "Category",
+                text = stringResource(R.string.edit_entry_category),
                 fontSize = 14.sp,
                 fontWeight = FontWeight.Medium,
                 color = MaterialTheme.colorScheme.onSurface
@@ -173,7 +177,7 @@ fun EditEntrySheet(
 
             // Paid By
             Text(
-                text = "Paid By",
+                text = stringResource(R.string.edit_entry_paid_by),
                 fontSize = 14.sp,
                 fontWeight = FontWeight.Medium,
                 color = MaterialTheme.colorScheme.onSurface
@@ -199,7 +203,7 @@ fun EditEntrySheet(
             OutlinedTextField(
                 value = note,
                 onValueChange = { if (it.length <= 500) note = it },
-                label = { Text("Note (optional)") },
+                label = { Text(stringResource(R.string.edit_entry_note)) },
                 modifier = Modifier.fillMaxWidth(),
                 minLines = 1,
                 maxLines = 3,
@@ -218,7 +222,7 @@ fun EditEntrySheet(
                     )
                 ) {
                     Text(
-                        text = "You can only view this entry. Only the creator or an admin can edit or delete it.",
+                        text = stringResource(R.string.edit_entry_view_only),
                         fontSize = 14.sp,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.padding(16.dp)
@@ -234,13 +238,13 @@ fun EditEntrySheet(
                             onClick = { showDeleteConfirm = false },
                             modifier = Modifier.weight(1f),
                             shape = RoundedCornerShape(12.dp)
-                        ) { Text("Cancel") }
+                        ) { Text(stringResource(R.string.common_cancel)) }
                         Button(
                             onClick = { onDelete(entry.expenseId) },
                             modifier = Modifier.weight(1f),
                             shape = RoundedCornerShape(12.dp),
                             colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
-                        ) { Text("Confirm Delete") }
+                        ) { Text(stringResource(R.string.edit_entry_confirm_delete)) }
                     } else {
                         OutlinedButton(
                             onClick = { showDeleteConfirm = true },
@@ -248,9 +252,9 @@ fun EditEntrySheet(
                             shape = RoundedCornerShape(12.dp),
                             colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error)
                         ) {
-                            Icon(Icons.Default.Delete, contentDescription = "Delete", modifier = Modifier.size(18.dp))
+                            Icon(Icons.Default.Delete, contentDescription = stringResource(R.string.edit_entry_delete), modifier = Modifier.size(18.dp))
                             Spacer(modifier = Modifier.width(4.dp))
-                            Text("Delete")
+                            Text(stringResource(R.string.edit_entry_delete))
                         }
                         Button(
                             onClick = {
@@ -280,7 +284,7 @@ fun EditEntrySheet(
                                     color = Color.White
                                 )
                             } else {
-                                Text("Save Changes")
+                                Text(stringResource(R.string.edit_entry_save_changes))
                             }
                         }
                     }
@@ -342,12 +346,12 @@ private fun CategoryChip(
     ) {
         Icon(
             imageVector = category.icon,
-            contentDescription = category.label,
+            contentDescription = stringResource(category.labelResId),
             tint = category.color,
             modifier = Modifier.size(16.dp)
         )
         Text(
-            text = category.label,
+            text = stringResource(category.labelResId),
             fontSize = 13.sp,
             fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
             color = if (selected) category.color else MaterialTheme.colorScheme.onSurface

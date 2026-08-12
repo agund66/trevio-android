@@ -8,6 +8,7 @@ import com.trevio.android.domain.model.GroupAnalytics
 import com.trevio.android.domain.model.Member
 import com.trevio.android.domain.model.UserAnalytics
 import com.trevio.android.domain.repository.AnalyticsService
+import com.trevio.android.util.AppConstants
 import com.trevio.android.util.computeGroupAnalytics
 import com.trevio.android.util.friendlyNetworkMessage
 import kotlinx.coroutines.tasks.await
@@ -47,7 +48,7 @@ class FirebaseAnalyticsService @Inject constructor(
                     expenseId = doc.id,
                     description = data["description"] as? String ?: "",
                     amount = (data["amount"] as? Number)?.toDouble() ?: 0.0,
-                    currency = data["currency"] as? String ?: "INR",
+                    currency = data["currency"] as? String ?: AppConstants.BASE_CURRENCY,
                     paidBy = data["paidBy"] as? String ?: "",
                     splitType = com.trevio.android.domain.model.SplitType.valueOf(
                         (data["splitType"] as? String ?: "EQUAL").uppercase()

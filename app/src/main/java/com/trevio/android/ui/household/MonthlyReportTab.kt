@@ -14,9 +14,13 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.trevio.android.R
+import com.trevio.android.core.designsystem.components.resolveLocalizedString
+import com.trevio.android.core.designsystem.theme.*
 import com.trevio.android.domain.model.CategoryBreakdown
 import com.trevio.android.domain.model.DailyTrend
 import com.trevio.android.domain.model.MemberContribution
@@ -40,15 +44,14 @@ fun MonthlyReportTab(
 
     Column(
         modifier = modifier
-            .fillMaxSize()
-            .verticalScroll(rememberScrollState())
+            .fillMaxWidth()
             .padding(horizontal = 16.dp)
     ) {
         Spacer(modifier = Modifier.height(16.dp))
 
         // ── Month Navigator ──
         MonthNavigator(
-            monthLabel = report?.monthLabel ?: "",
+            monthLabel = resolveLocalizedString(report?.monthLabelText),
             onPrevious = onPreviousMonth,
             onNext = onNextMonth,
             nextEnabled = !isCurrentMonth
@@ -89,7 +92,7 @@ fun MonthlyReportTab(
             // ── Category Breakdown ──
             if (r.spentByCategory.isNotEmpty()) {
                 CategoryBreakdownSection(
-                    title = "Where Money Went",
+                    title = stringResource(R.string.monthly_where_money_went),
                     breakdown = r.spentByCategory,
                     currencySymbol = state.currencySymbol
                 )
@@ -99,7 +102,7 @@ fun MonthlyReportTab(
             // ── Income Breakdown ──
             if (r.receivedByCategory.isNotEmpty()) {
                 CategoryBreakdownSection(
-                    title = "Money Received",
+                    title = stringResource(R.string.monthly_money_received),
                     breakdown = r.receivedByCategory,
                     currencySymbol = state.currencySymbol,
                     isIncome = true
@@ -114,8 +117,8 @@ fun MonthlyReportTab(
             }
 
             // ── Insight ──
-            state.gamification?.insightMessage?.let { insight ->
-                InsightCard(message = insight)
+            state.gamification?.insightMessageText?.let { insight ->
+                InsightCard(message = resolveLocalizedString(insight))
                 Spacer(modifier = Modifier.height(20.dp))
             }
         }
@@ -128,7 +131,7 @@ fun MonthlyReportTab(
                 contentAlignment = Alignment.Center
             ) {
                 Text(
-                    "No data for this month",
+                    stringResource(R.string.monthly_no_data),
                     fontSize = 16.sp,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -152,7 +155,7 @@ private fun MonthNavigator(
         horizontalArrangement = Arrangement.SpaceBetween
     ) {
         IconButton(onClick = onPrevious) {
-            Icon(Icons.Default.ChevronLeft, contentDescription = "Previous month")
+            Icon(Icons.Default.ChevronLeft, contentDescription = stringResource(R.string.monthly_previous_month))
         }
         Text(
             text = monthLabel,
@@ -166,7 +169,7 @@ private fun MonthNavigator(
         ) {
             Icon(
                 Icons.Default.ChevronRight,
-                contentDescription = "Next month",
+                contentDescription = stringResource(R.string.monthly_next_month),
                 tint = if (nextEnabled) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f)
             )
         }
@@ -184,7 +187,7 @@ private fun MonthlySummaryCard(report: MonthlyReport, currencySymbol: String) {
     ) {
         Column(modifier = Modifier.padding(20.dp)) {
             Text(
-                text = "${report.entryCount} ${if (report.entryCount == 1) "entry" else "entries"} this month",
+                text = stringResource(R.string.monthly_entry_count, report.entryCount, if (report.entryCount == 1) stringResource(R.string.daily_entry) else stringResource(R.string.daily_entries)),
                 fontSize = 12.sp,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
@@ -194,21 +197,21 @@ private fun MonthlySummaryCard(report: MonthlyReport, currencySymbol: String) {
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
                 Column {
-                    Text("Spent", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(stringResource(R.string.monthly_spent), fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     Text(
                         text = "$currencySymbol${FormatUtils.formatAmount(report.totalSpent)}",
                         fontSize = 26.sp,
                         fontWeight = FontWeight.Bold,
-                        color = Color(0xFFEF4444)
+                        color = BalanceNegative
                     )
                 }
                 Column(horizontalAlignment = Alignment.End) {
-                    Text("Received", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(stringResource(R.string.monthly_received), fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     Text(
                         text = "$currencySymbol${FormatUtils.formatAmount(report.totalReceived)}",
                         fontSize = 26.sp,
                         fontWeight = FontWeight.Bold,
-                        color = Color(0xFF22C55E)
+                        color = BalancePositive
                     )
                 }
             }
@@ -220,13 +223,13 @@ private fun MonthlySummaryCard(report: MonthlyReport, currencySymbol: String) {
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Text("Net", fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(stringResource(R.string.monthly_net), fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 val isPositive = report.netAmount >= 0
                 Text(
                     text = "${if (isPositive) "+" else "-"}$currencySymbol${FormatUtils.formatAmount(kotlin.math.abs(report.netAmount))}",
                     fontSize = 20.sp,
                     fontWeight = FontWeight.SemiBold,
-                    color = if (isPositive) Color(0xFF22C55E) else Color(0xFFEF4444)
+                    color = if (isPositive) BalancePositive else BalanceNegative
                 )
             }
         }
@@ -243,8 +246,8 @@ private fun BudgetProgressCard(
 ) {
     val isOverBudget = progress > 100
     val progressColor = when {
-        progress >= 100 -> Color(0xFFEF4444)
-        progress >= 80 -> Color(0xFFF59E0B)
+        progress >= 100 -> BalanceNegative
+        progress >= 80 -> BudgetWarning
         else -> MaterialTheme.colorScheme.primary
     }
 
@@ -260,7 +263,7 @@ private fun BudgetProgressCard(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Text("Budget", fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurface)
+                Text(stringResource(R.string.daily_budget), fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurface)
                 Text(
                     text = "$currencySymbol${FormatUtils.formatAmount(budget)}",
                     fontSize = 14.sp,
@@ -290,18 +293,18 @@ private fun BudgetProgressCard(
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
                 Text(
-                    text = "$currencySymbol${FormatUtils.formatAmount(spent)} spent",
+                    text = "$currencySymbol${FormatUtils.formatAmount(spent)} ${stringResource(R.string.monthly_spent_suffix)}",
                     fontSize = 12.sp,
                     color = progressColor
                 )
                 Text(
                     text = if (isOverBudget) {
-                        "$currencySymbol${FormatUtils.formatAmount(kotlin.math.abs(remaining))} over"
+                        "$currencySymbol${FormatUtils.formatAmount(kotlin.math.abs(remaining))} ${stringResource(R.string.monthly_over)}"
                     } else {
-                        "$currencySymbol${FormatUtils.formatAmount(remaining)} left"
+                        "$currencySymbol${FormatUtils.formatAmount(remaining)} ${stringResource(R.string.monthly_left)}"
                     },
                     fontSize = 12.sp,
-                    color = if (isOverBudget) Color(0xFFEF4444) else MaterialTheme.colorScheme.onSurfaceVariant
+                    color = if (isOverBudget) BalanceNegative else MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
         }
@@ -314,7 +317,7 @@ private fun MonthComparisonCard(
     currencySymbol: String
 ) {
     val isIncrease = comparison.spentChange > 0
-    val changeColor = if (isIncrease) Color(0xFFEF4444) else Color(0xFF22C55E)
+    val changeColor = if (isIncrease) BalanceNegative else BalancePositive
 
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -331,9 +334,9 @@ private fun MonthComparisonCard(
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
             Column {
-                Text("vs Last Month", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(stringResource(R.string.monthly_vs_last_month), fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 Text(
-                    text = "$currencySymbol${FormatUtils.formatAmount(comparison.lastMonthSpent)} last month",
+                    text = "$currencySymbol${FormatUtils.formatAmount(comparison.lastMonthSpent)} ${stringResource(R.string.monthly_last_month_label)}",
                     fontSize = 13.sp,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -367,7 +370,7 @@ private fun DailyTrendChart(trend: List<DailyTrend>, currencySymbol: String) {
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.2f))
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
-            Text("Daily Trend", fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurface)
+            Text(stringResource(R.string.monthly_daily_trend), fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurface)
             Spacer(modifier = Modifier.height(16.dp))
             Row(
                 modifier = Modifier
@@ -433,9 +436,9 @@ private fun CategoryBreakdownSection(
         Column(modifier = Modifier.padding(16.dp)) {
             breakdown.take(8).forEach { cat ->
                 val category = HouseholdCategories.getCategory(cat.category)
-                val color = category?.color ?: if (isIncome) Color(0xFF22C55E) else Color(0xFF94A3B8)
+                val color = category?.color ?: if (isIncome) BalancePositive else CategoryFallback
                 CategoryBreakdownRow(
-                    label = category?.label ?: cat.category.replaceFirstChar { it.uppercase() },
+                    label = category?.labelResId?.let { stringResource(it) } ?: cat.category.replaceFirstChar { it.uppercase() },
                     amount = cat.totalAmount,
                     percentage = cat.percentage,
                     color = color,
@@ -498,7 +501,7 @@ private fun CategoryBreakdownRow(
 @Composable
 private fun WhoPaidSection(contributions: List<MemberContribution>, currencySymbol: String) {
     Text(
-        text = "Who Paid",
+        text = stringResource(R.string.monthly_who_paid),
         fontSize = 16.sp,
         fontWeight = FontWeight.SemiBold,
         color = MaterialTheme.colorScheme.onSurface
@@ -602,7 +605,7 @@ private fun InsightCard(message: String) {
         ) {
             Icon(
                 imageVector = Icons.Filled.EmojiEvents,
-                contentDescription = "Insight",
+                contentDescription = stringResource(R.string.monthly_insight),
                 tint = MaterialTheme.colorScheme.tertiary,
                 modifier = Modifier.size(20.dp)
             )

@@ -1,6 +1,7 @@
 package com.trevio.android.data.remote
 
 import android.app.Activity
+import com.trevio.android.util.AppConstants
 import com.trevio.android.util.friendlyNetworkMessage
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.GoogleAuthProvider
@@ -31,17 +32,19 @@ class FirebaseAuthServiceImpl @Inject constructor(
                 val firstName = nameParts.getOrElse(0) { "" }
                 val lastName = nameParts.getOrElse(1) { "" }
 
-                val newUser = User(
-                    uid = firebaseUser.uid,
-                    email = firebaseUser.email ?: "",
-                    displayName = displayName,
-                    firstName = firstName,
-                    lastName = lastName,
-                    photoURL = firebaseUser.photoUrl?.toString() ?: "",
-                    defaultCurrency = "INR",
-                    acceptedTnC = false,
-                    role = "user",
-                    blocked = false
+                val newUser = mapOf(
+                    "uid" to firebaseUser.uid,
+                    "email" to (firebaseUser.email ?: ""),
+                    "displayName" to displayName,
+                    "firstName" to firstName,
+                    "lastName" to lastName,
+                    "photoURL" to (firebaseUser.photoUrl?.toString() ?: ""),
+                    "defaultCurrency" to AppConstants.BASE_CURRENCY,
+                    "acceptedTnC" to false,
+                    "role" to "user",
+                    "blocked" to false,
+                    "createdAt" to System.currentTimeMillis(),
+                    "updatedAt" to System.currentTimeMillis()
                 )
 
                 firestore.collection("users").document(firebaseUser.uid)
@@ -75,17 +78,19 @@ class FirebaseAuthServiceImpl @Inject constructor(
                 val firstName = nameParts.getOrElse(0) { "" }
                 val lastName = nameParts.getOrElse(1) { "" }
 
-                val newUser = User(
-                    uid = firebaseUser.uid,
-                    email = firebaseUser.email ?: "",
-                    displayName = displayName,
-                    firstName = firstName,
-                    lastName = lastName,
-                    photoURL = firebaseUser.photoUrl?.toString() ?: "",
-                    defaultCurrency = "INR",
-                    acceptedTnC = false,
-                    role = "user",
-                    blocked = false
+                val newUser = mapOf(
+                    "uid" to firebaseUser.uid,
+                    "email" to (firebaseUser.email ?: ""),
+                    "displayName" to displayName,
+                    "firstName" to firstName,
+                    "lastName" to lastName,
+                    "photoURL" to (firebaseUser.photoUrl?.toString() ?: ""),
+                    "defaultCurrency" to AppConstants.BASE_CURRENCY,
+                    "acceptedTnC" to false,
+                    "role" to "user",
+                    "blocked" to false,
+                    "createdAt" to System.currentTimeMillis(),
+                    "updatedAt" to System.currentTimeMillis()
                 )
 
                 firestore.collection("users").document(firebaseUser.uid)
@@ -120,7 +125,7 @@ class FirebaseAuthServiceImpl @Inject constructor(
                     lastName = data["lastName"] as? String ?: "",
                     username = data["username"] as? String ?: "",
                     photoURL = data["photoURL"] as? String ?: "",
-                    defaultCurrency = data["defaultCurrency"] as? String ?: "INR",
+                    defaultCurrency = data["defaultCurrency"] as? String ?: AppConstants.BASE_CURRENCY,
                     acceptedTnC = data["acceptedTnC"] as? Boolean ?: false,
                     role = data["role"] as? String ?: "user",
                     blocked = data["blocked"] as? Boolean ?: false,

@@ -1,5 +1,6 @@
 package com.trevio.android.ui.admin
 
+import androidx.annotation.StringRes
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.isSystemInDarkTheme
@@ -17,18 +18,21 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.trevio.android.R
 import com.trevio.android.core.designsystem.components.LoadingIndicator
 import com.trevio.android.core.designsystem.components.TrevioCard
-import com.trevio.android.core.designsystem.theme.TrevioBorder
+import com.trevio.android.core.designsystem.theme.*
 import com.trevio.android.domain.model.User
 import com.trevio.android.domain.repository.AdminService
 import com.trevio.android.domain.repository.AuthService
+import com.trevio.android.util.toStringResId
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -48,7 +52,7 @@ class AdminViewModel @Inject constructor(
         val users: List<User> = emptyList(),
         val usersHasMore: Boolean = false,
         val usersLoadingMore: Boolean = false,
-        val error: String? = null,
+        @StringRes val error: Int? = null,
         val actionLoading: String? = null,
         val currentUid: String? = null,
         val selectedTab: Int = 0
@@ -61,11 +65,11 @@ class AdminViewModel @Inject constructor(
         viewModelScope.launch {
             val user = authService.getCurrentUser()
             if (user == null) {
-                _state.value = _state.value.copy(isCheckingAdmin = false, isLoading = false, error = "Not authenticated")
+                _state.value = _state.value.copy(isCheckingAdmin = false, isLoading = false, error = R.string.admin_not_authenticated)
                 return@launch
             }
             if (user.role != "superadmin") {
-                _state.value = _state.value.copy(isCheckingAdmin = false, isLoading = false, error = "Access denied: superadmin only")
+                _state.value = _state.value.copy(isCheckingAdmin = false, isLoading = false, error = R.string.error_access_denied_superadmin)
                 return@launch
             }
             val currentUid = authService.getCurrentUserId()
@@ -83,7 +87,7 @@ class AdminViewModel @Inject constructor(
         viewModelScope.launch {
             adminService.getAllUsers(50, null)
                 .onSuccess { result -> _state.value = _state.value.copy(isLoading = false, users = result.items, usersHasMore = result.hasMore) }
-                .onFailure { e -> _state.value = _state.value.copy(isLoading = false, error = e.message) }
+                .onFailure { e -> _state.value = _state.value.copy(isLoading = false, error = e.toStringResId()) }
         }
     }
 
@@ -111,7 +115,7 @@ class AdminViewModel @Inject constructor(
         viewModelScope.launch {
             adminService.blockUser(uid)
                 .onSuccess { loadUsers() }
-                .onFailure { e -> _state.value = _state.value.copy(error = e.message) }
+                .onFailure { e -> _state.value = _state.value.copy(error = e.toStringResId()) }
             _state.value = _state.value.copy(actionLoading = null)
         }
     }
@@ -121,7 +125,7 @@ class AdminViewModel @Inject constructor(
         viewModelScope.launch {
             adminService.unblockUser(uid)
                 .onSuccess { loadUsers() }
-                .onFailure { e -> _state.value = _state.value.copy(error = e.message) }
+                .onFailure { e -> _state.value = _state.value.copy(error = e.toStringResId()) }
             _state.value = _state.value.copy(actionLoading = null)
         }
     }
@@ -131,7 +135,7 @@ class AdminViewModel @Inject constructor(
         viewModelScope.launch {
             adminService.promoteToSuperAdmin(uid)
                 .onSuccess { loadUsers() }
-                .onFailure { e -> _state.value = _state.value.copy(error = e.message) }
+                .onFailure { e -> _state.value = _state.value.copy(error = e.toStringResId()) }
             _state.value = _state.value.copy(actionLoading = null)
         }
     }
@@ -141,7 +145,7 @@ class AdminViewModel @Inject constructor(
         viewModelScope.launch {
             adminService.demoteToUser(uid)
                 .onSuccess { loadUsers() }
-                .onFailure { e -> _state.value = _state.value.copy(error = e.message) }
+                .onFailure { e -> _state.value = _state.value.copy(error = e.toStringResId()) }
             _state.value = _state.value.copy(actionLoading = null)
         }
     }
@@ -154,7 +158,11 @@ fun AdminScreen(
     viewModel: AdminViewModel = hiltViewModel()
 ) {
     val state by viewModel.state.collectAsState()
-    val tabs = listOf("Users" to Icons.Default.People, "Broadcasts" to Icons.Default.Campaign, "Support" to Icons.Default.Support)
+    val tabs = listOf(
+        stringResource(R.string.admin_users) to Icons.Default.People,
+        stringResource(R.string.admin_broadcasts) to Icons.Default.Campaign,
+        stringResource(R.string.admin_support) to Icons.Default.Support
+    )
 
     if (state.isCheckingAdmin) {
         Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -171,12 +179,12 @@ fun AdminScreen(
         ) {
             Icon(Icons.Default.Shield, contentDescription = null, modifier = Modifier.size(48.dp), tint = MaterialTheme.colorScheme.error)
             Spacer(Modifier.height(16.dp))
-            Text("Access Denied", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+            Text(stringResource(R.string.admin_access_denied), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
             Spacer(Modifier.height(8.dp))
-            Text("You need superadmin privileges to access this page.", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(stringResource(R.string.admin_superadmin_only), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
             Spacer(Modifier.height(24.dp))
             OutlinedButton(onClick = { navController.popBackStack() }) {
-                Text("Go Back")
+                Text(stringResource(R.string.admin_go_back))
             }
         }
         return
@@ -197,10 +205,10 @@ fun AdminScreen(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 IconButton(onClick = { navController.popBackStack() }) {
-                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = Color.White)
+                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.common_back), tint = Color.White)
                 }
                 Text(
-                    "Admin Dashboard",
+                    stringResource(R.string.admin_title),
                     style = MaterialTheme.typography.titleLarge,
                     fontWeight = FontWeight.Bold,
                     color = Color.White
@@ -233,7 +241,7 @@ fun AdminScreen(
         } else if (state.error != null) {
             Box(modifier = Modifier.fillMaxSize().padding(16.dp), contentAlignment = Alignment.Center) {
                 Text(
-                    state.error!!,
+                    stringResource(state.error!!),
                     color = MaterialTheme.colorScheme.error,
                     style = MaterialTheme.typography.bodyMedium
                 )
@@ -264,9 +272,9 @@ fun AdminScreen(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        StatCard("Total Users", totalUsers.toString(), MaterialTheme.colorScheme.onSurface)
-                        StatCard("Blocked", blockedUsers.toString(), if (isSystemInDarkTheme()) Color(0xFFF87171) else Color(0xFFEF4444))
-                        StatCard("Admins", adminUsers.toString(), MaterialTheme.colorScheme.primary)
+                        StatCard(stringResource(R.string.admin_users), totalUsers.toString(), MaterialTheme.colorScheme.onSurface)
+                        StatCard(stringResource(R.string.admin_blocked), blockedUsers.toString(), if (isSystemInDarkTheme()) BalanceNegativeDark else BalanceNegative)
+                        StatCard(stringResource(R.string.admin_superadmin), adminUsers.toString(), MaterialTheme.colorScheme.primary)
                     }
                 }
 
@@ -274,8 +282,8 @@ fun AdminScreen(
                     OutlinedTextField(
                         value = searchQuery,
                         onValueChange = { searchQuery = it },
-                        placeholder = { Text("Search by name, email, username...") },
-                        leadingIcon = { Icon(Icons.Default.Search, "Search") },
+                        placeholder = { Text(stringResource(R.string.admin_search_placeholder)) },
+                        leadingIcon = { Icon(Icons.Default.Search, stringResource(R.string.common_search)) },
                         modifier = Modifier.fillMaxWidth(),
                         singleLine = true,
                         shape = RoundedCornerShape(12.dp)
@@ -333,10 +341,10 @@ private fun UserRow(
 
     pendingAction?.let { action ->
         val (title, message) = when (action) {
-            "block" -> "Block User" to "Block ${user.displayName}? They will lose access to the app."
-            "unblock" -> "Unblock User" to "Unblock ${user.displayName}? They will regain access."
-            "promote" -> "Promote to Admin" to "Promote ${user.displayName} to superadmin? They will have full admin access."
-            "demote" -> "Demote to User" to "Demote ${user.displayName}? They will lose admin access."
+            "block" -> stringResource(R.string.admin_block) to stringResource(R.string.admin_block_confirm, user.displayName)
+            "unblock" -> stringResource(R.string.admin_unblock) to stringResource(R.string.admin_unblock_confirm, user.displayName)
+            "promote" -> stringResource(R.string.admin_promote) to stringResource(R.string.admin_promote_confirm, user.displayName)
+            "demote" -> stringResource(R.string.admin_demote) to stringResource(R.string.admin_demote_confirm, user.displayName)
             else -> "" to ""
         }
         AlertDialog(
@@ -352,10 +360,10 @@ private fun UserRow(
                         "demote" -> onDemote()
                     }
                     pendingAction = null
-                }) { Text("Confirm") }
+                }) { Text(stringResource(R.string.common_confirm)) }
             },
             dismissButton = {
-                TextButton(onClick = { pendingAction = null }) { Text("Cancel") }
+                TextButton(onClick = { pendingAction = null }) { Text(stringResource(R.string.common_cancel)) }
             }
         )
     }
@@ -392,7 +400,7 @@ private fun UserRow(
                 Column(modifier = Modifier.weight(1f)) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Text(
-                            user.displayName + if (isCurrentUser) " (You)" else "",
+                            user.displayName + if (isCurrentUser) stringResource(R.string.group_detail_you_suffix) else "",
                             style = MaterialTheme.typography.bodyLarge,
                             fontWeight = FontWeight.SemiBold,
                             maxLines = 1,
@@ -405,7 +413,7 @@ private fun UserRow(
                                 shape = RoundedCornerShape(6.dp)
                             ) {
                                 Text(
-                                    "Admin",
+                                    stringResource(R.string.admin_superadmin),
                                     style = MaterialTheme.typography.labelSmall,
                                     color = MaterialTheme.colorScheme.primary,
                                     modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
@@ -415,13 +423,13 @@ private fun UserRow(
                         if (user.blocked) {
                             Spacer(modifier = Modifier.width(6.dp))
                             Surface(
-                                color = if (isSystemInDarkTheme()) Color(0xFFF87171) else Color(0xFFEF4444).copy(alpha = 0.1f),
+                                color = if (isSystemInDarkTheme()) BalanceNegativeDark else BalanceNegative.copy(alpha = 0.1f),
                                 shape = RoundedCornerShape(6.dp)
                             ) {
                                 Text(
-                                    "Blocked",
+                                    stringResource(R.string.admin_blocked),
                                     style = MaterialTheme.typography.labelSmall,
-                                    color = if (isSystemInDarkTheme()) Color(0xFFF87171) else Color(0xFFEF4444),
+                                    color = if (isSystemInDarkTheme()) BalanceNegativeDark else BalanceNegative,
                                     modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
                                 )
                             }
@@ -451,7 +459,7 @@ private fun UserRow(
                     ) {
                         Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(16.dp))
                         Spacer(modifier = Modifier.width(4.dp))
-                        Text("Unblock")
+                        Text(stringResource(R.string.admin_unblock))
                     }
                 } else {
                     OutlinedButton(
@@ -461,7 +469,7 @@ private fun UserRow(
                     ) {
                         Icon(Icons.Default.Block, contentDescription = null, modifier = Modifier.size(16.dp))
                         Spacer(modifier = Modifier.width(4.dp))
-                        Text("Block")
+                        Text(stringResource(R.string.admin_block))
                     }
                 }
                 if (user.role == "superadmin") {
@@ -472,7 +480,7 @@ private fun UserRow(
                     ) {
                         Icon(Icons.Default.Shield, contentDescription = null, modifier = Modifier.size(16.dp))
                         Spacer(modifier = Modifier.width(4.dp))
-                        Text("Demote")
+                        Text(stringResource(R.string.admin_demote))
                     }
                 } else {
                     Button(
@@ -482,7 +490,7 @@ private fun UserRow(
                     ) {
                         Icon(Icons.Default.Star, contentDescription = null, modifier = Modifier.size(16.dp))
                         Spacer(modifier = Modifier.width(4.dp))
-                        Text("Promote")
+                        Text(stringResource(R.string.admin_promote))
                     }
                 }
             }

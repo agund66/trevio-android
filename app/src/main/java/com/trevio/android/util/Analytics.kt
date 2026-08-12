@@ -1,13 +1,16 @@
 package com.trevio.android.util
 
+import com.trevio.android.R
 import com.trevio.android.domain.model.CategoryBreakdown
 import com.trevio.android.domain.model.Expense
 import com.trevio.android.domain.model.GroupAnalytics
 import com.trevio.android.domain.model.HighestExpense
+import com.trevio.android.domain.model.LocalizedString
 import com.trevio.android.domain.model.Member
 import com.trevio.android.domain.model.MemberSpending
 import com.trevio.android.domain.model.MonthlyTrend
 import com.trevio.android.domain.model.TopGroupSpending
+import com.trevio.android.domain.model.TransactionType
 import com.trevio.android.domain.model.UserAnalytics
 import java.util.Calendar
 
@@ -39,9 +42,16 @@ fun computeMonthlyTrends(expenses: List<Expense>, months: Int = 6): List<Monthly
             set(Calendar.DAY_OF_MONTH, 1)
         }
         val key = "${cal.get(Calendar.YEAR)}-${String.format("%02d", cal.get(Calendar.MONTH) + 1)}"
+        val yearSuffix = cal.get(Calendar.YEAR).toString().takeLast(2)
         trends.add(MonthlyTrend(
             month = key,
-            label = "${DateUtils.MONTH_LABELS[cal.get(Calendar.MONTH)]} ${cal.get(Calendar.YEAR).toString().takeLast(2)}",
+            labelText = LocalizedString(
+                R.string.month_year_short,
+                listOf(
+                    LocalizedString(DateUtils.getMonthLabelResId(cal.get(Calendar.MONTH))),
+                    yearSuffix
+                )
+            ),
             totalAmount = 0.0,
             expenseCount = 0
         ))
@@ -110,12 +120,16 @@ fun computeGroupAnalytics(
     expenses: List<Expense>,
     members: List<Member>
 ): GroupAnalytics {
-    val totalExpenses = Math.round(expenses.sumOf { it.amount } * 100) / 100.0
-    val expenseCount = expenses.size
+    // Filter to only "expense" type for spending analytics.
+    // Income entries should not be counted in spending totals.
+    val spendingExpenses = expenses.filter { it.transactionType == TransactionType.EXPENSE }
+
+    val totalExpenses = Math.round(spendingExpenses.sumOf { it.amount } * 100) / 100.0
+    val expenseCount = spendingExpenses.size
     val avgExpenseAmount = if (expenseCount > 0) Math.round((totalExpenses / expenseCount) * 100) / 100.0 else 0.0
 
-    val highestExpense = if (expenses.isNotEmpty()) {
-        val highest = expenses.maxByOrNull { it.amount }
+    val highestExpense = if (spendingExpenses.isNotEmpty()) {
+        val highest = spendingExpenses.maxByOrNull { it.amount }
         if (highest != null) {
             HighestExpense(
                 description = highest.description,
@@ -127,7 +141,7 @@ fun computeGroupAnalytics(
 
     val now = System.currentTimeMillis()
     val thirtyDaysAgo = now - 30L * 24 * 60 * 60 * 1000
-    val recentExpenses = expenses.count { it.date >= thirtyDaysAgo }
+    val recentExpenses = spendingExpenses.count { it.date >= thirtyDaysAgo }
     val recentActivityRate = if (expenseCount > 0) Math.round((recentExpenses.toDouble() / expenseCount) * 10000) / 100.0 else 0.0
 
     return GroupAnalytics(
@@ -135,9 +149,9 @@ fun computeGroupAnalytics(
         groupName = groupName,
         totalExpenses = totalExpenses,
         expenseCount = expenseCount,
-        categoryBreakdown = computeCategoryBreakdown(expenses),
-        monthlyTrends = computeMonthlyTrends(expenses),
-        memberSpending = computeMemberSpending(expenses, members),
+        categoryBreakdown = computeCategoryBreakdown(spendingExpenses),
+        monthlyTrends = computeMonthlyTrends(spendingExpenses),
+        memberSpending = computeMemberSpending(spendingExpenses, members),
         avgExpenseAmount = avgExpenseAmount,
         highestExpense = highestExpense,
         recentActivityRate = recentActivityRate
@@ -157,7 +171,10 @@ fun computeUserAnalytics(
 
     for ((groupId, groupName, _) in groups) {
         val expenses = allExpensesByGroup[groupId] ?: emptyList()
-        for (e in expenses) {
+        // Filter to only "expense" type for spending analytics.
+        // Income entries should not be counted in spending totals.
+        val spendingExpenses = expenses.filter { it.transactionType == TransactionType.EXPENSE }
+        for (e in spendingExpenses) {
             allExpenses.add(e)
             totalSpent += e.amount
             expenseCount++
@@ -165,12 +182,12 @@ fun computeUserAnalytics(
                 totalPaid += e.amount
             }
         }
-        val groupTotal = expenses.sumOf { it.amount }
+        val groupTotal = spendingExpenses.sumOf { it.amount }
         groupSpendingMap[groupId] = TopGroupSpending(
             groupId = groupId,
             groupName = groupName,
             totalSpent = Math.round(groupTotal * 100) / 100.0,
-            expenseCount = expenses.size
+            expenseCount = spendingExpenses.size
         )
     }
 

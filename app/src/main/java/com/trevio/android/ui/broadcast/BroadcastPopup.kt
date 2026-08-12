@@ -13,10 +13,13 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.trevio.android.R
+import com.trevio.android.core.designsystem.theme.*
 import com.trevio.android.domain.model.BroadcastPriority
 import org.jsoup.Jsoup
 import org.jsoup.safety.Safelist
@@ -68,18 +71,18 @@ private fun BroadcastDialog(
 ) {
     val isDark = isSystemInDarkTheme()
     val priorityColor = when (broadcast.priority) {
-        BroadcastPriority.CRITICAL -> if (isDark) Color(0xFFF87171) else Color(0xFFEF4444)
-        BroadcastPriority.MAINTENANCE -> if (isDark) Color(0xFFFBBF24) else Color(0xFFF59E0B)
-        BroadcastPriority.INFO -> if (isDark) Color(0xFF60A5FA) else Color(0xFF3B82F6)
+        BroadcastPriority.CRITICAL -> if (isDark) BalanceNegativeDark else BalanceNegative
+        BroadcastPriority.MAINTENANCE -> if (isDark) TrevioWarningDarkTheme else TrevioWarning
+        BroadcastPriority.INFO -> if (isDark) TrevioSecondaryDarkTheme else TrevioSecondary
     }
     val priorityLabel = when (broadcast.priority) {
-        BroadcastPriority.CRITICAL -> "Critical Alert"
-        BroadcastPriority.MAINTENANCE -> "Maintenance Notice"
-        BroadcastPriority.INFO -> "Information"
+        BroadcastPriority.CRITICAL -> stringResource(R.string.broadcast_critical_alert)
+        BroadcastPriority.MAINTENANCE -> stringResource(R.string.broadcast_maintenance_notice)
+        BroadcastPriority.INFO -> stringResource(R.string.broadcast_information)
     }
     val buttonText = when (broadcast.priority) {
-        BroadcastPriority.CRITICAL -> "Understood"
-        else -> "OK, Got it"
+        BroadcastPriority.CRITICAL -> stringResource(R.string.broadcast_understood)
+        else -> stringResource(R.string.broadcast_ok_got_it)
     }
     val isCritical = broadcast.priority == BroadcastPriority.CRITICAL
 
@@ -107,7 +110,7 @@ private fun BroadcastDialog(
         dismissButton = {
             if (!isCritical) {
                 TextButton(onClick = onDismiss) {
-                    Text("Dismiss")
+                    Text(stringResource(R.string.broadcast_dismiss))
                 }
             }
         },

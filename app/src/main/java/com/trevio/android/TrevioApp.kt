@@ -35,18 +35,18 @@ class TrevioApp : Application() {
 
         val generalChannel = NotificationChannel(
             NotificationChannels.GENERAL,
-            "General",
+            getString(R.string.notification_channel_general),
             NotificationManager.IMPORTANCE_DEFAULT
         ).apply {
-            description = "General app notifications — group invites, expense updates, and settlements"
+            description = getString(R.string.notification_channel_general_desc)
         }
 
         val broadcastChannel = NotificationChannel(
             NotificationChannels.BROADCAST,
-            "Announcements",
+            getString(R.string.notification_channel_announcements),
             NotificationManager.IMPORTANCE_HIGH
         ).apply {
-            description = "Important announcements from the Trevio team"
+            description = getString(R.string.notification_channel_announcements_desc)
         }
 
         notificationManager.createNotificationChannels(listOf(generalChannel, broadcastChannel))

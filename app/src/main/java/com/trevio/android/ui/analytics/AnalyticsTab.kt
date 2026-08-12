@@ -18,10 +18,14 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.trevio.android.R
 import com.trevio.android.core.designsystem.components.MemberAvatar
+import com.trevio.android.core.designsystem.components.resolveLocalizedString
+import com.trevio.android.core.designsystem.theme.*
 import com.trevio.android.domain.model.Expense
 import com.trevio.android.domain.model.Member
 import com.trevio.android.util.computeGroupAnalytics
@@ -31,21 +35,21 @@ import java.util.Date
 import java.util.Locale
 
 private val CATEGORY_COLORS = mapOf(
-    "food" to Color(0xFFF97316),
-    "transport" to Color(0xFF3B82F6),
-    "shopping" to Color(0xFFA855F7),
-    "turf" to Color(0xFF22C55E),
-    "accommodation" to Color(0xFFEC4899),
-    "other" to Color(0xFF94A3B8)
+    "food" to CategoryFood,
+    "transport" to CategoryTransport,
+    "shopping" to CategoryShopping,
+    "turf" to CategoryTurf,
+    "accommodation" to CategoryAccommodation,
+    "other" to CategoryOther
 )
 
-private val CATEGORY_LABELS = mapOf(
-    "food" to "Food",
-    "transport" to "Transport",
-    "shopping" to "Shopping",
-    "turf" to "Turf",
-    "accommodation" to "Stay",
-    "other" to "Other"
+private val CATEGORY_LABEL_KEYS = mapOf(
+    "food" to R.string.analytics_food,
+    "transport" to R.string.analytics_transport,
+    "shopping" to R.string.analytics_shopping,
+    "turf" to R.string.analytics_turf,
+    "accommodation" to R.string.analytics_stay,
+    "other" to R.string.analytics_other
 )
 
 @Composable
@@ -65,9 +69,9 @@ fun AnalyticsTab(
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 Icon(Icons.Default.BarChart, contentDescription = null, modifier = Modifier.size(48.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
                 Spacer(Modifier.height(16.dp))
-                Text("No analytics data yet", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                Text(stringResource(R.string.analytics_no_data), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
                 Spacer(Modifier.height(4.dp))
-                Text("Add expenses to see spending insights.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(stringResource(R.string.analytics_no_data_msg), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
         return
@@ -82,16 +86,16 @@ fun AnalyticsTab(
             StatCard(
                 modifier = Modifier.weight(1f),
                 icon = Icons.Default.Receipt,
-                label = "Total",
+                label = stringResource(R.string.analytics_total),
                 value = currencyFormatter.formatBase(analytics.totalExpenses),
                 color = MaterialTheme.colorScheme.primary
             )
             StatCard(
                 modifier = Modifier.weight(1f),
                 icon = Icons.Default.BarChart,
-                label = "Avg",
+                label = stringResource(R.string.analytics_avg),
                 value = currencyFormatter.formatBase(analytics.avgExpenseAmount),
-                color = Color(0xFF3B82F6)
+                color = InfoBlue
             )
         }
         Spacer(modifier = Modifier.height(8.dp))
@@ -102,23 +106,23 @@ fun AnalyticsTab(
             StatCard(
                 modifier = Modifier.weight(1f),
                 icon = Icons.Default.Paid,
-                label = "Expenses",
+                label = stringResource(R.string.analytics_expenses),
                 value = analytics.expenseCount.toString(),
-                color = Color(0xFFA855F7)
+                color = AnalyticsPurple
             )
             StatCard(
                 modifier = Modifier.weight(1f),
                 icon = Icons.Default.TrendingUp,
-                label = "Recent",
+                label = stringResource(R.string.analytics_recent),
                 value = "${analytics.recentActivityRate}%",
-                color = Color(0xFF22C55E)
+                color = BalancePositive
             )
         }
 
         Spacer(modifier = Modifier.height(20.dp))
 
         // Monthly Trend Chart
-        AnalyticsCard(title = "Monthly Spending", icon = Icons.Default.CalendarMonth) {
+        AnalyticsCard(title = stringResource(R.string.analytics_monthly_spending), icon = Icons.Default.CalendarMonth) {
             val maxTrend = analytics.monthlyTrends.maxOfOrNull { it.totalAmount } ?: 1.0
             Row(
                 horizontalArrangement = Arrangement.spacedBy(4.dp),
@@ -146,7 +150,7 @@ fun AnalyticsTab(
                         )
                         Spacer(modifier = Modifier.height(4.dp))
                         Text(
-                            text = trend.label,
+                            text = resolveLocalizedString(trend.labelText),
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -159,7 +163,7 @@ fun AnalyticsTab(
 
         // Category Breakdown
         if (analytics.categoryBreakdown.isNotEmpty()) {
-            AnalyticsCard(title = "By Category", icon = Icons.Default.Insights) {
+            AnalyticsCard(title = stringResource(R.string.analytics_by_category), icon = Icons.Default.Insights) {
                 analytics.categoryBreakdown.forEach { cat ->
                     Column(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
                         Row(
@@ -175,10 +179,10 @@ fun AnalyticsTab(
                                     modifier = Modifier
                                         .size(10.dp)
                                         .clip(RoundedCornerShape(50))
-                                        .background(CATEGORY_COLORS[cat.category] ?: Color.Gray)
+                                        .background(CATEGORY_COLORS[cat.category] ?: MaterialTheme.colorScheme.onSurfaceVariant)
                                 )
                                 Text(
-                                    text = CATEGORY_LABELS[cat.category] ?: cat.category,
+                                    text = CATEGORY_LABEL_KEYS[cat.category]?.let { stringResource(it) } ?: cat.category,
                                     style = MaterialTheme.typography.bodyMedium,
                                     fontWeight = FontWeight.Medium,
                                     color = MaterialTheme.colorScheme.onSurface
@@ -210,7 +214,7 @@ fun AnalyticsTab(
                         LinearProgressIndicator(
                             progress = { (cat.percentage / 100).toFloat() },
                             modifier = Modifier.fillMaxWidth().height(6.dp).clip(RoundedCornerShape(3.dp)),
-                            color = CATEGORY_COLORS[cat.category] ?: Color.Gray,
+                            color = CATEGORY_COLORS[cat.category] ?: MaterialTheme.colorScheme.onSurfaceVariant,
                             trackColor = MaterialTheme.colorScheme.surfaceVariant
                         )
                     }
@@ -223,7 +227,7 @@ fun AnalyticsTab(
         val topSpenders = analytics.memberSpending.filter { it.totalPaid > 0 }.take(5)
         if (topSpenders.isNotEmpty()) {
             val maxPaid = topSpenders.maxOfOrNull { it.totalPaid } ?: 1.0
-            AnalyticsCard(title = "Top Spenders", icon = Icons.Default.TrendingUp) {
+            AnalyticsCard(title = stringResource(R.string.analytics_top_spenders), icon = Icons.Default.TrendingUp) {
                 topSpenders.forEachIndexed { index, member ->
                     Row(
                         modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
@@ -265,7 +269,7 @@ fun AnalyticsTab(
                                 color = MaterialTheme.colorScheme.onSurface
                             )
                             Text(
-                                text = "${member.expenseCount} expenses",
+                                text = stringResource(R.string.analytics_expenses_count, member.expenseCount),
                                 style = MaterialTheme.typography.labelSmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
@@ -278,7 +282,7 @@ fun AnalyticsTab(
 
         // Highest Expense
         analytics.highestExpense?.let { highest ->
-            AnalyticsCard(title = "Biggest Expense", icon = Icons.Default.TrendingUp) {
+            AnalyticsCard(title = stringResource(R.string.analytics_biggest_expense), icon = Icons.Default.TrendingUp) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,

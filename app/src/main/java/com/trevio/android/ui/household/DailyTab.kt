@@ -20,9 +20,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.trevio.android.R
+import com.trevio.android.core.designsystem.components.resolveLocalizedString
+import com.trevio.android.core.designsystem.theme.*
 import com.trevio.android.domain.model.DailySummary
 import com.trevio.android.domain.model.Expense
 import com.trevio.android.domain.model.HouseholdGamification
@@ -48,11 +52,10 @@ fun DailyTab(
     val dailySummary = state.dailySummary
     val gamification = state.gamification
 
-    Box(modifier = modifier.fillMaxSize()) {
+    Box(modifier = modifier.fillMaxWidth()) {
         Column(
             modifier = Modifier
-                .fillMaxSize()
-                .verticalScroll(rememberScrollState())
+                .fillMaxWidth()
                 .padding(horizontal = 16.dp)
         ) {
             Spacer(modifier = Modifier.height(16.dp))
@@ -77,7 +80,7 @@ fun DailyTab(
                     )
                 ) {
                     Text(
-                        text = errorMsg,
+                        text = stringResource(errorMsg),
                         fontSize = 14.sp,
                         color = MaterialTheme.colorScheme.error,
                         modifier = Modifier.padding(16.dp)
@@ -90,7 +93,7 @@ fun DailyTab(
 
             // ── Date Navigator ──
             DateNavigator(
-                dateLabel = dailySummary?.dateLabel ?: "Today",
+                dateLabel = resolveLocalizedString(dailySummary?.dateLabelText),
                 onPrevious = onPreviousDay,
                 onNext = onNextDay,
                 nextEnabled = !isToday
@@ -112,7 +115,7 @@ fun DailyTab(
 
             // ── Today's Entries ──
             Text(
-                text = "Entries",
+                text = stringResource(R.string.daily_recent_entries),
                 fontSize = 16.sp,
                 fontWeight = FontWeight.SemiBold,
                 color = MaterialTheme.colorScheme.onSurface
@@ -120,7 +123,7 @@ fun DailyTab(
             Spacer(modifier = Modifier.height(8.dp))
 
             if (dailySummary?.entries.isNullOrEmpty()) {
-                EmptyEntriesState(isToday = isToday, expenses = state.expenses, onPreviousDay = onPreviousDay)
+                EmptyEntriesState(isToday = isToday, expenses = state.expenses, currencySymbol = state.currencySymbol, onPreviousDay = onPreviousDay)
             } else {
                 dailySummary?.entries?.forEach { entry ->
                     EntryCard(
@@ -153,7 +156,7 @@ fun DailyTab(
                     .padding(horizontal = 24.dp)
             ) {
                 Text(
-                    text = state.lastSavedMessage ?: "",
+                    text = resolveLocalizedString(state.lastSavedMessage),
                     color = Color.White,
                     fontSize = 13.sp,
                     fontWeight = FontWeight.Medium,
@@ -177,7 +180,7 @@ private fun DateNavigator(
         horizontalArrangement = Arrangement.SpaceBetween
     ) {
         IconButton(onClick = onPrevious) {
-            Icon(Icons.Default.ChevronLeft, contentDescription = "Previous day")
+            Icon(Icons.Default.ChevronLeft, contentDescription = stringResource(R.string.daily_previous_day))
         }
         Text(
             text = dateLabel,
@@ -188,7 +191,7 @@ private fun DateNavigator(
         IconButton(onClick = onNext, enabled = nextEnabled) {
             Icon(
                 Icons.Default.ChevronRight,
-                contentDescription = "Next day",
+                contentDescription = stringResource(R.string.daily_next_day),
                 tint = if (nextEnabled) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.38f)
             )
         }
@@ -217,19 +220,19 @@ private fun GamificationRow(gamification: HouseholdGamification, isToday: Boolea
             ) {
                 Icon(
                     imageVector = Icons.Filled.LocalFireDepartment,
-                    contentDescription = "Streak",
-                    tint = Color(0xFFF97316),
+                    contentDescription = stringResource(R.string.daily_streak),
+                    tint = StreakFire,
                     modifier = Modifier.size(24.dp)
                 )
                 Column {
                     Text(
-                        text = "${gamification.loggingStreak} day${if (gamification.loggingStreak != 1) "s" else ""}",
+                        text = "${gamification.loggingStreak} ${stringResource(R.string.daily_days)}",
                         fontSize = 14.sp,
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.onSurface
                     )
                     Text(
-                        text = "Streak",
+                        text = stringResource(R.string.daily_streak),
                         fontSize = 11.sp,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -262,7 +265,7 @@ private fun GamificationRow(gamification: HouseholdGamification, isToday: Boolea
                             color = MaterialTheme.colorScheme.onSurface
                         )
                         Text(
-                            text = "Logged today",
+                            text = stringResource(R.string.daily_logged_today),
                             fontSize = 11.sp,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -286,19 +289,19 @@ private fun GamificationRow(gamification: HouseholdGamification, isToday: Boolea
                     ) {
                         Icon(
                             imageVector = Icons.Filled.Category,
-                            contentDescription = "Badge",
+                            contentDescription = stringResource(R.string.daily_badge),
                             tint = MaterialTheme.colorScheme.tertiary,
                             modifier = Modifier.size(24.dp)
                         )
                         Column {
                             Text(
-                                text = badge.replace("_", " ").replaceFirstChar { it.uppercase() },
+                                text = resolveLocalizedString(badge),
                                 fontSize = 14.sp,
                                 fontWeight = FontWeight.Bold,
                                 color = MaterialTheme.colorScheme.onSurface
                             )
                             Text(
-                                text = "This month",
+                                text = stringResource(R.string.group_detail_monthly),
                                 fontSize = 11.sp,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
@@ -310,7 +313,7 @@ private fun GamificationRow(gamification: HouseholdGamification, isToday: Boolea
         }
 
         // Insight message
-        gamification.insightMessage?.let { insight ->
+        gamification.insightMessageText?.let { insight ->
             Spacer(modifier = Modifier.height(8.dp))
             Row(
                 modifier = Modifier
@@ -323,12 +326,12 @@ private fun GamificationRow(gamification: HouseholdGamification, isToday: Boolea
             ) {
                 Icon(
                     imageVector = Icons.Default.Lightbulb,
-                    contentDescription = "Insight",
+                    contentDescription = stringResource(R.string.monthly_insight),
                     modifier = Modifier.size(14.dp),
-                    tint = Color(0xFFF59E0B)
+                    tint = BudgetWarning
                 )
                 Text(
-                    text = insight,
+                    text = resolveLocalizedString(insight),
                     fontSize = 12.sp,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     lineHeight = 16.sp
@@ -360,66 +363,66 @@ private fun ParticipationDots(logged: Int, total: Int) {
 private fun DailySummaryCard(summary: DailySummary, currencySymbol: String) {
     val isPositiveNet = summary.netAmount >= 0
     val gradientColors = if (isPositiveNet) {
-        listOf(Color(0xFF22C55E).copy(alpha = 0.1f), Color(0xFF0D9488).copy(alpha = 0.05f))
+        listOf(BalancePositive.copy(alpha = 0.1f), CategoryAccommodation.copy(alpha = 0.05f))
     } else {
-        listOf(Color(0xFFEF4444).copy(alpha = 0.1f), Color(0xFFF97316).copy(alpha = 0.05f))
+        listOf(BalanceNegative.copy(alpha = 0.1f), StreakFire.copy(alpha = 0.05f))
     }
 
     Card(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(20.dp),
+        shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(containerColor = Color.Transparent),
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
     ) {
         Box(
             modifier = Modifier
                 .background(Brush.verticalGradient(gradientColors))
-                .padding(20.dp)
+                .padding(14.dp)
         ) {
             Column {
                 Text(
-                    text = "${summary.entryCount} ${if (summary.entryCount == 1) "entry" else "entries"}",
-                    fontSize = 12.sp,
+                    text = stringResource(R.string.daily_entries_count, summary.entryCount, if (summary.entryCount == 1) stringResource(R.string.daily_entry) else stringResource(R.string.daily_entries)),
+                    fontSize = 11.sp,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
-                Spacer(modifier = Modifier.height(12.dp))
+                Spacer(modifier = Modifier.height(8.dp))
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
                     Column {
-                        Text("Spent", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text(stringResource(R.string.daily_spent), fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         Text(
                             text = "$currencySymbol${FormatUtils.formatAmount(summary.totalSpent)}",
-                            fontSize = 24.sp,
+                            fontSize = 20.sp,
                             fontWeight = FontWeight.Bold,
-                            color = Color(0xFFEF4444)
+                            color = BalanceNegative
                         )
                     }
                     Column(horizontalAlignment = Alignment.End) {
-                        Text("Received", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text(stringResource(R.string.daily_received), fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         Text(
                             text = "$currencySymbol${FormatUtils.formatAmount(summary.totalReceived)}",
-                            fontSize = 24.sp,
+                            fontSize = 20.sp,
                             fontWeight = FontWeight.Bold,
-                            color = Color(0xFF22C55E)
+                            color = BalancePositive
                         )
                     }
                 }
-                Spacer(modifier = Modifier.height(12.dp))
-                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
                 Spacer(modifier = Modifier.height(8.dp))
+                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
+                Spacer(modifier = Modifier.height(6.dp))
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text("Net", fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(stringResource(R.string.daily_net), fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     Text(
                         text = "${if (isPositiveNet) "+" else "-"}$currencySymbol${FormatUtils.formatAmount(kotlin.math.abs(summary.netAmount))}",
-                        fontSize = 18.sp,
+                        fontSize = 16.sp,
                         fontWeight = FontWeight.SemiBold,
-                        color = if (isPositiveNet) Color(0xFF22C55E) else Color(0xFFEF4444)
+                        color = if (isPositiveNet) BalancePositive else BalanceNegative
                     )
                 }
             }
@@ -461,27 +464,27 @@ private fun EntryCard(
                 modifier = Modifier
                     .size(40.dp)
                     .clip(CircleShape)
-                    .background((category?.color ?: Color(0xFF94A3B8)).copy(alpha = 0.15f)),
+                    .background((category?.color ?: CategoryFallback).copy(alpha = 0.15f)),
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
                     imageVector = category?.icon ?: Icons.Filled.Category,
-                    contentDescription = category?.label,
-                    tint = category?.color ?: Color(0xFF94A3B8),
+                    contentDescription = category?.labelResId?.let { stringResource(it) },
+                    tint = category?.color ?: CategoryFallback,
                     modifier = Modifier.size(20.dp)
                 )
             }
             // Description and payer
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = entry.description.ifBlank { category?.label ?: "Other" },
+                    text = entry.description.ifBlank { category?.labelResId?.let { stringResource(it) } ?: stringResource(R.string.daily_other) },
                     fontSize = 14.sp,
                     fontWeight = FontWeight.Medium,
                     color = MaterialTheme.colorScheme.onSurface,
                     maxLines = 1
                 )
                 Text(
-                    text = "${entry.paidByName.ifBlank { "Someone" }} · ${timeFormat.format(entry.date)}",
+                    text = "${entry.paidByName.ifBlank { stringResource(R.string.daily_someone) }} · ${timeFormat.format(entry.date)}",
                     fontSize = 12.sp,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -491,7 +494,7 @@ private fun EntryCard(
                 text = "${if (isIncome) "+" else "-"}$currencySymbol${FormatUtils.formatAmount(entry.amount)}",
                 fontSize = 16.sp,
                 fontWeight = FontWeight.Bold,
-                color = if (isIncome) Color(0xFF22C55E) else MaterialTheme.colorScheme.onSurface
+                color = if (isIncome) BalancePositive else MaterialTheme.colorScheme.onSurface
             )
         }
     }
@@ -501,6 +504,7 @@ private fun EntryCard(
 private fun EmptyEntriesState(
     isToday: Boolean = false,
     expenses: List<Expense> = emptyList(),
+    currencySymbol: String = "₹",
     onPreviousDay: () -> Unit = {}
 ) {
     // Find the most recent day with entries (if today is empty)
@@ -525,7 +529,8 @@ private fun EmptyEntriesState(
         }
     }
 
-    val lastEntryDayLabel = remember(recentEntries) {
+    val yesterdayLabel = stringResource(R.string.daily_yesterday)
+    val lastEntryDayLabel = remember(recentEntries, yesterdayLabel) {
         if (recentEntries.isEmpty()) ""
         else {
             val latest = recentEntries.first()
@@ -534,7 +539,7 @@ private fun EmptyEntriesState(
             val yesterday = Calendar.getInstance().apply { add(Calendar.DAY_OF_YEAR, -1) }
             if (latestCal.get(Calendar.YEAR) == yesterday.get(Calendar.YEAR) &&
                 latestCal.get(Calendar.DAY_OF_YEAR) == yesterday.get(Calendar.DAY_OF_YEAR)
-            ) "Yesterday"
+            ) yesterdayLabel
             else {
                 val fmt = SimpleDateFormat("EEE, MMM d", Locale.getDefault())
                 fmt.format(latest.date)
@@ -551,14 +556,14 @@ private fun EmptyEntriesState(
         ) {
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 Text(
-                    text = if (isToday) "No entries yet today" else "No entries for this day",
+                    text = if (isToday) stringResource(R.string.daily_no_entries) else stringResource(R.string.daily_no_entries),
                     fontSize = 16.sp,
                     fontWeight = FontWeight.Medium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
                 Spacer(modifier = Modifier.height(4.dp))
                 Text(
-                    text = "Tap Add Entry to log a new entry",
+                    text = stringResource(R.string.daily_tap_add),
                     fontSize = 13.sp,
                     color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
                 )
@@ -579,7 +584,7 @@ private fun EmptyEntriesState(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text(
-                            text = "$lastEntryDayLabel · ${recentEntries.size} ${if (recentEntries.size == 1) "entry" else "entries"}",
+                            text = "$lastEntryDayLabel · ${stringResource(R.string.daily_entries_count, recentEntries.size, if (recentEntries.size == 1) stringResource(R.string.daily_entry) else stringResource(R.string.daily_entries))}",
                             fontSize = 12.sp,
                             fontWeight = FontWeight.SemiBold,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -588,7 +593,7 @@ private fun EmptyEntriesState(
                             onClick = onPreviousDay,
                             contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp)
                         ) {
-                            Text("View all →", fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+                            Text(stringResource(R.string.daily_view_all), fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
                         }
                     }
                     Spacer(modifier = Modifier.height(8.dp))
@@ -603,21 +608,21 @@ private fun EmptyEntriesState(
                         ) {
                             Surface(
                                 shape = RoundedCornerShape(8.dp),
-                                color = (category?.color ?: Color.Gray).copy(alpha = 0.15f),
+                                color = (category?.color ?: CategoryFallback).copy(alpha = 0.15f),
                                 modifier = Modifier.size(28.dp)
                             ) {
                                 Box(contentAlignment = Alignment.Center) {
                                     Icon(
                                         imageVector = category?.icon ?: Icons.Default.Category,
-                                        contentDescription = category?.label,
+                                        contentDescription = category?.labelResId?.let { stringResource(it) },
                                         modifier = Modifier.size(16.dp),
-                                        tint = category?.color ?: Color.Gray
+                                        tint = category?.color ?: CategoryFallback
                                     )
                                 }
                             }
                             Spacer(modifier = Modifier.width(10.dp))
                             Text(
-                                text = entry.description.ifBlank { category?.label ?: "Other" },
+                                text = entry.description.ifBlank { category?.labelResId?.let { stringResource(it) } ?: stringResource(R.string.daily_other) },
                                 fontSize = 12.sp,
                                 fontWeight = FontWeight.Medium,
                                 color = MaterialTheme.colorScheme.onSurface,
@@ -626,10 +631,10 @@ private fun EmptyEntriesState(
                                 overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
                             )
                             Text(
-                                text = FormatUtils.formatAmount(entry.amount),
+                                text = "${if (isIncome) "+" else "-"}$currencySymbol${FormatUtils.formatAmount(entry.amount)}",
                                 fontSize = 12.sp,
                                 fontWeight = FontWeight.Bold,
-                                color = if (isIncome) Color(0xFF22C55E) else MaterialTheme.colorScheme.onSurface
+                                color = if (isIncome) BalancePositive else MaterialTheme.colorScheme.onSurface
                             )
                         }
                     }

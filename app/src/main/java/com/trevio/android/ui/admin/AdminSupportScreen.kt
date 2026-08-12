@@ -1,5 +1,6 @@
 package com.trevio.android.ui.admin
 
+import androidx.annotation.StringRes
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -19,6 +20,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -27,6 +29,9 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.trevio.android.core.designsystem.components.LoadingIndicator
 import com.trevio.android.core.designsystem.components.TrevioCard
+import com.trevio.android.core.designsystem.components.formatRelativeTimeText
+import com.trevio.android.core.designsystem.theme.*
+import com.trevio.android.R
 import com.trevio.android.domain.model.HelpArticle
 import com.trevio.android.domain.model.SupportCategory
 import com.trevio.android.domain.model.SupportMessage
@@ -35,7 +40,9 @@ import com.trevio.android.domain.model.SupportPriority
 import com.trevio.android.domain.model.SupportStatus
 import com.trevio.android.domain.model.SupportTicket
 import com.trevio.android.domain.repository.SupportService
+import com.trevio.android.util.AppConstants
 import com.trevio.android.util.DateUtils
+import com.trevio.android.util.toStringResId
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -56,7 +63,7 @@ class AdminSupportViewModel @Inject constructor(
         val selectedTicket: SupportTicket? = null,
         val messages: List<SupportMessage> = emptyList(),
         val isSending: Boolean = false,
-        val error: String? = null,
+        @StringRes val error: Int? = null,
         val subTab: Int = 0,
         val statusFilter: SupportStatus? = null
     )
@@ -81,12 +88,12 @@ class AdminSupportViewModel @Inject constructor(
     fun loadTickets(status: SupportStatus? = null) {
         _state.value = _state.value.copy(isLoading = true)
         viewModelScope.launch {
-            supportService.getAllTickets(status = status, pageSize = 20, lastTicketId = null)
+            supportService.getAllTickets(status = status, pageSize = AppConstants.DEFAULT_PAGE_SIZE, lastTicketId = null)
                 .onSuccess { result ->
                     _state.value = _state.value.copy(isLoading = false, tickets = result.items, ticketsHasMore = result.hasMore)
                 }
                 .onFailure { e ->
-                    _state.value = _state.value.copy(isLoading = false, error = e.message)
+                    _state.value = _state.value.copy(isLoading = false, error = e.toStringResId())
                 }
         }
     }
@@ -96,7 +103,7 @@ class AdminSupportViewModel @Inject constructor(
         _state.value = _state.value.copy(ticketsLoadingMore = true)
         val lastId = _state.value.tickets.lastOrNull()?.ticketId
         viewModelScope.launch {
-            supportService.getAllTickets(status = _state.value.statusFilter, pageSize = 20, lastTicketId = lastId)
+            supportService.getAllTickets(status = _state.value.statusFilter, pageSize = AppConstants.DEFAULT_PAGE_SIZE, lastTicketId = lastId)
                 .onSuccess { result ->
                     _state.value = _state.value.copy(
                         tickets = _state.value.tickets + result.items,
@@ -144,7 +151,7 @@ class AdminSupportViewModel @Inject constructor(
                     }
                 }
                 .onFailure { e ->
-                    _state.value = _state.value.copy(isSending = false, error = e.message)
+                    _state.value = _state.value.copy(isSending = false, error = e.toStringResId())
                 }
         }
     }
@@ -177,7 +184,7 @@ class AdminSupportViewModel @Inject constructor(
         viewModelScope.launch {
             supportService.getAllHelpArticles()
                 .onSuccess { articles -> _state.value = _state.value.copy(articles = articles) }
-                .onFailure { e -> _state.value = _state.value.copy(error = e.message) }
+                .onFailure { e -> _state.value = _state.value.copy(error = e.toStringResId()) }
         }
     }
 
@@ -258,13 +265,13 @@ fun AdminSupportScreen(
             Tab(
                 selected = state.subTab == 0,
                 onClick = { viewModel.selectSubTab(0) },
-                text = { Text("Tickets") },
+                text = { Text(stringResource(R.string.admin_support_tickets)) },
                 icon = { Icon(Icons.Default.Inbox, contentDescription = null, modifier = Modifier.size(18.dp)) }
             )
             Tab(
                 selected = state.subTab == 1,
                 onClick = { viewModel.selectSubTab(1) },
-                text = { Text("Articles") },
+                text = { Text(stringResource(R.string.admin_support_articles)) },
                 icon = { Icon(Icons.Default.Book, contentDescription = null, modifier = Modifier.size(18.dp)) }
             )
         }
@@ -323,17 +330,17 @@ private fun AdminTicketsList(
             modifier = Modifier.fillMaxWidth().padding(16.dp),
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            StatChip("Total", total.toString())
-            StatChip("Open", open.toString())
-            StatChip("Unread", unread.toString())
+            StatChip(stringResource(R.string.admin_support_total), total.toString())
+            StatChip(stringResource(R.string.admin_support_filter_open), open.toString())
+            StatChip(stringResource(R.string.admin_support_unread), unread.toString())
         }
 
         // Search bar
         OutlinedTextField(
             value = searchQuery,
             onValueChange = { searchQuery = it },
-            placeholder = { Text("Search by subject, user, email...") },
-            leadingIcon = { Icon(Icons.Filled.Search, "Search") },
+            placeholder = { Text(stringResource(R.string.admin_support_search_placeholder)) },
+            leadingIcon = { Icon(Icons.Filled.Search, stringResource(R.string.common_search)) },
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 16.dp, vertical = 4.dp),
@@ -351,13 +358,13 @@ private fun AdminTicketsList(
             FilterChip(
                 selected = state.statusFilter == null,
                 onClick = { onFilterChange(null) },
-                label = { Text("All Status") }
+                label = { Text(stringResource(R.string.admin_support_all_status)) }
             )
             SupportStatus.values().forEach { status ->
                 FilterChip(
                     selected = state.statusFilter == status,
                     onClick = { onFilterChange(status) },
-                    label = { Text(status.name.replace("_", " ")) }
+                    label = { Text(stringResource(status.toStringResId())) }
                 )
             }
         }
@@ -372,13 +379,13 @@ private fun AdminTicketsList(
             FilterChip(
                 selected = categoryFilter == null,
                 onClick = { categoryFilter = null },
-                label = { Text("All Categories") }
+                label = { Text(stringResource(R.string.admin_support_all_categories)) }
             )
             SupportCategory.values().forEach { cat ->
                 FilterChip(
                     selected = categoryFilter == cat,
                     onClick = { categoryFilter = if (categoryFilter == cat) null else cat },
-                    label = { Text(cat.name.replace("_", " ")) }
+                    label = { Text(stringResource(cat.toStringResId())) }
                 )
             }
         }
@@ -391,7 +398,7 @@ private fun AdminTicketsList(
             }
         } else if (filteredTickets.isEmpty()) {
             Box(Modifier.fillMaxSize().padding(32.dp), contentAlignment = Alignment.Center) {
-                Text("No tickets found", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(stringResource(R.string.admin_support_no_tickets_found), color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         } else {
             LazyColumn(
@@ -461,7 +468,7 @@ private fun AdminTicketItem(ticket: SupportTicket, onClick: (SupportTicket) -> U
                         modifier = Modifier.weight(1f)
                     )
                     if (ticket.unreadByAdmin) {
-                        Badge { Text("NEW", style = MaterialTheme.typography.labelSmall) }
+                        Badge { Text(stringResource(R.string.common_new), style = MaterialTheme.typography.labelSmall) }
                     }
                 }
                 Text(
@@ -476,15 +483,15 @@ private fun AdminTicketItem(ticket: SupportTicket, onClick: (SupportTicket) -> U
                 ) {
                     AssistChip(
                         onClick = {},
-                        label = { Text(ticket.status.name.replace("_", " "), style = MaterialTheme.typography.labelSmall) }
+                        label = { Text(stringResource(ticket.status.toStringResId()), style = MaterialTheme.typography.labelSmall) }
                     )
                     Text(
-                        ticket.priority.name,
+                        stringResource(ticket.priority.toStringResId()),
                         style = MaterialTheme.typography.labelSmall,
                         color = priorityColor
                     )
                     Text(
-                        "• ${DateUtils.formatRelativeTime(ticket.updatedAt)}",
+                        "• ${formatRelativeTimeText(ticket.updatedAt)}",
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -500,7 +507,7 @@ private fun AdminTicketDetail(
     ticket: SupportTicket,
     messages: List<SupportMessage>,
     isSending: Boolean,
-    error: String?,
+    @StringRes error: Int?,
     onBack: () -> Unit,
     onSendReply: (String) -> Unit,
     onUpdateStatus: (SupportStatus) -> Unit,
@@ -511,10 +518,10 @@ private fun AdminTicketDetail(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Ticket Detail", fontWeight = FontWeight.SemiBold) },
+                title = { Text(stringResource(R.string.admin_support_ticket_detail_title), fontWeight = FontWeight.SemiBold) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back")
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, stringResource(R.string.common_back))
                     }
                 }
             )
@@ -524,7 +531,7 @@ private fun AdminTicketDetail(
                 Column(modifier = Modifier.fillMaxWidth()) {
                     if (ticket.status == SupportStatus.CLOSED) {
                         Text(
-                            "This ticket is closed. Change status to reopen, or send a message below.",
+                            stringResource(R.string.admin_support_closed_notice),
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .padding(horizontal = 16.dp, vertical = 6.dp),
@@ -535,7 +542,7 @@ private fun AdminTicketDetail(
                     }
                     error?.let {
                         Text(
-                            "Error: $it",
+                            stringResource(it),
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .padding(horizontal = 16.dp, vertical = 4.dp),
@@ -550,7 +557,7 @@ private fun AdminTicketDetail(
                         OutlinedTextField(
                             value = reply,
                             onValueChange = { reply = it },
-                            placeholder = { Text("Type your response...") },
+                            placeholder = { Text(stringResource(R.string.admin_support_type_response)) },
                             modifier = Modifier.weight(1f),
                             shape = RoundedCornerShape(24.dp)
                         )
@@ -567,7 +574,7 @@ private fun AdminTicketDetail(
                             if (isSending) {
                                 CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
                             } else {
-                                Icon(Icons.AutoMirrored.Filled.Send, "Send", tint = MaterialTheme.colorScheme.primary)
+                                Icon(Icons.AutoMirrored.Filled.Send, stringResource(R.string.common_send), tint = MaterialTheme.colorScheme.primary)
                             }
                         }
                     }
@@ -586,15 +593,15 @@ private fun AdminTicketDetail(
                     Spacer(Modifier.height(8.dp))
                     Text(ticket.description, style = MaterialTheme.typography.bodyMedium)
                     Spacer(Modifier.height(8.dp))
-                    Text("From: ${ticket.userDisplayName} @${ticket.userUsername}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(stringResource(R.string.admin_support_from, ticket.userDisplayName, ticket.userUsername), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     if (ticket.context.groupName.isNotEmpty()) {
-                        Text("Context: ${ticket.context.groupName}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text(stringResource(R.string.admin_support_context, ticket.context.groupName), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
 
                     Spacer(Modifier.height(12.dp))
 
                     // Status controls
-                    Text("Status:", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.SemiBold)
+                    Text(stringResource(R.string.admin_support_status_colon), style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.SemiBold)
                     Spacer(Modifier.height(4.dp))
                     @OptIn(ExperimentalLayoutApi::class)
                     FlowRow(
@@ -606,7 +613,7 @@ private fun AdminTicketDetail(
                             FilterChip(
                                 selected = ticket.status == status,
                                 onClick = { onUpdateStatus(status) },
-                                label = { Text(status.name.replace("_", " "), style = MaterialTheme.typography.labelSmall) }
+                                label = { Text(stringResource(status.toStringResId()), style = MaterialTheme.typography.labelSmall) }
                             )
                         }
                     }
@@ -614,7 +621,7 @@ private fun AdminTicketDetail(
                     Spacer(Modifier.height(8.dp))
 
                     // Priority controls
-                    Text("Priority:", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.SemiBold)
+                    Text(stringResource(R.string.admin_support_priority_colon), style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.SemiBold)
                     Spacer(Modifier.height(4.dp))
                     @OptIn(ExperimentalLayoutApi::class)
                     FlowRow(
@@ -626,7 +633,7 @@ private fun AdminTicketDetail(
                             FilterChip(
                                 selected = ticket.priority == priority,
                                 onClick = { onUpdatePriority(priority) },
-                                label = { Text(priority.name, style = MaterialTheme.typography.labelSmall) }
+                                label = { Text(stringResource(priority.toStringResId()), style = MaterialTheme.typography.labelSmall) }
                             )
                         }
                     }
@@ -668,7 +675,7 @@ private fun AdminMessageBubble(message: SupportMessage) {
         ) {
             Column(modifier = Modifier.padding(12.dp)) {
                 Text(
-                    if (isAdmin) "You (Admin)" else message.fromName,
+                    if (isAdmin) stringResource(R.string.admin_support_you_admin) else message.fromName,
                     style = MaterialTheme.typography.labelSmall,
                     fontWeight = FontWeight.SemiBold,
                     color = if (isAdmin) MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.8f) else MaterialTheme.colorScheme.primary
@@ -737,17 +744,17 @@ private fun AdminArticlesList(
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Text("Help Articles", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+            Text(stringResource(R.string.admin_support_help_articles), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
             Button(onClick = { showCreateDialog = true }) {
                 Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(18.dp))
                 Spacer(Modifier.width(4.dp))
-                Text("New")
+                Text(stringResource(R.string.broadcasts_new))
             }
         }
 
         if (state.articles.isEmpty()) {
             Box(Modifier.fillMaxSize().padding(32.dp), contentAlignment = Alignment.Center) {
-                Text("No articles yet. Create one to help your users.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(stringResource(R.string.admin_support_no_articles_msg), color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         } else {
             LazyColumn(
@@ -795,27 +802,27 @@ private fun AdminArticleItem(
                             color = MaterialTheme.colorScheme.outline.copy(alpha = 0.1f),
                             shape = RoundedCornerShape(6.dp)
                         ) {
-                            Text("Hidden", style = MaterialTheme.typography.labelSmall, modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp))
+                            Text(stringResource(R.string.admin_support_hidden), style = MaterialTheme.typography.labelSmall, modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp))
                         }
                     }
                 }
                 Text(
-                    "${article.category} • Order: ${article.order}",
+                    stringResource(R.string.admin_support_article_category_order, article.category, article.order),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
             IconButton(onClick = { onEdit(article) }) {
-                Icon(Icons.Default.Edit, contentDescription = "Edit")
+                Icon(Icons.Default.Edit, contentDescription = stringResource(R.string.common_edit))
             }
             IconButton(onClick = { onToggleActive(article) }) {
                 Icon(
                     if (article.active) Icons.Default.Visibility else Icons.Default.VisibilityOff,
-                    contentDescription = if (article.active) "Hide" else "Show"
+                    contentDescription = if (article.active) stringResource(R.string.admin_support_hide) else stringResource(R.string.admin_support_show)
                 )
             }
             IconButton(onClick = { onDelete(article) }) {
-                Icon(Icons.Default.Delete, contentDescription = "Delete", tint = MaterialTheme.colorScheme.error)
+                Icon(Icons.Default.Delete, contentDescription = stringResource(R.string.common_delete), tint = MaterialTheme.colorScheme.error)
             }
         }
     }
@@ -835,13 +842,13 @@ private fun CreateArticleDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("New Help Article") },
+        title = { Text(stringResource(R.string.admin_support_create_article)) },
         text = {
             Column(modifier = Modifier.fillMaxWidth()) {
                 OutlinedTextField(
                     value = title,
                     onValueChange = { title = it },
-                    label = { Text("Title") },
+                    label = { Text(stringResource(R.string.admin_support_article_title)) },
                     modifier = Modifier.fillMaxWidth(),
                     singleLine = true
                 )
@@ -849,14 +856,14 @@ private fun CreateArticleDialog(
                 OutlinedTextField(
                     value = content,
                     onValueChange = { content = it },
-                    label = { Text("Content (HTML)") },
+                    label = { Text(stringResource(R.string.admin_support_article_content)) },
                     modifier = Modifier.fillMaxWidth().heightIn(min = 100.dp)
                 )
                 Spacer(Modifier.height(8.dp))
                 OutlinedTextField(
                     value = category,
                     onValueChange = { category = it },
-                    label = { Text("Category") },
+                    label = { Text(stringResource(R.string.admin_support_article_category)) },
                     modifier = Modifier.fillMaxWidth(),
                     singleLine = true
                 )
@@ -864,7 +871,7 @@ private fun CreateArticleDialog(
                 OutlinedTextField(
                     value = tags,
                     onValueChange = { tags = it },
-                    label = { Text("Tags (comma-separated)") },
+                    label = { Text(stringResource(R.string.admin_support_article_tags)) },
                     modifier = Modifier.fillMaxWidth(),
                     singleLine = true
                 )
@@ -872,7 +879,7 @@ private fun CreateArticleDialog(
                 OutlinedTextField(
                     value = order,
                     onValueChange = { order = it.filter { c -> c.isDigit() } },
-                    label = { Text("Display Order") },
+                    label = { Text(stringResource(R.string.admin_support_article_order)) },
                     modifier = Modifier.fillMaxWidth(),
                     singleLine = true
                 )
@@ -892,10 +899,10 @@ private fun CreateArticleDialog(
                     }
                 },
                 enabled = title.isNotBlank() && content.isNotBlank()
-            ) { Text("Create") }
+            ) { Text(stringResource(R.string.admin_support_create_button)) }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) { Text("Cancel") }
+            TextButton(onClick = onDismiss) { Text(stringResource(R.string.common_cancel)) }
         }
     )
 }
@@ -915,13 +922,13 @@ private fun EditArticleDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Edit Help Article") },
+        title = { Text(stringResource(R.string.admin_support_edit_article)) },
         text = {
             Column(modifier = Modifier.fillMaxWidth()) {
                 OutlinedTextField(
                     value = title,
                     onValueChange = { title = it },
-                    label = { Text("Title") },
+                    label = { Text(stringResource(R.string.admin_support_article_title)) },
                     modifier = Modifier.fillMaxWidth(),
                     singleLine = true
                 )
@@ -929,14 +936,14 @@ private fun EditArticleDialog(
                 OutlinedTextField(
                     value = content,
                     onValueChange = { content = it },
-                    label = { Text("Content (HTML)") },
+                    label = { Text(stringResource(R.string.admin_support_article_content)) },
                     modifier = Modifier.fillMaxWidth().heightIn(min = 100.dp)
                 )
                 Spacer(Modifier.height(8.dp))
                 OutlinedTextField(
                     value = category,
                     onValueChange = { category = it },
-                    label = { Text("Category") },
+                    label = { Text(stringResource(R.string.admin_support_article_category)) },
                     modifier = Modifier.fillMaxWidth(),
                     singleLine = true
                 )
@@ -944,7 +951,7 @@ private fun EditArticleDialog(
                 OutlinedTextField(
                     value = tags,
                     onValueChange = { tags = it },
-                    label = { Text("Tags (comma-separated)") },
+                    label = { Text(stringResource(R.string.admin_support_article_tags)) },
                     modifier = Modifier.fillMaxWidth(),
                     singleLine = true
                 )
@@ -952,7 +959,7 @@ private fun EditArticleDialog(
                 OutlinedTextField(
                     value = order,
                     onValueChange = { order = it.filter { c -> c.isDigit() } },
-                    label = { Text("Display Order") },
+                    label = { Text(stringResource(R.string.admin_support_article_order)) },
                     modifier = Modifier.fillMaxWidth(),
                     singleLine = true
                 )
@@ -972,10 +979,10 @@ private fun EditArticleDialog(
                     }
                 },
                 enabled = title.isNotBlank() && content.isNotBlank()
-            ) { Text("Save") }
+            ) { Text(stringResource(R.string.common_save)) }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) { Text("Cancel") }
+            TextButton(onClick = onDismiss) { Text(stringResource(R.string.common_cancel)) }
         }
     )
 }

@@ -5,6 +5,7 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
+import androidx.annotation.StringRes
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -33,6 +34,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -40,8 +42,17 @@ import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.trevio.android.R
 import com.trevio.android.core.designsystem.components.MemberAvatar
 import com.trevio.android.core.designsystem.components.TrevioHeader
+import com.trevio.android.core.designsystem.theme.TemplateTrip
+import com.trevio.android.core.designsystem.theme.TemplateTripDark
+import com.trevio.android.core.designsystem.theme.TemplateTurf
+import com.trevio.android.core.designsystem.theme.TemplateTurfDark
+import com.trevio.android.core.designsystem.theme.TemplateCasual
+import com.trevio.android.core.designsystem.theme.TemplateCasualDark
+import com.trevio.android.core.designsystem.theme.TemplateHousehold
+import com.trevio.android.core.designsystem.theme.TemplateHouseholdDark
 import com.trevio.android.core.navigation.TrevioRoute
 import com.trevio.android.domain.model.GroupTemplate
 import com.trevio.android.domain.model.UserSearchResult
@@ -49,7 +60,9 @@ import com.trevio.android.domain.repository.AuthService
 import com.trevio.android.domain.repository.GroupService
 import com.trevio.android.domain.repository.UserService
 import com.trevio.android.util.CurrencyConverter
+import com.trevio.android.util.AppConstants
 import com.trevio.android.util.rememberCurrencyFormatter
+import com.trevio.android.util.toStringResId
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -70,7 +83,7 @@ class CreateGroupViewModel @Inject constructor(
 
     data class CreateState(
         val isLoading: Boolean = false,
-        val error: String? = null,
+        @StringRes val error: Int? = null,
         val searchResults: List<UserSearchResult> = emptyList(),
         val selectedMembers: List<UserSearchResult> = emptyList(),
         val offlineMembers: List<OfflineMember> = emptyList(),
@@ -157,7 +170,7 @@ class CreateGroupViewModel @Inject constructor(
                     inviteCode = inviteCode
                 )
             }.onFailure { e ->
-                _state.value = _state.value.copy(isLoading = false, error = e.message)
+                _state.value = _state.value.copy(isLoading = false, error = e.toStringResId())
             }
         }
     }
@@ -192,7 +205,7 @@ fun CreateGroupScreen(
 
     LaunchedEffect(searchQuery) {
         if (searchQuery.isNotBlank()) {
-            delay(300)
+            delay(AppConstants.DEBOUNCE_DELAY_MS)
             debouncedQuery = searchQuery
             viewModel.searchUsers(debouncedQuery)
         } else {
@@ -203,7 +216,7 @@ fun CreateGroupScreen(
 
     Column(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
         TrevioHeader(
-            title = "Create Group",
+            title = stringResource(R.string.create_group_title),
             onBack = { navController.popBackStack() }
         )
 
@@ -214,9 +227,9 @@ fun CreateGroupScreen(
                 .padding(horizontal = 20.dp, vertical = 20.dp)
         ) {
             // ── Template Selection ──
-            SectionLabel("Choose a template")
+            SectionLabel(stringResource(R.string.create_group_choose_template))
             Spacer(modifier = Modifier.height(4.dp))
-            SectionHint("Pick a category that best fits your group")
+            SectionHint(stringResource(R.string.create_group_template_hint))
             Spacer(modifier = Modifier.height(12.dp))
 
             Row(
@@ -225,27 +238,27 @@ fun CreateGroupScreen(
             ) {
                 TemplateCard(
                     icon = Icons.Default.TravelExplore,
-                    title = "Trip",
-                    subtitle = "Travel & trips",
-                    iconColor = if (isDark) Color(0xFF818CF8) else Color(0xFF6366F1),
+                    title = stringResource(R.string.create_group_template_trip),
+                    subtitle = stringResource(R.string.create_group_template_trip_subtitle),
+                    iconColor = if (isDark) TemplateTripDark else TemplateTrip,
                     selected = selectedTemplate == GroupTemplate.TRIP,
                     onClick = { selectedTemplate = GroupTemplate.TRIP },
                     modifier = Modifier.weight(1f)
                 )
                 TemplateCard(
                     icon = Icons.Default.Sports,
-                    title = "Turf",
-                    subtitle = "Sports & turf",
-                    iconColor = if (isDark) Color(0xFF4ADE80) else Color(0xFF22C55E),
+                    title = stringResource(R.string.create_group_template_turf),
+                    subtitle = stringResource(R.string.create_group_template_turf_subtitle),
+                    iconColor = if (isDark) TemplateTurfDark else TemplateTurf,
                     selected = selectedTemplate == GroupTemplate.TURF,
                     onClick = { selectedTemplate = GroupTemplate.TURF },
                     modifier = Modifier.weight(1f)
                 )
                 TemplateCard(
                     icon = Icons.Default.Group,
-                    title = "Casual",
-                    subtitle = "Friends & casual",
-                    iconColor = if (isDark) Color(0xFFFBBF24) else Color(0xFFF59E0B),
+                    title = stringResource(R.string.create_group_template_casual),
+                    subtitle = stringResource(R.string.create_group_template_casual_subtitle),
+                    iconColor = if (isDark) TemplateCasualDark else TemplateCasual,
                     selected = selectedTemplate == GroupTemplate.CASUAL,
                     onClick = { selectedTemplate = GroupTemplate.CASUAL },
                     modifier = Modifier.weight(1f)
@@ -258,9 +271,9 @@ fun CreateGroupScreen(
             ) {
                 TemplateCard(
                     icon = Icons.Default.Home,
-                    title = "Household",
-                    subtitle = "Daily family expenses",
-                    iconColor = if (isDark) Color(0xFF2DD4BF) else Color(0xFF0D9488),
+                    title = stringResource(R.string.create_group_template_household),
+                    subtitle = stringResource(R.string.create_group_template_household_subtitle),
+                    iconColor = if (isDark) TemplateHouseholdDark else TemplateHousehold,
                     selected = selectedTemplate == GroupTemplate.HOUSEHOLD,
                     onClick = { selectedTemplate = GroupTemplate.HOUSEHOLD },
                     modifier = Modifier.weight(1f)
@@ -269,21 +282,21 @@ fun CreateGroupScreen(
             }
             if (selectedTemplate == GroupTemplate.HOUSEHOLD) {
                 Spacer(modifier = Modifier.height(8.dp))
-                SectionHint("Track daily family spending and income. No splitting — just log who paid what and see monthly reports.")
+                SectionHint(stringResource(R.string.create_group_household_hint))
             }
 
             Spacer(modifier = Modifier.height(28.dp))
 
             // ── Group Details ──
-            SectionLabel("Group details")
+            SectionLabel(stringResource(R.string.create_group_details_label))
             Spacer(modifier = Modifier.height(4.dp))
-            SectionHint("Give your group a name so members can identify it")
+            SectionHint(stringResource(R.string.create_group_details_hint))
             Spacer(modifier = Modifier.height(12.dp))
 
             StyledTextField(
                 value = name,
                 onValueChange = { name = it },
-                label = "Group name",
+                label = stringResource(R.string.create_group_name_label),
                 icon = Icons.Outlined.Label,
                 singleLine = true
             )
@@ -291,7 +304,7 @@ fun CreateGroupScreen(
             StyledTextField(
                 value = description,
                 onValueChange = { description = it },
-                label = "Description (optional)",
+                label = stringResource(R.string.create_group_description),
                 icon = Icons.Outlined.Description,
                 minLines = 2
             )
@@ -300,7 +313,7 @@ fun CreateGroupScreen(
                 OutlinedTextField(
                     value = monthlyBudget,
                     onValueChange = { monthlyBudget = it.filter { c -> c.isDigit() || c == '.' } },
-                    label = { Text("Monthly budget (optional)") },
+                    label = { Text(stringResource(R.string.create_group_monthly_budget)) },
                     prefix = { Text(currencySymbol) },
                     singleLine = true,
                     shape = RoundedCornerShape(14.dp),
@@ -315,20 +328,20 @@ fun CreateGroupScreen(
             Spacer(modifier = Modifier.height(28.dp))
 
             // ── Add Members ──
-            SectionLabel("Add members")
+            SectionLabel(stringResource(R.string.create_group_add_members_label))
             Spacer(modifier = Modifier.height(4.dp))
-            SectionHint("Search by username or add someone not on the app")
+            SectionHint(stringResource(R.string.create_group_add_members_hint))
             Spacer(modifier = Modifier.height(12.dp))
 
             OutlinedTextField(
                 value = searchQuery,
                 onValueChange = { searchQuery = it },
-                placeholder = { Text("Search by username", color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)) },
+                placeholder = { Text(stringResource(R.string.create_group_search_placeholder), color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)) },
                 leadingIcon = { Icon(Icons.Outlined.Search, contentDescription = null, modifier = Modifier.size(20.dp)) },
                 trailingIcon = {
                     if (searchQuery.isNotEmpty()) {
                         IconButton(onClick = { searchQuery = ""; debouncedQuery = "" }, modifier = Modifier.size(20.dp)) {
-                            Icon(Icons.Outlined.Close, contentDescription = "Clear", modifier = Modifier.size(16.dp))
+                            Icon(Icons.Outlined.Close, contentDescription = stringResource(R.string.common_clear), modifier = Modifier.size(16.dp))
                         }
                     }
                 },
@@ -378,7 +391,7 @@ fun CreateGroupScreen(
                                     Spacer(modifier = Modifier.width(12.dp))
                                     Column(modifier = Modifier.weight(1f)) {
                                         Text(
-                                            user.displayName + if (user.uid == currentUserId) " (You)" else "",
+                                            user.displayName + if (user.uid == currentUserId) stringResource(R.string.create_group_you_suffix) else "",
                                             style = MaterialTheme.typography.bodyMedium,
                                             fontWeight = FontWeight.SemiBold,
                                             maxLines = 1,
@@ -399,7 +412,7 @@ fun CreateGroupScreen(
                                     ) {
                                         Icon(
                                             Icons.Outlined.PersonAdd,
-                                            contentDescription = "Add",
+                                            contentDescription = stringResource(R.string.common_add),
                                             tint = MaterialTheme.colorScheme.primary,
                                             modifier = Modifier.size(18.dp)
                                         )
@@ -438,7 +451,7 @@ fun CreateGroupScreen(
                         )
                         Spacer(modifier = Modifier.width(12.dp))
                         Text(
-                            "Add \"$searchQuery\" as offline member",
+                            stringResource(R.string.create_group_add_offline_hint, searchQuery),
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.primary,
                             fontWeight = FontWeight.Medium
@@ -454,7 +467,7 @@ fun CreateGroupScreen(
                 horizontalArrangement = Arrangement.spacedBy(6.dp)
             ) {
                 Box(modifier = Modifier.weight(1f).height(1.dp).background(MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f)))
-                Text("or add by name", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f))
+                Text(stringResource(R.string.create_group_or_add_by_name), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f))
                 Box(modifier = Modifier.weight(1f).height(1.dp).background(MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f)))
             }
             Spacer(modifier = Modifier.height(12.dp))
@@ -468,7 +481,7 @@ fun CreateGroupScreen(
                 OutlinedTextField(
                     value = offlineName,
                     onValueChange = { offlineName = it },
-                    placeholder = { Text("Name", color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)) },
+                    placeholder = { Text(stringResource(R.string.create_group_offline_name), color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)) },
                     leadingIcon = { Icon(Icons.Outlined.Person, contentDescription = null, modifier = Modifier.size(20.dp)) },
                     modifier = Modifier.weight(1f),
                     singleLine = true,
@@ -487,7 +500,7 @@ fun CreateGroupScreen(
                     shape = RoundedCornerShape(14.dp),
                     contentPadding = PaddingValues(horizontal = 16.dp, vertical = 14.dp)
                 ) {
-                    Icon(Icons.Default.Add, contentDescription = "Add", modifier = Modifier.size(20.dp))
+                    Icon(Icons.Default.Add, contentDescription = stringResource(R.string.common_add), modifier = Modifier.size(20.dp))
                 }
             }
 
@@ -505,7 +518,7 @@ fun CreateGroupScreen(
                     ) {
                         Icon(Icons.Default.Group, contentDescription = null, modifier = Modifier.size(16.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
                         Text(
-                            "$totalCount added",
+                            stringResource(R.string.create_group_members_added, totalCount),
                             style = MaterialTheme.typography.labelLarge,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             fontWeight = FontWeight.SemiBold
@@ -543,7 +556,7 @@ fun CreateGroupScreen(
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Text(
-                        state.error!!,
+                        stringResource(state.error!!),
                         modifier = Modifier.padding(12.dp),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onErrorContainer
@@ -580,7 +593,7 @@ fun CreateGroupScreen(
                 } else {
                     Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(20.dp))
                     Spacer(modifier = Modifier.width(8.dp))
-                    Text("Create Group", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                    Text(stringResource(R.string.create_group_create), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
                 }
             }
 
@@ -652,7 +665,7 @@ private fun SelectedMemberChip(
             MemberAvatar(name = user.displayName, photoURL = user.photoURL, size = 28)
             Spacer(modifier = Modifier.width(8.dp))
             Text(
-                text = user.displayName + if (isCurrentUser) " (You)" else "",
+                text = user.displayName + if (isCurrentUser) stringResource(R.string.create_group_you_suffix) else "",
                 style = MaterialTheme.typography.bodySmall,
                 fontWeight = FontWeight.Medium,
                 maxLines = 1,
@@ -660,7 +673,7 @@ private fun SelectedMemberChip(
             )
             Spacer(modifier = Modifier.width(4.dp))
             IconButton(onClick = onRemove, modifier = Modifier.size(24.dp)) {
-                Icon(Icons.Outlined.Close, contentDescription = "Remove", modifier = Modifier.size(14.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                Icon(Icons.Outlined.Close, contentDescription = stringResource(R.string.common_remove), modifier = Modifier.size(14.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
     }
@@ -704,7 +717,7 @@ private fun OfflineMemberChip(
             )
             Spacer(modifier = Modifier.width(4.dp))
             IconButton(onClick = onRemove, modifier = Modifier.size(24.dp)) {
-                Icon(Icons.Outlined.Close, contentDescription = "Remove", modifier = Modifier.size(14.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                Icon(Icons.Outlined.Close, contentDescription = stringResource(R.string.common_remove), modifier = Modifier.size(14.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
     }

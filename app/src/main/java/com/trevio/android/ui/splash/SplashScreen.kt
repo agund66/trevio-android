@@ -10,6 +10,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.trevio.android.R
@@ -19,6 +20,7 @@ import androidx.lifecycle.viewModelScope
 import com.trevio.android.core.navigation.TrevioRoute
 import com.trevio.android.domain.repository.AuthService
 import com.trevio.android.domain.repository.UserService
+import com.trevio.android.util.AppConstants
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -36,6 +38,7 @@ class SplashViewModel @Inject constructor(
         data object Loading : SplashState()
         data object NotAuthenticated : SplashState()
         data object NeedsTnC : SplashState()
+        data object NeedsPhone : SplashState()
         data object Authenticated : SplashState()
         data object Blocked : SplashState()
     }
@@ -49,7 +52,7 @@ class SplashViewModel @Inject constructor(
 
     private fun checkAuthState() {
         viewModelScope.launch {
-            delay(800)
+            delay(AppConstants.SPLASH_DELAY_MS)
             if (!authService.isUserAuthenticated()) {
                 _state.value = SplashState.NotAuthenticated
                 return@launch
@@ -62,6 +65,8 @@ class SplashViewModel @Inject constructor(
                 _state.value = SplashState.Blocked
             } else if (!user.acceptedTnC) {
                 _state.value = SplashState.NeedsTnC
+            } else if (user.phoneNumber.isBlank()) {
+                _state.value = SplashState.NeedsPhone
             } else if (user.username.isBlank()) {
                 // Auto-repair: generate missing username for existing users
                 userService.acceptTnC()
@@ -89,6 +94,11 @@ fun SplashScreen(
             }
             is SplashViewModel.SplashState.NeedsTnC -> {
                 navController.navigate(TrevioRoute.Terms.route) {
+                    popUpTo(0) { inclusive = true }
+                }
+            }
+            is SplashViewModel.SplashState.NeedsPhone -> {
+                navController.navigate(TrevioRoute.PhoneSetup.route) {
                     popUpTo(0) { inclusive = true }
                 }
             }
@@ -125,12 +135,12 @@ fun SplashScreen(
         ) {
             Image(
                 painter = painterResource(R.drawable.ic_trevio_logo),
-                contentDescription = "Trevio",
+                contentDescription = stringResource(R.string.app_name),
                 modifier = Modifier.size(96.dp)
             )
             Spacer(modifier = Modifier.height(12.dp))
             Text(
-                text = "Split bills. Simplify life.",
+                text = stringResource(R.string.auth_tagline),
                 style = MaterialTheme.typography.bodyLarge,
                 color = Color.White.copy(alpha = 0.9f),
                 fontWeight = FontWeight.Medium

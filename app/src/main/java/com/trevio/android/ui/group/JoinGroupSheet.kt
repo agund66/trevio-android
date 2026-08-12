@@ -1,6 +1,7 @@
 package com.trevio.android.ui.group
 
 import android.widget.Toast
+import androidx.annotation.StringRes
 import com.google.android.gms.common.ConnectionResult
 import com.google.android.gms.common.GoogleApiAvailability
 import androidx.compose.foundation.background
@@ -17,6 +18,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
@@ -24,7 +26,9 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.google.mlkit.vision.codescanner.GmsBarcodeScanning
+import com.trevio.android.R
 import com.trevio.android.util.QrCodeGenerator
+import com.trevio.android.util.toStringResId
 import com.trevio.android.domain.model.Member
 import com.trevio.android.domain.repository.AuthService
 import com.trevio.android.domain.repository.GroupService
@@ -44,7 +48,7 @@ class JoinGroupSheetViewModel @Inject constructor(
 
     data class SheetState(
         val isLoading: Boolean = false,
-        val error: String? = null,
+        @StringRes val error: Int? = null,
         val joined: Boolean = false,
         val joinedGroupName: String? = null,
         val needsAuth: Boolean = false,
@@ -52,7 +56,7 @@ class JoinGroupSheetViewModel @Inject constructor(
         val claimableMembers: List<Member> = emptyList(),
         val groupId: String? = null,
         val claiming: Boolean = false,
-        val claimError: String? = null,
+        @StringRes val claimError: Int? = null,
         val claimed: Boolean = false
     )
 
@@ -62,7 +66,7 @@ class JoinGroupSheetViewModel @Inject constructor(
     fun join(inviteCode: String) {
         val code = inviteCode.trim()
         if (code.isBlank()) {
-            _state.value = SheetState(error = "Please enter an invite code")
+            _state.value = SheetState(error = R.string.join_sheet_error)
             return
         }
         _state.value = SheetState(isLoading = true)
@@ -87,7 +91,7 @@ class JoinGroupSheetViewModel @Inject constructor(
                     _state.value = SheetState(joined = true, joinedGroupName = groupName, groupId = groupId, claimableMembers = claimable)
                 }
                 .onFailure { e ->
-                    _state.value = SheetState(error = e.message ?: "Failed to join group")
+                    _state.value = SheetState(error = e.toStringResId())
                 }
         }
     }
@@ -101,7 +105,7 @@ class JoinGroupSheetViewModel @Inject constructor(
                     _state.value = _state.value.copy(claiming = false, claimed = true, claimableMembers = emptyList())
                 }
                 .onFailure { e ->
-                    _state.value = _state.value.copy(claiming = false, claimError = e.message)
+                    _state.value = _state.value.copy(claiming = false, claimError = e.toStringResId())
                 }
         }
     }
@@ -146,7 +150,7 @@ fun JoinGroupSheet(
     LaunchedEffect(state.joined, state.claimableMembers, state.claimed) {
         if (state.joined && state.claimableMembers.isEmpty() && !state.claiming) {
             val name = state.joinedGroupName
-            Toast.makeText(context, if (name != null) "Joined \"$name\"" else "Joined group", Toast.LENGTH_SHORT).show()
+            Toast.makeText(context, if (name != null) context.getString(R.string.join_sheet_joined, name) else context.getString(R.string.join_sheet_joined_default), Toast.LENGTH_SHORT).show()
             viewModel.reset()
             onDismiss()
             onJoined()
@@ -170,13 +174,13 @@ fun JoinGroupSheet(
         ) {
             if (state.claimableMembers.isNotEmpty()) {
                 Text(
-                    text = "Claim a Profile",
+                    text = stringResource(R.string.join_sheet_claim_title),
                     style = MaterialTheme.typography.headlineSmall,
                     fontWeight = FontWeight.Bold
                 )
                 Spacer(modifier = Modifier.height(4.dp))
                 Text(
-                    text = "Are any of these offline profiles you?",
+                    text = stringResource(R.string.join_sheet_claim_message),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -209,29 +213,29 @@ fun JoinGroupSheet(
                             Button(
                                 onClick = { viewModel.claimOfflineMember(member.uid) },
                                 enabled = !state.claiming
-                            ) { Text("Claim") }
+                            ) { Text(stringResource(R.string.join_group_claim)) }
                         }
                     }
                 }
 
                 if (state.claimError != null) {
                     Spacer(modifier = Modifier.height(8.dp))
-                    Text(state.claimError!!, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
+                    Text(stringResource(state.claimError!!), color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
                 }
 
                 Spacer(modifier = Modifier.height(20.dp))
                 TextButton(onClick = { viewModel.skipClaim() }) {
-                    Text("Skip for now")
+                    Text(stringResource(R.string.join_group_skip_for_now))
                 }
             } else {
                 Text(
-                    text = "Join Group",
+                    text = stringResource(R.string.join_sheet_title),
                     style = MaterialTheme.typography.headlineSmall,
                     fontWeight = FontWeight.Bold
                 )
                 Spacer(modifier = Modifier.height(4.dp))
                 Text(
-                    text = "Enter an invite code or scan a QR code",
+                    text = stringResource(R.string.join_sheet_enter_code_or_scan),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -240,8 +244,8 @@ fun JoinGroupSheet(
                 OutlinedTextField(
                     value = inviteCode,
                     onValueChange = { inviteCode = it.trim() },
-                    label = { Text("Invite Code") },
-                    placeholder = { Text("e.g., ABC123") },
+                    label = { Text(stringResource(R.string.join_sheet_code)) },
+                    placeholder = { Text(stringResource(R.string.join_sheet_code_example)) },
                     singleLine = true,
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Ascii),
                     modifier = Modifier.fillMaxWidth(),
@@ -251,7 +255,7 @@ fun JoinGroupSheet(
                 if (state.error != null) {
                     Spacer(modifier = Modifier.height(8.dp))
                     Text(
-                        text = state.error!!,
+                        text = stringResource(state.error!!),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.error
                     )
@@ -272,7 +276,7 @@ fun JoinGroupSheet(
                             strokeWidth = 2.dp
                         )
                     } else {
-                        Text("Join Group", style = MaterialTheme.typography.titleMedium)
+                        Text(stringResource(R.string.join_sheet_join_btn), style = MaterialTheme.typography.titleMedium)
                     }
                 }
 
@@ -284,7 +288,7 @@ fun JoinGroupSheet(
                 ) {
                     HorizontalDivider(modifier = Modifier.weight(1f))
                     Text(
-                        text = "OR",
+                        text = stringResource(R.string.join_sheet_or),
                         style = MaterialTheme.typography.labelMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.padding(horizontal = 12.dp)
@@ -302,7 +306,7 @@ fun JoinGroupSheet(
                         if (playServicesStatus != ConnectionResult.SUCCESS) {
                             Toast.makeText(
                                 context,
-                                "QR scanning requires Google Play Services. Please update it and try again.",
+                                context.getString(R.string.join_sheet_play_services_error),
                                 Toast.LENGTH_LONG
                             ).show()
                             return@OutlinedButton
@@ -325,7 +329,7 @@ fun JoinGroupSheet(
                                 ) return@addOnFailureListener
                                 Toast.makeText(
                                     context,
-                                    "Scan failed. Try entering the code manually.",
+                                    context.getString(R.string.join_sheet_scan_failed),
                                     Toast.LENGTH_SHORT
                                 ).show()
                             }
@@ -335,7 +339,7 @@ fun JoinGroupSheet(
             ) {
                 Icon(Icons.Default.QrCodeScanner, contentDescription = null, modifier = Modifier.size(22.dp))
                 Spacer(modifier = Modifier.width(8.dp))
-                Text("Scan QR Code", style = MaterialTheme.typography.titleMedium)
+                Text(stringResource(R.string.join_sheet_scan), style = MaterialTheme.typography.titleMedium)
             }
             }
         }

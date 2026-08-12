@@ -1,7 +1,9 @@
 package com.trevio.android.ui.admin
 
+import androidx.annotation.StringRes
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.trevio.android.R
 import com.trevio.android.domain.model.BroadcastMessage
 import com.trevio.android.domain.model.BroadcastPriority
 import com.trevio.android.domain.model.BroadcastRead
@@ -10,6 +12,7 @@ import com.trevio.android.domain.model.User
 import com.trevio.android.domain.repository.AdminService
 import com.trevio.android.domain.repository.AuthService
 import com.trevio.android.domain.repository.BroadcastService
+import com.trevio.android.util.toStringResId
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -27,7 +30,7 @@ class BroadcastViewModel @Inject constructor(
         val isLoading: Boolean = true,
         val broadcasts: List<BroadcastMessage> = emptyList(),
         val readCounts: Map<String, Int> = emptyMap(),
-        val error: String? = null,
+        @StringRes val error: Int? = null,
         val actionLoading: String? = null,
         val showForm: Boolean = false,
         val allUsers: List<User> = emptyList(),
@@ -38,7 +41,7 @@ class BroadcastViewModel @Inject constructor(
         val formTargetUids: Set<String> = emptySet(),
         val formStartAt: Long? = null,
         val formEndAt: Long? = null,
-        val formError: String? = null,
+        @StringRes val formError: Int? = null,
         val isSubmitting: Boolean = false,
         val selectedBroadcast: BroadcastMessage? = null,
         val detailReads: List<BroadcastRead> = emptyList(),
@@ -79,7 +82,7 @@ class BroadcastViewModel @Inject constructor(
                     )
                 }
                 .onFailure { e ->
-                    _state.value = _state.value.copy(isLoading = false, error = e.message)
+                    _state.value = _state.value.copy(isLoading = false, error = e.toStringResId())
                 }
         }
     }
@@ -89,7 +92,7 @@ class BroadcastViewModel @Inject constructor(
         viewModelScope.launch {
             broadcastService.stopBroadcast(id)
                 .onSuccess { loadBroadcasts() }
-                .onFailure { e -> _state.value = _state.value.copy(error = e.message) }
+                .onFailure { e -> _state.value = _state.value.copy(error = e.toStringResId()) }
             _state.value = _state.value.copy(actionLoading = null)
         }
     }
@@ -101,7 +104,7 @@ class BroadcastViewModel @Inject constructor(
                     _state.value = _state.value.copy(showForm = true, allUsers = result.items)
                 }
                 .onFailure { e ->
-                    _state.value = _state.value.copy(error = e.message)
+                    _state.value = _state.value.copy(error = e.toStringResId())
                 }
         }
     }
@@ -173,19 +176,19 @@ class BroadcastViewModel @Inject constructor(
     fun submitBroadcast() {
         val s = _state.value
         if (s.formTitle.isBlank()) {
-            _state.value = _state.value.copy(formError = "Title is required")
+            _state.value = _state.value.copy(formError = R.string.broadcast_error_title_required)
             return
         }
         if (s.formHtmlContent.isBlank()) {
-            _state.value = _state.value.copy(formError = "Message content is required")
+            _state.value = _state.value.copy(formError = R.string.broadcast_error_content_required)
             return
         }
         if (s.formStartAt == null) {
-            _state.value = _state.value.copy(formError = "Start date and time is required")
+            _state.value = _state.value.copy(formError = R.string.broadcast_error_start_required)
             return
         }
         if (s.formTargetType == BroadcastTargetType.SPECIFIC && s.formTargetUids.isEmpty()) {
-            _state.value = _state.value.copy(formError = "Select at least one user")
+            _state.value = _state.value.copy(formError = R.string.broadcast_error_select_users)
             return
         }
 
@@ -195,7 +198,7 @@ class BroadcastViewModel @Inject constructor(
                 val startMs = s.formStartAt
                 val endMs = s.formEndAt
                 if (endMs != null && endMs < startMs) {
-                    _state.value = _state.value.copy(isSubmitting = false, formError = "End time must be after start time")
+                    _state.value = _state.value.copy(isSubmitting = false, formError = R.string.broadcast_error_end_after_start)
                     return@launch
                 }
 
@@ -221,10 +224,10 @@ class BroadcastViewModel @Inject constructor(
                     )
                     loadBroadcasts()
                 }.onFailure { e ->
-                    _state.value = _state.value.copy(isSubmitting = false, formError = e.message)
+                    _state.value = _state.value.copy(isSubmitting = false, formError = e.toStringResId())
                 }
             } catch (e: Exception) {
-                _state.value = _state.value.copy(isSubmitting = false, formError = e.message)
+                _state.value = _state.value.copy(isSubmitting = false, formError = e.toStringResId())
             }
         }
     }

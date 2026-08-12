@@ -1,5 +1,6 @@
 package com.trevio.android.ui.profile
 
+import androidx.annotation.StringRes
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.isSystemInDarkTheme
@@ -34,14 +35,17 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.trevio.android.R
 import com.trevio.android.core.UserRefreshNotifier
 import com.trevio.android.core.designsystem.components.MemberAvatar
 import com.trevio.android.core.designsystem.components.TrevioCard
+import com.trevio.android.core.designsystem.theme.*
 import com.trevio.android.core.designsystem.theme.ThemeMode
 import com.trevio.android.core.designsystem.theme.ThemeViewModel
 import com.trevio.android.core.designsystem.theme.TrevioBorder
@@ -50,7 +54,10 @@ import com.trevio.android.core.navigation.TrevioRouteSupport
 import com.trevio.android.domain.model.User
 import com.trevio.android.domain.repository.AuthService
 import com.trevio.android.domain.repository.UserService
+import com.trevio.android.util.CountryConstants
+import com.trevio.android.util.CountryInfo
 import com.trevio.android.util.CurrencyConverter
+import com.trevio.android.util.toStringResId
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -59,18 +66,10 @@ import javax.inject.Inject
 
 internal data class CountryCode(val code: String, val dialCode: String, val flag: String, val phoneLength: Int)
 
-internal val COUNTRY_CODES = listOf(
-    CountryCode("IN", "+91", "🇮🇳", 10),
-    CountryCode("US", "+1", "🇺🇸", 10),
-    CountryCode("GB", "+44", "🇬🇧", 10),
-    CountryCode("AE", "+971", "🇦🇪", 9),
-    CountryCode("SG", "+65", "🇸🇬", 8),
-    CountryCode("AU", "+61", "🇦🇺", 9),
-    CountryCode("CA", "+1", "🇨🇦", 10),
-    CountryCode("DE", "+49", "🇩🇪", 10),
-    CountryCode("FR", "+33", "🇫🇷", 9),
-    CountryCode("JP", "+81", "🇯🇵", 10)
-)
+/** Backward-compatible wrapper: maps CountryInfo → CountryCode for existing UI code */
+internal val COUNTRY_CODES: List<CountryCode> = CountryConstants.COUNTRY_CODES.map {
+    CountryCode(it.code, it.dialCode, it.flag, it.phoneLength)
+}
 
 private fun isValidUpiId(upiId: String): Boolean {
     if (upiId.isEmpty()) return true
@@ -82,17 +81,6 @@ private fun isValidPhoneNumber(phone: String, countryCode: String): Boolean {
     if (phone.isEmpty()) return false
     val country = COUNTRY_CODES.find { it.code == countryCode } ?: COUNTRY_CODES.first()
     return phone.length == country.phoneLength && phone.all { it.isDigit() }
-}
-
-private fun getPaymentAddress(user: User): String {
-    return if (user.upiId.isNotEmpty()) {
-        user.upiId
-    } else if (user.phoneNumber.isNotEmpty()) {
-        val country = COUNTRY_CODES.find { it.code == user.countryCode } ?: COUNTRY_CODES.first()
-        "${country.dialCode} ${user.phoneNumber}"
-    } else {
-        "Not set"
-    }
 }
 
 @HiltViewModel
@@ -107,7 +95,7 @@ class ProfileViewModel @Inject constructor(
         val isLoading: Boolean = true,
         val isEditing: Boolean = false,
         val isSaving: Boolean = false,
-        val error: String? = null,
+        @StringRes val error: Int? = null,
         val signedOut: Boolean = false
     )
 
@@ -148,7 +136,7 @@ class ProfileViewModel @Inject constructor(
                     userRefreshNotifier.notifyUserRefreshed()
                 }
                 .onFailure { e ->
-                    _state.value = _state.value.copy(isSaving = false, error = e.message)
+                    _state.value = _state.value.copy(isSaving = false, error = e.toStringResId())
                 }
         }
     }
@@ -169,7 +157,7 @@ class ProfileViewModel @Inject constructor(
                     _state.value = _state.value.copy(isSaving = false, signedOut = true)
                 }
                 .onFailure { e ->
-                    _state.value = _state.value.copy(isSaving = false, error = e.message)
+                    _state.value = _state.value.copy(isSaving = false, error = e.toStringResId())
                 }
         }
     }
@@ -205,7 +193,7 @@ fun ProfileScreen(
                 ) {
                     Spacer(modifier = Modifier.width(12.dp))
                     Text(
-                        text = "Profile",
+                        text = stringResource(R.string.profile_title),
                         style = MaterialTheme.typography.titleLarge,
                         fontWeight = FontWeight.Bold,
                         color = Color.White,
@@ -240,13 +228,13 @@ fun ProfileScreen(
             ) {
                 if (state.isEditing) {
                     IconButton(onClick = { viewModel.cancelEditing() }) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = Color.White)
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.common_back), tint = Color.White)
                     }
                 } else {
                     Spacer(modifier = Modifier.width(48.dp))
                 }
                 Text(
-                    "Profile",
+                    stringResource(R.string.profile_title),
                     style = MaterialTheme.typography.titleLarge,
                     fontWeight = FontWeight.Bold,
                     color = Color.White,
@@ -257,11 +245,11 @@ fun ProfileScreen(
                         TextButton(onClick = { viewModel.startEditing() }) {
                             Icon(Icons.Default.Edit, contentDescription = null, tint = Color.White, modifier = Modifier.size(16.dp))
                             Spacer(modifier = Modifier.width(4.dp))
-                            Text("Edit", color = Color.White, style = MaterialTheme.typography.labelMedium)
+                            Text(stringResource(R.string.profile_edit), color = Color.White, style = MaterialTheme.typography.labelMedium)
                         }
                     }
                     IconButton(onClick = { viewModel.signOut() }) {
-                        Icon(Icons.AutoMirrored.Filled.Logout, contentDescription = "Sign Out", tint = Color.White)
+                        Icon(Icons.AutoMirrored.Filled.Logout, contentDescription = stringResource(R.string.profile_sign_out), tint = Color.White)
                     }
                 }
             }
@@ -340,41 +328,41 @@ private fun ViewProfileContent(
         val isDark = isSystemInDarkTheme()
         ProfileInfoCard(
             icon = Icons.Default.Person,
-            iconColor = if (isDark) Color(0xFF818CF8) else Color(0xFF6366F1),
-            label = "Username",
+            iconColor = if (isDark) CategoryTransportDark else CategoryTransport,
+            label = stringResource(R.string.profile_username),
             value = "@${user.username}"
         )
         ProfileInfoCard(
             icon = Icons.Default.Mail,
-            iconColor = if (isDark) Color(0xFF4ADE80) else Color(0xFF22C55E),
-            label = "Email",
+            iconColor = if (isDark) BalancePositiveDark else BalancePositive,
+            label = stringResource(R.string.profile_email),
             value = user.email
         )
         val currencySymbol = CurrencyConverter.getCurrencySymbol(user.defaultCurrency)
         ProfileInfoCard(
             icon = Icons.Default.Payments,
-            iconColor = if (isDark) Color(0xFFFBBF24) else Color(0xFFF59E0B),
-            label = "Currency",
+            iconColor = if (isDark) CategoryFoodDark else CategoryFood,
+            label = stringResource(R.string.profile_currency),
             value = "$currencySymbol ${user.defaultCurrency}"
         )
 
         // Always show phone card
         ProfileInfoCard(
             icon = Icons.Default.Phone,
-            iconColor = if (isDark) Color(0xFFF472B6) else Color(0xFFEC4899),
-            label = "Mobile",
-            value = if (hasPhone) "${country.flag} ${country.dialCode} ${user.phoneNumber}" else "Not set",
-            actionLabel = if (!hasPhone) "Add" else null,
+            iconColor = if (isDark) CategoryShoppingDark else CategoryShopping,
+            label = stringResource(R.string.profile_phone),
+            value = if (hasPhone) "${country.flag} ${country.dialCode} ${user.phoneNumber}" else stringResource(R.string.profile_not_set),
+            actionLabel = if (!hasPhone) stringResource(R.string.profile_add) else null,
             onAction = if (!hasPhone) onEdit else null
         )
 
         // Always show UPI ID card
         ProfileInfoCard(
             icon = Icons.Default.Payments,
-            iconColor = if (isDark) Color(0xFF2DD4BF) else Color(0xFF0D9488),
-            label = "UPI ID",
-            value = if (hasUpiId) user.upiId else "Not set",
-            actionLabel = if (!hasUpiId) "Add" else null,
+            iconColor = if (isDark) CategoryAccommodationDark else CategoryAccommodation,
+            label = stringResource(R.string.profile_upi_id),
+            value = if (hasUpiId) user.upiId else stringResource(R.string.profile_not_set),
+            actionLabel = if (!hasUpiId) stringResource(R.string.profile_add) else null,
             onAction = if (!hasUpiId) onEdit else null
         )
 
@@ -392,7 +380,7 @@ private fun ViewProfileContent(
                     )
                     Spacer(modifier = Modifier.width(8.dp))
                     Text(
-                        "Payment Info",
+                        stringResource(R.string.profile_payment_info),
                         style = MaterialTheme.typography.titleSmall,
                         fontWeight = FontWeight.SemiBold,
                         color = MaterialTheme.colorScheme.primary
@@ -409,7 +397,7 @@ private fun ViewProfileContent(
                         )
                         Spacer(modifier = Modifier.height(2.dp))
                         Text(
-                            "Friends can pay you via UPI ID",
+                            stringResource(R.string.profile_payment_upi_hint),
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -423,14 +411,14 @@ private fun ViewProfileContent(
                         )
                         Spacer(modifier = Modifier.height(2.dp))
                         Text(
-                            "Friends can pay you via mobile number",
+                            stringResource(R.string.profile_payment_phone_hint),
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
                     else -> {
                         Text(
-                            "No payment info set",
+                            stringResource(R.string.profile_no_payment_info),
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -441,7 +429,7 @@ private fun ViewProfileContent(
                         ) {
                             Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(16.dp))
                             Spacer(modifier = Modifier.width(4.dp))
-                            Text("Set up payment info", style = MaterialTheme.typography.labelMedium)
+                            Text(stringResource(R.string.profile_set_up_payment), style = MaterialTheme.typography.labelMedium)
                         }
                     }
                 }
@@ -464,7 +452,7 @@ private fun ViewProfileContent(
                     )
                     Spacer(modifier = Modifier.width(8.dp))
                     Text(
-                        "Appearance",
+                        stringResource(R.string.profile_theme),
                         style = MaterialTheme.typography.titleSmall,
                         fontWeight = FontWeight.SemiBold,
                         color = MaterialTheme.colorScheme.onSurface
@@ -476,19 +464,19 @@ private fun ViewProfileContent(
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     ThemeOptionButton(
-                        label = "Light",
+                        label = stringResource(R.string.profile_theme_light),
                         isSelected = themeMode == ThemeMode.LIGHT,
                         onClick = { onThemeModeChange(ThemeMode.LIGHT) },
                         modifier = Modifier.weight(1f)
                     )
                     ThemeOptionButton(
-                        label = "Dark",
+                        label = stringResource(R.string.profile_theme_dark),
                         isSelected = themeMode == ThemeMode.DARK,
                         onClick = { onThemeModeChange(ThemeMode.DARK) },
                         modifier = Modifier.weight(1f)
                     )
                     ThemeOptionButton(
-                        label = "System",
+                        label = stringResource(R.string.profile_theme_system),
                         isSelected = themeMode == ThemeMode.SYSTEM,
                         onClick = { onThemeModeChange(ThemeMode.SYSTEM) },
                         modifier = Modifier.weight(1f)
@@ -506,7 +494,7 @@ private fun ViewProfileContent(
         ) {
             Icon(Icons.Default.Description, contentDescription = null, modifier = Modifier.size(18.dp))
             Spacer(modifier = Modifier.width(8.dp))
-            Text("Terms & Conditions")
+            Text(stringResource(R.string.profile_terms_conditions))
         }
 
         Spacer(modifier = Modifier.height(8.dp))
@@ -518,7 +506,7 @@ private fun ViewProfileContent(
         ) {
             Icon(Icons.Default.Info, contentDescription = null, modifier = Modifier.size(18.dp))
             Spacer(modifier = Modifier.width(8.dp))
-            Text("Help & Support")
+            Text(stringResource(R.string.profile_help_support))
         }
 
         OutlinedButton(
@@ -532,7 +520,7 @@ private fun ViewProfileContent(
         ) {
             Icon(Icons.Default.Delete, contentDescription = null, modifier = Modifier.size(18.dp))
             Spacer(modifier = Modifier.width(8.dp))
-            Text("Delete Account")
+            Text(stringResource(R.string.profile_delete_account))
         }
 
         Spacer(modifier = Modifier.height(80.dp))
@@ -546,9 +534,9 @@ private fun ViewProfileContent(
         AlertDialog(
             onDismissRequest = { showDeleteDialog = false },
             icon = { Icon(Icons.Default.Warning, contentDescription = null, tint = MaterialTheme.colorScheme.error) },
-            title = { Text("Delete Account?") },
+            title = { Text(stringResource(R.string.profile_delete_account)) },
             text = {
-                Text("This will permanently delete your account, remove you from all groups, and erase your data. This action cannot be undone.")
+                Text(stringResource(R.string.profile_delete_confirm))
             },
             confirmButton = {
                 TextButton(
@@ -558,12 +546,12 @@ private fun ViewProfileContent(
                     },
                     colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)
                 ) {
-                    Text("Delete")
+                    Text(stringResource(R.string.group_detail_delete))
                 }
             },
             dismissButton = {
                 TextButton(onClick = { showDeleteDialog = false }) {
-                    Text("Cancel")
+                    Text(stringResource(R.string.profile_cancel))
                 }
             }
         )
@@ -610,11 +598,12 @@ fun ProfileInfoCard(
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
                 Spacer(modifier = Modifier.height(2.dp))
+                val notSetText = stringResource(R.string.profile_not_set)
                 Text(
                     text = value,
                     style = MaterialTheme.typography.bodyLarge,
                     fontWeight = FontWeight.Medium,
-                    color = if (value == "Not set") MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurface
+                    color = if (value == notSetText) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurface
                 )
             }
             if (actionLabel != null && onAction != null) {
@@ -635,33 +624,25 @@ fun ProfileInfoCard(
 private fun EditProfileContent(
     user: User,
     isSaving: Boolean,
-    error: String?,
+    @StringRes error: Int?,
     onSave: (String, String, String, String, String) -> Unit
 ) {
     var displayName by remember { mutableStateOf(user.displayName) }
     var currency by remember { mutableStateOf(user.defaultCurrency) }
     var upiId by remember { mutableStateOf(user.upiId) }
     var phoneNumber by remember { mutableStateOf(user.phoneNumber) }
-    var countryCode by remember { mutableStateOf(user.countryCode.ifEmpty { "IN" }) }
+    var countryCode by remember { mutableStateOf(user.countryCode.ifEmpty { CountryConstants.DEFAULT_COUNTRY_CODE }) }
     var countryMenuExpanded by remember { mutableStateOf(false) }
 
-    val currencies = listOf(
-        Triple("INR", "₹", "Indian Rupee"),
-        Triple("USD", "$", "US Dollar"),
-        Triple("EUR", "€", "Euro"),
-        Triple("GBP", "£", "British Pound"),
-        Triple("AED", "د.إ", "UAE Dirham"),
-        Triple("SGD", "S$", "Singapore Dollar"),
-        Triple("AUD", "A$", "Australian Dollar"),
-        Triple("CAD", "C$", "Canadian Dollar"),
-        Triple("JPY", "¥", "Japanese Yen")
-    )
+    val currencies = CurrencyConverter.SUPPORTED_CURRENCIES.map {
+        Triple(it.code, it.symbol, stringResource(it.nameResId))
+    }
     var currencyMenuExpanded by remember { mutableStateOf(false) }
     val selectedCurrency = currencies.find { it.first == currency }
 
-    val upiError = if (upiId.isNotEmpty() && !isValidUpiId(upiId)) "Invalid UPI ID format (e.g. name@bank)" else null
-    val phoneError = if (!isValidPhoneNumber(phoneNumber, countryCode)) "Invalid phone number for selected country" else null
-    val nameError = if (displayName.isBlank()) "Display name cannot be empty" else null
+    val upiError = if (upiId.isNotEmpty() && !isValidUpiId(upiId)) stringResource(R.string.profile_upi_invalid) else null
+    val phoneError = if (!isValidPhoneNumber(phoneNumber, countryCode)) stringResource(R.string.profile_phone_invalid) else null
+    val nameError = if (displayName.isBlank()) stringResource(R.string.profile_name_required) else null
     val hasErrors = upiError != null || phoneError != null || nameError != null
 
     Column(
@@ -672,7 +653,7 @@ private fun EditProfileContent(
         OutlinedTextField(
             value = displayName,
             onValueChange = { displayName = it },
-            label = { Text("Display Name") },
+            label = { Text(stringResource(R.string.profile_display_name)) },
             modifier = Modifier.fillMaxWidth(),
             singleLine = true,
             isError = nameError != null,
@@ -680,7 +661,7 @@ private fun EditProfileContent(
         )
         Spacer(modifier = Modifier.height(12.dp))
 
-        Text("Currency", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+        Text(stringResource(R.string.profile_currency), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
         Spacer(modifier = Modifier.height(8.dp))
         Box {
             OutlinedTextField(
@@ -688,7 +669,7 @@ private fun EditProfileContent(
                 onValueChange = {},
                 readOnly = true,
                 trailingIcon = {
-                    Icon(Icons.Default.ArrowDropDown, contentDescription = "Select currency")
+                    Icon(Icons.Default.ArrowDropDown, contentDescription = stringResource(R.string.profile_select_currency))
                 },
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(12.dp)
@@ -715,16 +696,16 @@ private fun EditProfileContent(
         }
 
         Spacer(modifier = Modifier.height(16.dp))
-        Text("Phone Number", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+        Text(stringResource(R.string.profile_phone), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
         Spacer(modifier = Modifier.height(8.dp))
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-            Box {
+            Box(modifier = Modifier.clickable { countryMenuExpanded = true }) {
                 OutlinedTextField(
                     value = COUNTRY_CODES.find { it.code == countryCode }?.let { "${it.flag} ${it.dialCode}" } ?: "🇮🇳 +91",
                     onValueChange = {},
                     readOnly = true,
                     trailingIcon = {
-                        Icon(Icons.Default.ArrowDropDown, contentDescription = "Select country")
+                        Icon(Icons.Default.ArrowDropDown, contentDescription = stringResource(R.string.profile_select_country))
                     },
                     modifier = Modifier.width(120.dp),
                     singleLine = true
@@ -744,7 +725,7 @@ private fun EditProfileContent(
             OutlinedTextField(
                 value = phoneNumber,
                 onValueChange = { phoneNumber = it.filter { c -> c.isDigit() }.take((COUNTRY_CODES.find { c -> c.code == countryCode }?.phoneLength ?: 10)) },
-                label = { Text("Phone number") },
+                label = { Text(stringResource(R.string.profile_phone)) },
                 modifier = Modifier.weight(1f),
                 singleLine = true,
                 isError = phoneError != null,
@@ -756,16 +737,16 @@ private fun EditProfileContent(
         OutlinedTextField(
             value = upiId,
             onValueChange = { upiId = it },
-            label = { Text("UPI ID (optional)") },
+            label = { Text(stringResource(R.string.profile_upi_id)) },
             modifier = Modifier.fillMaxWidth(),
             singleLine = true,
             isError = upiError != null,
-            supportingText = { if (upiError != null) Text(upiError) else Text("Used for receiving payments. Phone number used as fallback.") }
+            supportingText = { if (upiError != null) Text(upiError) else Text(stringResource(R.string.profile_upi_hint)) }
         )
 
         if (error != null) {
             Spacer(modifier = Modifier.height(8.dp))
-            Text(error, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
+            Text(stringResource(error), color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
         }
 
         Spacer(modifier = Modifier.height(24.dp))
@@ -778,7 +759,7 @@ private fun EditProfileContent(
             if (isSaving) {
                 CircularProgressIndicator(color = MaterialTheme.colorScheme.onPrimary, strokeWidth = 2.dp, modifier = Modifier.size(24.dp))
             } else {
-                Text("Save")
+                Text(stringResource(R.string.profile_save))
             }
         }
     }
@@ -805,22 +786,22 @@ private fun TermsConditionsDialog(onDismiss: () -> Unit) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Icon(Icons.Default.Description, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(22.dp))
                     Spacer(modifier = Modifier.width(8.dp))
-                    Text("Terms & Conditions", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                    Text(stringResource(R.string.profile_terms_conditions), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                 }
                 IconButton(onClick = onDismiss) {
-                    Icon(Icons.Default.Close, contentDescription = "Close")
+                    Icon(Icons.Default.Close, contentDescription = stringResource(R.string.common_close))
                 }
             }
             Spacer(modifier = Modifier.height(12.dp))
-            TermsSection("1. Acceptance of Terms", "By using Trevio, you agree to these terms and conditions. If you do not agree, please do not use the app.")
+            TermsSection(stringResource(R.string.terms_acceptance_title), stringResource(R.string.terms_acceptance_body))
             Spacer(modifier = Modifier.height(10.dp))
-            TermsSection("2. Privacy & Data", "Trevio stores your name, email, and profile photo from your Google account. We use this to identify you and facilitate group expense splitting. Your data is stored securely in Firebase.")
+            TermsSection(stringResource(R.string.terms_privacy_title), stringResource(R.string.terms_privacy_body))
             Spacer(modifier = Modifier.height(10.dp))
-            TermsSection("3. Financial Data", "Trevio helps track expenses and settlements between users. We do not process actual payments. All settlements are tracked in-app. UPI deep links redirect you to your preferred payment app.")
+            TermsSection(stringResource(R.string.terms_financial_title), stringResource(R.string.terms_financial_body))
             Spacer(modifier = Modifier.height(10.dp))
-            TermsSection("4. User Conduct", "You are responsible for the expenses and settlements you add. Do not create fraudulent or misleading expense entries.")
+            TermsSection(stringResource(R.string.terms_conduct_title), stringResource(R.string.terms_conduct_body))
             Spacer(modifier = Modifier.height(10.dp))
-            TermsSection("5. Account Termination", "You can delete your account at any time. Upon deletion, your data will be removed from our servers.")
+            TermsSection(stringResource(R.string.terms_termination_title), stringResource(R.string.terms_termination_body))
         }
     }
 }

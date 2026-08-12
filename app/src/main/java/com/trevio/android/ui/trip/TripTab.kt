@@ -1,5 +1,6 @@
 package com.trevio.android.ui.trip
 
+import androidx.annotation.StringRes
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -16,6 +17,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextOverflow
@@ -24,12 +26,15 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.trevio.android.R
+import com.trevio.android.core.designsystem.theme.*
 import com.trevio.android.domain.model.Member
 import com.trevio.android.domain.model.TripItineraryItem
 import com.trevio.android.domain.model.TripLocation
 import com.trevio.android.domain.repository.SettlementService
 import com.trevio.android.domain.repository.TripService
 import com.trevio.android.util.rememberCurrencyFormatter
+import com.trevio.android.util.toStringResId
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -53,7 +58,7 @@ class TripViewModel @Inject constructor(
         val itinerary: List<TripItineraryItem> = emptyList(),
         val locations: List<TripLocation> = emptyList(),
         val members: List<Member> = emptyList(),
-        val error: String? = null
+        @StringRes val error: Int? = null
     )
 
     private val _state = MutableStateFlow(TripState())
@@ -67,7 +72,7 @@ class TripViewModel @Inject constructor(
             val tripResult = tripService.getTripData(groupId)
             val membersResult = settlementService.getGroupBalances(groupId)
             if (tripResult.isFailure && membersResult.isFailure) {
-                _state.value = _state.value.copy(isLoading = false, error = tripResult.exceptionOrNull()?.message ?: "Failed to load trip data")
+                _state.value = _state.value.copy(isLoading = false, error = tripResult.exceptionOrNull()?.toStringResId() ?: R.string.trip_failed_to_load)
                 return@launch
             }
             val tripData = tripResult.getOrNull()
@@ -93,7 +98,7 @@ class TripViewModel @Inject constructor(
                     onSuccess()
                 }
                 .onFailure { e ->
-                    _state.value = _state.value.copy(error = e.message)
+                    _state.value = _state.value.copy(error = e.toStringResId())
                 }
         }
     }
@@ -106,7 +111,7 @@ class TripViewModel @Inject constructor(
                     loadData()
                 }
                 .onFailure { e ->
-                    _state.value = _state.value.copy(error = e.message)
+                    _state.value = _state.value.copy(error = e.toStringResId())
                 }
         }
     }
@@ -119,7 +124,7 @@ class TripViewModel @Inject constructor(
                     loadData()
                 }
                 .onFailure { e ->
-                    _state.value = _state.value.copy(error = e.message)
+                    _state.value = _state.value.copy(error = e.toStringResId())
                 }
         }
     }
@@ -133,7 +138,7 @@ class TripViewModel @Inject constructor(
                     onSuccess()
                 }
                 .onFailure { e ->
-                    _state.value = _state.value.copy(error = e.message)
+                    _state.value = _state.value.copy(error = e.toStringResId())
                 }
         }
     }
@@ -146,7 +151,7 @@ class TripViewModel @Inject constructor(
                     loadData()
                 }
                 .onFailure { e ->
-                    _state.value = _state.value.copy(error = e.message)
+                    _state.value = _state.value.copy(error = e.toStringResId())
                 }
         }
     }
@@ -188,13 +193,13 @@ fun TripTab(
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
                         Text(
-                            text = state.error!!,
+                            text = stringResource(state.error!!),
                             modifier = Modifier.weight(1f),
                             color = MaterialTheme.colorScheme.onErrorContainer,
                             style = MaterialTheme.typography.bodySmall
                         )
                         TextButton(onClick = { viewModel.loadData() }) {
-                            Text("Retry")
+                            Text(stringResource(R.string.trip_retry))
                         }
                     }
                 }
@@ -216,7 +221,7 @@ fun TripTab(
                     ) {
                         Icon(Icons.Default.Star, contentDescription = null, tint = MaterialTheme.colorScheme.onPrimaryContainer)
                         Text(
-                            text = state.destination.ifEmpty { "Set your destination" },
+                            text = state.destination.ifEmpty { stringResource(R.string.trip_set_destination) },
                             style = MaterialTheme.typography.titleLarge,
                             fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.onPrimaryContainer
@@ -229,9 +234,9 @@ fun TripTab(
                             state.startDate > 0 && state.endDate > 0 ->
                                 "${dateFmt.format(java.util.Date(state.startDate))} - ${dateFmt.format(java.util.Date(state.endDate))}"
                             state.startDate > 0 ->
-                                "Starts ${dateFmt.format(java.util.Date(state.startDate))}"
+                                stringResource(R.string.trip_starts, dateFmt.format(java.util.Date(state.startDate)))
                             else ->
-                                "Ends ${dateFmt.format(java.util.Date(state.endDate))}"
+                                stringResource(R.string.trip_ends, dateFmt.format(java.util.Date(state.endDate)))
                         }
                         Text(
                             text = dateText,
@@ -246,15 +251,15 @@ fun TripTab(
                         horizontalArrangement = Arrangement.spacedBy(16.dp)
                     ) {
                         Column {
-                            Text("Items", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f))
+                            Text(stringResource(R.string.trip_items), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f))
                             Text("${state.itinerary.size}", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onPrimaryContainer)
                         }
                         Column {
-                            Text("Done", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f))
+                            Text(stringResource(R.string.trip_done), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f))
                             Text("$completed/${state.itinerary.size}", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onPrimaryContainer)
                         }
                         Column {
-                            Text("Est. Cost", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f))
+                            Text(stringResource(R.string.trip_est_cost_label), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f))
                             Text(currencyFormatter.formatBase(totalEst), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onPrimaryContainer)
                         }
                     }
@@ -274,12 +279,12 @@ fun TripTab(
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     Icon(Icons.Default.CalendarMonth, contentDescription = null, modifier = Modifier.size(18.dp), tint = MaterialTheme.colorScheme.primary)
-                    Text("Itinerary", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                    Text(stringResource(R.string.trip_itinerary), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
                 }
                 TextButton(onClick = { showAddItem = true }) {
                     Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(16.dp))
                     Spacer(modifier = Modifier.width(4.dp))
-                    Text("Add Item")
+                    Text(stringResource(R.string.trip_add_item))
                 }
             }
         }
@@ -303,10 +308,10 @@ fun TripTab(
 
         grouped.forEach { (dayKey, items) ->
             item {
-                val label = if (dayKey == "none") "Unscheduled" else {
+                val label = if (dayKey == "none") stringResource(R.string.trip_unscheduled) else {
                     val parts = dayKey.split("-")
                     if (parts.size < 3) {
-                        "Unscheduled"
+                        stringResource(R.string.trip_unscheduled)
                     } else {
                         val y = parts[0].toIntOrNull() ?: return@item
                         val m = parts[1].toIntOrNull() ?: return@item
@@ -338,7 +343,7 @@ fun TripTab(
             item {
                 EmptySection(
                     icon = Icons.Default.CalendarMonth,
-                    message = "No itinerary items yet. Add your first activity!"
+                    message = stringResource(R.string.trip_no_itinerary_msg)
                 )
             }
         }
@@ -356,12 +361,12 @@ fun TripTab(
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     Icon(Icons.Default.LocationOn, contentDescription = null, modifier = Modifier.size(18.dp), tint = MaterialTheme.colorScheme.primary)
-                    Text("Locations", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                    Text(stringResource(R.string.trip_locations), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
                 }
                 TextButton(onClick = { showAddLocation = true }) {
                     Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(16.dp))
                     Spacer(modifier = Modifier.width(4.dp))
-                    Text("Add Location")
+                    Text(stringResource(R.string.trip_add_location))
                 }
             }
         }
@@ -377,7 +382,7 @@ fun TripTab(
             item {
                 EmptySection(
                     icon = Icons.Default.LocationOn,
-                    message = "No locations added yet."
+                    message = stringResource(R.string.trip_no_locations_msg)
                 )
             }
         }
@@ -460,13 +465,13 @@ private fun ItineraryItemCard(
                 IconButton(onClick = onToggleComplete, modifier = Modifier.size(28.dp)) {
                     Icon(
                         Icons.Default.Check,
-                        contentDescription = if (item.completed) "Mark incomplete" else "Mark complete",
+                        contentDescription = if (item.completed) stringResource(R.string.trip_mark_incomplete) else stringResource(R.string.trip_mark_complete_label),
                         modifier = Modifier.size(16.dp),
                         tint = if (item.completed) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
                 IconButton(onClick = onRemove, modifier = Modifier.size(28.dp)) {
-                    Icon(Icons.Default.Delete, contentDescription = "Remove", modifier = Modifier.size(16.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Icon(Icons.Default.Delete, contentDescription = stringResource(R.string.trip_remove), modifier = Modifier.size(16.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
         }
@@ -495,7 +500,7 @@ private fun LocationCard(
                 }
             }
             IconButton(onClick = onRemove, modifier = Modifier.size(28.dp)) {
-                Icon(Icons.Default.Delete, contentDescription = "Remove", modifier = Modifier.size(16.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                Icon(Icons.Default.Delete, contentDescription = stringResource(R.string.trip_remove), modifier = Modifier.size(16.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
     }
@@ -530,25 +535,25 @@ private fun AddItemSheet(
             modifier = Modifier.padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            Text("Add Itinerary Item", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+            Text(stringResource(R.string.trip_add_itinerary_item), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
             OutlinedTextField(
                 value = title,
                 onValueChange = { title = it },
-                label = { Text("Title") },
+                label = { Text(stringResource(R.string.trip_title_field)) },
                 modifier = Modifier.fillMaxWidth(),
                 singleLine = true
             )
             OutlinedTextField(
                 value = description,
                 onValueChange = { description = it },
-                label = { Text("Description (optional)") },
+                label = { Text(stringResource(R.string.trip_description_optional)) },
                 modifier = Modifier.fillMaxWidth(),
                 maxLines = 2
             )
             OutlinedTextField(
                 value = location,
                 onValueChange = { location = it },
-                label = { Text("Location") },
+                label = { Text(stringResource(R.string.trip_location_field)) },
                 modifier = Modifier.fillMaxWidth(),
                 singleLine = true
             )
@@ -558,14 +563,14 @@ private fun AddItemSheet(
                 OutlinedTextField(
                     value = category,
                     onValueChange = { category = it },
-                    label = { Text("Category") },
+                    label = { Text(stringResource(R.string.trip_category_field)) },
                     modifier = Modifier.weight(1f),
                     singleLine = true
                 )
                 OutlinedTextField(
                     value = estimatedCost,
                     onValueChange = { estimatedCost = it },
-                    label = { Text("Est. Cost") },
+                    label = { Text(stringResource(R.string.trip_est_cost_label)) },
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                     modifier = Modifier.weight(1f),
                     singleLine = true
@@ -587,7 +592,7 @@ private fun AddItemSheet(
                 modifier = Modifier.fillMaxWidth(),
                 enabled = title.isNotBlank()
             ) {
-                Text("Add Item")
+                Text(stringResource(R.string.trip_add_item))
             }
         }
     }
@@ -610,18 +615,18 @@ private fun AddLocationSheet(
             modifier = Modifier.padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            Text("Add Location", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+            Text(stringResource(R.string.trip_add_location), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
             OutlinedTextField(
                 value = name,
                 onValueChange = { name = it },
-                label = { Text("Location name") },
+                label = { Text(stringResource(R.string.trip_location_name)) },
                 modifier = Modifier.fillMaxWidth(),
                 singleLine = true
             )
             OutlinedTextField(
                 value = address,
                 onValueChange = { address = it },
-                label = { Text("Address") },
+                label = { Text(stringResource(R.string.trip_location_address)) },
                 modifier = Modifier.fillMaxWidth(),
                 singleLine = true
             )
@@ -631,7 +636,7 @@ private fun AddLocationSheet(
                 OutlinedTextField(
                     value = latitude,
                     onValueChange = { latitude = it },
-                    label = { Text("Latitude") },
+                    label = { Text(stringResource(R.string.trip_latitude)) },
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                     modifier = Modifier.weight(1f),
                     singleLine = true
@@ -639,7 +644,7 @@ private fun AddLocationSheet(
                 OutlinedTextField(
                     value = longitude,
                     onValueChange = { longitude = it },
-                    label = { Text("Longitude") },
+                    label = { Text(stringResource(R.string.trip_longitude)) },
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                     modifier = Modifier.weight(1f),
                     singleLine = true
@@ -660,7 +665,7 @@ private fun AddLocationSheet(
                 modifier = Modifier.fillMaxWidth(),
                 enabled = name.isNotBlank()
             ) {
-                Text("Add Location")
+                Text(stringResource(R.string.trip_add_location))
             }
         }
     }

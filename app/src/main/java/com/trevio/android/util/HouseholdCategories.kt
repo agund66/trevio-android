@@ -23,12 +23,15 @@ import androidx.compose.material.icons.filled.TrendingUp
 import androidx.compose.material.icons.filled.Undo
 import androidx.compose.material.icons.filled.Work
 import androidx.compose.material.icons.filled.Celebration
+import androidx.annotation.StringRes
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import com.trevio.android.R
 
 data class HouseholdCategory(
     val key: String,
     val label: String,
+    @StringRes val labelResId: Int,
     val icon: ImageVector,
     val color: Color,
     val isIncome: Boolean = false
@@ -39,32 +42,32 @@ object HouseholdCategories {
     // ─── Expense Categories ──────────────────────────────────────
 
     val EXPENSE_CATEGORIES = listOf(
-        HouseholdCategory("groceries", "Groceries", Icons.Filled.LocalGroceryStore, Color(0xFFF97316)),
-        HouseholdCategory("vegetables", "Vegetables", Icons.Filled.Eco, Color(0xFF84CC16)),
-        HouseholdCategory("utilities", "Utilities", Icons.Filled.Bolt, Color(0xFF3B82F6)),
-        HouseholdCategory("rent", "Rent", Icons.Filled.Home, Color(0xFF8B5CF6)),
-        HouseholdCategory("transport", "Transport", Icons.Filled.DirectionsCar, Color(0xFF06B6D4)),
-        HouseholdCategory("medical", "Medical", Icons.Filled.MedicalServices, Color(0xFFEF4444)),
-        HouseholdCategory("education", "Education", Icons.Filled.School, Color(0xFF6366F1)),
-        HouseholdCategory("entertainment", "Entertainment", Icons.Filled.Movie, Color(0xFFEC4899)),
-        HouseholdCategory("dining", "Dining Out", Icons.Filled.Restaurant, Color(0xFFF59E0B)),
-        HouseholdCategory("shopping", "Shopping", Icons.Filled.ShoppingBag, Color(0xFFA855F7)),
-        HouseholdCategory("household", "Household", Icons.Filled.CleaningServices, Color(0xFF14B8A6)),
-        HouseholdCategory("insurance", "Insurance", Icons.Filled.Shield, Color(0xFF64748B)),
-        HouseholdCategory("other", "Other", Icons.Filled.Category, Color(0xFF94A3B8))
+        HouseholdCategory("groceries", "Groceries", R.string.cat_groceries, Icons.Filled.LocalGroceryStore, Color(0xFFF97316)),
+        HouseholdCategory("vegetables", "Vegetables", R.string.cat_vegetables, Icons.Filled.Eco, Color(0xFF84CC16)),
+        HouseholdCategory("utilities", "Utilities", R.string.cat_utilities, Icons.Filled.Bolt, Color(0xFF3B82F6)),
+        HouseholdCategory("rent", "Rent", R.string.cat_rent, Icons.Filled.Home, Color(0xFF8B5CF6)),
+        HouseholdCategory("transport", "Transport", R.string.cat_transport, Icons.Filled.DirectionsCar, Color(0xFF06B6D4)),
+        HouseholdCategory("medical", "Medical", R.string.cat_medical, Icons.Filled.MedicalServices, Color(0xFFEF4444)),
+        HouseholdCategory("education", "Education", R.string.cat_education, Icons.Filled.School, Color(0xFF6366F1)),
+        HouseholdCategory("entertainment", "Entertainment", R.string.cat_entertainment, Icons.Filled.Movie, Color(0xFFEC4899)),
+        HouseholdCategory("dining", "Dining Out", R.string.cat_dining, Icons.Filled.Restaurant, Color(0xFFF59E0B)),
+        HouseholdCategory("shopping", "Shopping", R.string.cat_shopping, Icons.Filled.ShoppingBag, Color(0xFFA855F7)),
+        HouseholdCategory("household", "Household", R.string.cat_household, Icons.Filled.CleaningServices, Color(0xFF14B8A6)),
+        HouseholdCategory("insurance", "Insurance", R.string.cat_insurance, Icons.Filled.Shield, Color(0xFF64748B)),
+        HouseholdCategory("other", "Other", R.string.cat_other, Icons.Filled.Category, Color(0xFF94A3B8))
     )
 
     // ─── Income Categories ───────────────────────────────────────
 
     val INCOME_CATEGORIES = listOf(
-        HouseholdCategory("salary", "Salary", Icons.Filled.Work, Color(0xFF22C55E), isIncome = true),
-        HouseholdCategory("bonus", "Bonus", Icons.Filled.Celebration, Color(0xFFF59E0B), isIncome = true),
-        HouseholdCategory("gift", "Gift", Icons.Filled.CardGiftcard, Color(0xFFEC4899), isIncome = true),
-        HouseholdCategory("refund", "Refund", Icons.Filled.Undo, Color(0xFF3B82F6), isIncome = true),
-        HouseholdCategory("investment", "Investment", Icons.Filled.TrendingUp, Color(0xFF14B8A6), isIncome = true),
-        HouseholdCategory("rental_income", "Rental Income", Icons.Filled.Apartment, Color(0xFF8B5CF6), isIncome = true),
-        HouseholdCategory("pension", "Pension", Icons.Filled.Elderly, Color(0xFF6366F1), isIncome = true),
-        HouseholdCategory("other_income", "Other Income", Icons.Filled.AccountBalance, Color(0xFF94A3B8), isIncome = true)
+        HouseholdCategory("salary", "Salary", R.string.cat_salary, Icons.Filled.Work, Color(0xFF22C55E), isIncome = true),
+        HouseholdCategory("bonus", "Bonus", R.string.cat_bonus, Icons.Filled.Celebration, Color(0xFFF59E0B), isIncome = true),
+        HouseholdCategory("gift", "Gift", R.string.cat_gift, Icons.Filled.CardGiftcard, Color(0xFFEC4899), isIncome = true),
+        HouseholdCategory("refund", "Refund", R.string.cat_refund, Icons.Filled.Undo, Color(0xFF3B82F6), isIncome = true),
+        HouseholdCategory("investment", "Investment", R.string.cat_investment, Icons.Filled.TrendingUp, Color(0xFF14B8A6), isIncome = true),
+        HouseholdCategory("rental_income", "Rental Income", R.string.cat_rental_income, Icons.Filled.Apartment, Color(0xFF8B5CF6), isIncome = true),
+        HouseholdCategory("pension", "Pension", R.string.cat_pension, Icons.Filled.Elderly, Color(0xFF6366F1), isIncome = true),
+        HouseholdCategory("other_income", "Other Income", R.string.cat_other_income, Icons.Filled.AccountBalance, Color(0xFF94A3B8), isIncome = true)
     )
 
     val ALL_CATEGORIES = EXPENSE_CATEGORIES + INCOME_CATEGORIES
@@ -76,6 +79,9 @@ object HouseholdCategories {
     fun getCategory(key: String): HouseholdCategory? = categoryMap[key]
 
     fun getCategoryLabel(key: String): String = categoryMap[key]?.label ?: key.replaceFirstChar { it.uppercase() }
+
+    @StringRes
+    fun getCategoryLabelResId(key: String): Int = categoryMap[key]?.labelResId ?: R.string.cat_other
 
     fun getCategoryColor(key: String): Color = categoryMap[key]?.color ?: Color(0xFF94A3B8)
 
@@ -200,12 +206,12 @@ object HouseholdCategories {
     val DEFAULT_CATEGORIES = listOf("food", "transport", "shopping", "turf", "accommodation", "other")
 
     val DEFAULT_CATEGORY_LABELS = mapOf(
-        "food" to "Food",
-        "transport" to "Transport",
-        "shopping" to "Shopping",
-        "turf" to "Turf",
-        "accommodation" to "Stay",
-        "other" to "Other"
+        "food" to R.string.cat_food,
+        "transport" to R.string.cat_transport,
+        "shopping" to R.string.cat_shopping,
+        "turf" to R.string.cat_turf,
+        "accommodation" to R.string.cat_accommodation,
+        "other" to R.string.cat_other
     )
 
     val DEFAULT_CATEGORY_COLORS = mapOf(

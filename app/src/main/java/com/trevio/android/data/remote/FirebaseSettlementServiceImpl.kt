@@ -11,6 +11,7 @@ import com.trevio.android.domain.model.SimplifiedDebt
 import com.trevio.android.domain.model.SplitEntry
 import com.trevio.android.domain.repository.SettlementService
 import com.trevio.android.domain.repository.ExchangeRateService
+import com.trevio.android.util.AppConstants
 import com.trevio.android.util.Calculations
 import com.trevio.android.util.ErrorMessages
 import com.trevio.android.util.Logger
@@ -71,7 +72,7 @@ class FirebaseSettlementServiceImpl @Inject constructor(
                 "fromUid" to fromUid,
                 "toUid" to toUid,
                 "amount" to amountInBase,
-                "currency" to "INR",
+                "currency" to AppConstants.BASE_CURRENCY,
                 "originalAmount" to amount,
                 "originalCurrency" to currency,
                 "method" to method.toStorageString(),
@@ -367,7 +368,7 @@ class FirebaseSettlementServiceImpl @Inject constructor(
                     fromName = fromName,
                     toName = toName,
                     amount = (data["amount"] as? Number)?.toDouble() ?: 0.0,
-                    currency = data["currency"] as? String ?: "INR",
+                    currency = data["currency"] as? String ?: AppConstants.BASE_CURRENCY,
                     method = SettlementMethod.valueOf((data["method"] as? String ?: "cash").uppercase()),
                     upiRefId = data["upiRefId"] as? String ?: "",
                     date = (data["date"] as? Number)?.toLong() ?: 0,

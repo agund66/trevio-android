@@ -2,6 +2,7 @@ package com.trevio.android.ui.group
 
 import android.content.Intent
 import android.widget.Toast
+import androidx.annotation.StringRes
 import androidx.compose.foundation.background
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
@@ -24,6 +25,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -36,7 +38,33 @@ import com.trevio.android.core.designsystem.components.LoadingIndicator
 import com.trevio.android.core.designsystem.components.MemberAvatar
 import com.trevio.android.core.designsystem.components.TrevioCard
 import com.trevio.android.core.designsystem.components.TrevioHeader
+import com.trevio.android.core.designsystem.components.formatRelativeTimeText
 import com.trevio.android.core.designsystem.theme.TrevioBorder
+import com.trevio.android.core.designsystem.theme.TemplateTrip
+import com.trevio.android.core.designsystem.theme.TemplateTripDark
+import com.trevio.android.core.designsystem.theme.TemplateTurf
+import com.trevio.android.core.designsystem.theme.TemplateTurfDark
+import com.trevio.android.core.designsystem.theme.TemplateCasual
+import com.trevio.android.core.designsystem.theme.TemplateCasualDark
+import com.trevio.android.core.designsystem.theme.TemplateHousehold
+import com.trevio.android.core.designsystem.theme.TemplateHouseholdDark
+import com.trevio.android.core.designsystem.theme.BalancePositive
+import com.trevio.android.core.designsystem.theme.BalancePositiveDark
+import com.trevio.android.core.designsystem.theme.BalanceNegative
+import com.trevio.android.core.designsystem.theme.BalanceNegativeDark
+import com.trevio.android.core.designsystem.theme.CategoryFood
+import com.trevio.android.core.designsystem.theme.CategoryFoodDark
+import com.trevio.android.core.designsystem.theme.CategoryTransport
+import com.trevio.android.core.designsystem.theme.CategoryTransportDark
+import com.trevio.android.core.designsystem.theme.CategoryShopping
+import com.trevio.android.core.designsystem.theme.CategoryShoppingDark
+import com.trevio.android.core.designsystem.theme.CategoryTurf
+import com.trevio.android.core.designsystem.theme.CategoryTurfDark
+import com.trevio.android.core.designsystem.theme.CategoryAccommodation
+import com.trevio.android.core.designsystem.theme.CategoryAccommodationDark
+import com.trevio.android.core.designsystem.theme.CategoryOther
+import com.trevio.android.core.designsystem.theme.CategoryOtherDark
+import com.trevio.android.R
 import com.trevio.android.core.navigation.TrevioRoute
 import com.trevio.android.domain.model.Activity
 import com.trevio.android.domain.model.Expense
@@ -53,10 +81,11 @@ import com.trevio.android.domain.repository.SettlementService
 import com.trevio.android.domain.repository.UserService
 import com.trevio.android.ui.analytics.AnalyticsTab
 import com.trevio.android.ui.trip.TripTab
+import com.trevio.android.util.AppConstants
 import com.trevio.android.util.DateUtils
-import com.trevio.android.util.ErrorMessages
 import com.trevio.android.util.MemberRole
 import com.trevio.android.util.rememberCurrencyFormatter
+import com.trevio.android.util.toStringResId
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -88,21 +117,21 @@ class GroupViewModel @Inject constructor(
         val currentUserId: String? = null,
         val activities: List<Activity> = emptyList(),
         val activitiesLoading: Boolean = false,
-        val activitiesError: String? = null,
+        @StringRes val activitiesError: Int? = null,
         val activitiesHasMore: Boolean = false,
         val activitiesLoadingMore: Boolean = false,
         val searchResults: List<UserSearchResult> = emptyList(),
-        val inviteError: String? = null,
-        val actionError: String? = null,
-        val error: String? = null,
+        @StringRes val inviteError: Int? = null,
+        @StringRes val actionError: Int? = null,
+        @StringRes val error: Int? = null,
         val settlements: List<Settlement> = emptyList(),
         val settlementsLoading: Boolean = false,
-        val settlementsError: String? = null,
+        @StringRes val settlementsError: Int? = null,
         val settlementsHasMore: Boolean = false,
         val settlementsLoadingMore: Boolean = false,
         val deleteExpenseId: String? = null,
-        val deleteError: String? = null,
-        val loadMoreError: String? = null
+        @StringRes val deleteError: Int? = null,
+        @StringRes val loadMoreError: Int? = null
     )
 
     private val _state = MutableStateFlow(GroupState())
@@ -122,7 +151,7 @@ class GroupViewModel @Inject constructor(
         viewModelScope.launch {
             val currentUid = authService.getCurrentUserId()
             val info = groupService.getGroupInfo(groupId).getOrNull()
-            val expensesResult = expenseService.getGroupExpenses(groupId, 20, null).getOrNull()
+            val expensesResult = expenseService.getGroupExpenses(groupId, AppConstants.DEFAULT_PAGE_SIZE, null).getOrNull()
             val members = settlementService.getGroupBalances(groupId).getOrDefault(emptyList())
             val debts = settlementService.getSimplifiedDebts(groupId).getOrDefault(emptyList())
             _state.value = _state.value.copy(
@@ -141,7 +170,7 @@ class GroupViewModel @Inject constructor(
         viewModelScope.launch {
             val currentUid = authService.getCurrentUserId()
             val info = groupService.getGroupInfo(groupId).getOrNull()
-            val expensesResult = expenseService.getGroupExpenses(groupId, 20, null).getOrNull()
+            val expensesResult = expenseService.getGroupExpenses(groupId, AppConstants.DEFAULT_PAGE_SIZE, null).getOrNull()
             val members = settlementService.getGroupBalances(groupId).getOrDefault(emptyList())
             val debts = settlementService.getSimplifiedDebts(groupId).getOrDefault(emptyList())
             _state.value = _state.value.copy(
@@ -183,7 +212,7 @@ class GroupViewModel @Inject constructor(
                     refreshData()
                 }
                 .onFailure { e ->
-                    _state.value = _state.value.copy(inviteError = e.message)
+                    _state.value = _state.value.copy(inviteError = e.toStringResId())
                 }
         }
     }
@@ -199,7 +228,7 @@ class GroupViewModel @Inject constructor(
                     refreshData()
                 }
                 .onFailure { e ->
-                    _state.value = _state.value.copy(inviteError = e.message)
+                    _state.value = _state.value.copy(inviteError = e.toStringResId())
                 }
         }
     }
@@ -220,7 +249,7 @@ class GroupViewModel @Inject constructor(
                 _state.value = _state.value.copy(actionError = null)
                 refreshData()
             }.onFailure { e ->
-                _state.value = _state.value.copy(actionError = e.message)
+                _state.value = _state.value.copy(actionError = e.toStringResId())
             }
         }
     }
@@ -228,12 +257,12 @@ class GroupViewModel @Inject constructor(
     fun loadActivities() {
         _state.value = _state.value.copy(activitiesLoading = true, activitiesError = null)
         viewModelScope.launch {
-            groupService.getGroupActivities(groupId, 20, null)
+            groupService.getGroupActivities(groupId, AppConstants.DEFAULT_PAGE_SIZE, null)
                 .onSuccess { result ->
                     _state.value = _state.value.copy(activities = result.items, activitiesLoading = false, activitiesHasMore = result.hasMore)
                 }
                 .onFailure { e ->
-                    _state.value = _state.value.copy(activitiesLoading = false, activitiesError = e.message)
+                    _state.value = _state.value.copy(activitiesLoading = false, activitiesError = e.toStringResId())
                 }
         }
     }
@@ -243,7 +272,7 @@ class GroupViewModel @Inject constructor(
         _state.value = _state.value.copy(activitiesLoadingMore = true)
         val lastId = _state.value.activities.lastOrNull()?.activityId
         viewModelScope.launch {
-            groupService.getGroupActivities(groupId, 20, lastId)
+            groupService.getGroupActivities(groupId, AppConstants.DEFAULT_PAGE_SIZE, lastId)
                 .onSuccess { result ->
                     _state.value = _state.value.copy(
                         activities = _state.value.activities + result.items,
@@ -264,14 +293,14 @@ class GroupViewModel @Inject constructor(
                 fromUid = debt.fromUid,
                 toUid = debt.toUid,
                 amount = debt.amount,
-                currency = "INR",
+                currency = com.trevio.android.util.AppConstants.BASE_CURRENCY,
                 method = com.trevio.android.domain.model.SettlementMethod.CASH,
                 upiRefId = null
             ).onSuccess {
                 _state.value = _state.value.copy(actionError = null)
                 refreshData()
             }.onFailure { e ->
-                _state.value = _state.value.copy(actionError = e.message)
+                _state.value = _state.value.copy(actionError = e.toStringResId())
             }
         }
     }
@@ -279,12 +308,12 @@ class GroupViewModel @Inject constructor(
     fun loadSettlements() {
         _state.value = _state.value.copy(settlementsLoading = true, settlementsError = null)
         viewModelScope.launch {
-            settlementService.getSettlementHistory(groupId, 20, null)
+            settlementService.getSettlementHistory(groupId, AppConstants.DEFAULT_PAGE_SIZE, null)
                 .onSuccess { result ->
                     _state.value = _state.value.copy(settlements = result.items, settlementsLoading = false, settlementsHasMore = result.hasMore)
                 }
                 .onFailure { e ->
-                    _state.value = _state.value.copy(settlementsLoading = false, settlementsError = e.message)
+                    _state.value = _state.value.copy(settlementsLoading = false, settlementsError = e.toStringResId())
                 }
         }
     }
@@ -294,7 +323,7 @@ class GroupViewModel @Inject constructor(
         _state.value = _state.value.copy(settlementsLoadingMore = true)
         val lastId = _state.value.settlements.lastOrNull()?.settlementId
         viewModelScope.launch {
-            settlementService.getSettlementHistory(groupId, 20, lastId)
+            settlementService.getSettlementHistory(groupId, AppConstants.DEFAULT_PAGE_SIZE, lastId)
                 .onSuccess { result ->
                     _state.value = _state.value.copy(
                         settlements = _state.value.settlements + result.items,
@@ -313,7 +342,7 @@ class GroupViewModel @Inject constructor(
         _state.value = _state.value.copy(expensesLoadingMore = true, loadMoreError = null)
         val lastId = _state.value.expenses.lastOrNull()?.expenseId
         viewModelScope.launch {
-            expenseService.getGroupExpenses(groupId, 20, lastId)
+            expenseService.getGroupExpenses(groupId, AppConstants.DEFAULT_PAGE_SIZE, lastId)
                 .onSuccess { result ->
                     _state.value = _state.value.copy(
                         expenses = _state.value.expenses + result.items,
@@ -325,7 +354,7 @@ class GroupViewModel @Inject constructor(
                 .onFailure {
                     _state.value = _state.value.copy(
                         expensesLoadingMore = false,
-                        loadMoreError = ErrorMessages.LOAD_MORE_ERROR
+                        loadMoreError = R.string.load_more_error
                     )
                 }
         }
@@ -339,7 +368,7 @@ class GroupViewModel @Inject constructor(
                     refreshData()
                 }
                 .onFailure { e ->
-                    _state.value = _state.value.copy(deleteError = e.message)
+                    _state.value = _state.value.copy(deleteError = e.toStringResId())
                 }
         }
     }
@@ -354,20 +383,14 @@ class GroupViewModel @Inject constructor(
                 .onSuccess {
                     refreshData()
                 }
-                .onFailure { error ->
-                    _state.value = _state.value.copy(error = error.message)
+                .onFailure { e ->
+                    _state.value = _state.value.copy(error = e.toStringResId())
                 }
         }
     }
 }
 
-private fun getUpiVpa(debt: SimplifiedDebt): String {
-    if (debt.toUpiId.isNotEmpty()) return debt.toUpiId
-    if (debt.toPhoneNumber.isNotEmpty() && (debt.toCountryCode.isEmpty() || debt.toCountryCode == "IN")) {
-        return "${debt.toPhoneNumber}@paytm"
-    }
-    return ""
-}
+private fun getUpiVpa(debt: SimplifiedDebt): String = com.trevio.android.util.PaymentUtils.getUpiVpa(debt)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -402,7 +425,7 @@ fun GroupDetailScreen(
 
     LaunchedEffect(searchQuery) {
         if (searchQuery.isNotBlank()) {
-            delay(300)
+            delay(AppConstants.DEBOUNCE_DELAY_MS)
             debouncedQuery = searchQuery
             viewModel.searchUsers(debouncedQuery)
         } else {
@@ -416,10 +439,10 @@ fun GroupDetailScreen(
         if (!inviteCode.isNullOrBlank()) {
             val shareIntent = Intent(Intent.ACTION_SEND).apply {
                 type = "text/plain"
-                putExtra(Intent.EXTRA_SUBJECT, "Join \"${state.groupInfo?.name}\" on Trevio")
-                putExtra(Intent.EXTRA_TEXT, "You've been invited to join \"${state.groupInfo?.name}\" on Trevio. Tap to join and start splitting bills!\n\nhttps://trevio.app/join/$inviteCode")
+                putExtra(Intent.EXTRA_SUBJECT, context.getString(R.string.group_detail_share_subject, state.groupInfo?.name ?: ""))
+                putExtra(Intent.EXTRA_TEXT, context.getString(R.string.group_detail_share_text, state.groupInfo?.name ?: "", inviteCode))
             }
-            context.startActivity(Intent.createChooser(shareIntent, "Share Invite"))
+            context.startActivity(Intent.createChooser(shareIntent, context.getString(R.string.group_detail_share_chooser)))
         }
     }
 
@@ -427,23 +450,21 @@ fun GroupDetailScreen(
 
     Scaffold(
         floatingActionButton = {
-            if (!isHouseholdPreLoad) {
-                FloatingActionButton(
-                    onClick = {
-                        navController.navigate(TrevioRoute.AddExpense.createRoute(state.groupInfo?.groupId ?: ""))
-                    },
-                    shape = RoundedCornerShape(16.dp),
-                    containerColor = MaterialTheme.colorScheme.primary
-                ) {
-                    Icon(Icons.Default.Add, contentDescription = "Add Expense", tint = MaterialTheme.colorScheme.onPrimary)
-                }
+            FloatingActionButton(
+                onClick = {
+                    navController.navigate(TrevioRoute.AddExpense.createRoute(state.groupInfo?.groupId ?: ""))
+                },
+                shape = RoundedCornerShape(16.dp),
+                containerColor = MaterialTheme.colorScheme.primary
+            ) {
+                Icon(Icons.Default.Add, contentDescription = if (isHouseholdPreLoad) stringResource(R.string.group_detail_add_entry) else stringResource(R.string.group_detail_add_expense), tint = MaterialTheme.colorScheme.onPrimary)
             }
         }
     ) { padding ->
         if (state.isLoading) {
             Column(modifier = Modifier.padding(padding).background(MaterialTheme.colorScheme.background)) {
                 TrevioHeader(
-                    title = "Group",
+                    title = stringResource(R.string.group_detail_title),
                     onBack = { navController.popBackStack() }
                 )
                 Box(modifier = Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
@@ -456,7 +477,7 @@ fun GroupDetailScreen(
         if (state.groupInfo == null) {
             Column(modifier = Modifier.padding(padding).background(MaterialTheme.colorScheme.background)) {
                 TrevioHeader(
-                    title = "Group",
+                    title = stringResource(R.string.group_detail_title),
                     onBack = { navController.popBackStack() }
                 )
                 Box(modifier = Modifier.weight(1f).fillMaxWidth().padding(32.dp), contentAlignment = Alignment.Center) {
@@ -464,13 +485,13 @@ fun GroupDetailScreen(
                         Icon(Icons.Default.Warning, contentDescription = null, modifier = Modifier.size(48.dp), tint = MaterialTheme.colorScheme.error)
                         Spacer(Modifier.height(16.dp))
                         Text(
-                            state.error ?: "Failed to load group",
+                            stringResource(state.error ?: R.string.group_detail_failed_load),
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                         Spacer(Modifier.height(16.dp))
                         OutlinedButton(onClick = { viewModel.loadData() }) {
-                            Text("Retry")
+                            Text(stringResource(R.string.group_detail_retry))
                         }
                     }
                 }
@@ -500,192 +521,185 @@ fun GroupDetailScreen(
             selectedTab = 0
         }
 
-        LazyColumn(modifier = Modifier.padding(padding).background(MaterialTheme.colorScheme.background)) {
-            item {
-                TrevioHeader(
-                    title = groupInfo?.name ?: "Group",
-                    onBack = { navController.popBackStack() },
-                    actions = {
-                        if (isAdmin) {
-                            IconButton(onClick = { navController.navigate(TrevioRoute.GroupSettings.createRoute(state.groupInfo?.groupId ?: "")) }) {
-                                Icon(Icons.Default.Settings, contentDescription = "Settings", tint = Color.White)
-                            }
-                            IconButton(onClick = { viewModel.toggleArchive() }) {
-                                Icon(
-                                    if (groupInfo?.archived == true) Icons.Default.Unarchive else Icons.Default.Archive,
-                                    contentDescription = if (groupInfo?.archived == true) "Unarchive" else "Archive",
-                                    tint = Color.White
-                                )
-                            }
+        Column(modifier = Modifier.fillMaxSize().padding(padding).background(MaterialTheme.colorScheme.background)) {
+            // ── Fixed Header (does not scroll) ──
+            TrevioHeader(
+                title = groupInfo?.name ?: stringResource(R.string.group_detail_title),
+                onBack = { navController.popBackStack() },
+                actions = {
+                    if (isAdmin) {
+                        IconButton(onClick = { navController.navigate(TrevioRoute.GroupSettings.createRoute(state.groupInfo?.groupId ?: "")) }) {
+                            Icon(Icons.Default.Settings, contentDescription = stringResource(R.string.group_detail_settings), tint = Color.White)
                         }
-                        if (!state.groupInfo?.inviteCode.isNullOrBlank()) {
-                            IconButton(onClick = { showQrDialog = true }) {
-                                Icon(Icons.Default.QrCode2, contentDescription = "QR Code", tint = Color.White)
-                            }
-                            IconButton(onClick = {
-                                val clipboard = context.getSystemService(android.content.Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
-                                clipboard.setPrimaryClip(android.content.ClipData.newPlainText("Invite Code", state.groupInfo?.inviteCode))
-                                Toast.makeText(context, "Invite code copied", Toast.LENGTH_SHORT).show()
-                            }) {
-                                Icon(Icons.Default.ContentCopy, contentDescription = "Copy Code", tint = Color.White)
-                            }
-                            IconButton(onClick = { shareInviteLink() }) {
-                                Icon(Icons.Default.Share, contentDescription = "Share Invite", tint = Color.White)
-                            }
-                        }
-                    }
-                ) {
-                    if (groupInfo?.archived == true) {
-                        Spacer(modifier = Modifier.height(4.dp))
-                        Surface(
-                            color = Color.White.copy(alpha = 0.2f),
-                            shape = RoundedCornerShape(6.dp),
-                            modifier = Modifier.padding(horizontal = 16.dp)
-                        ) {
-                            Text(
-                                "Archived",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = Color.White,
-                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
+                        IconButton(onClick = { viewModel.toggleArchive() }) {
+                            Icon(
+                                if (groupInfo?.archived == true) Icons.Default.Unarchive else Icons.Default.Archive,
+                                contentDescription = if (groupInfo?.archived == true) stringResource(R.string.group_detail_unarchive) else stringResource(R.string.group_detail_archive),
+                                tint = Color.White
                             )
                         }
                     }
-                    if (groupInfo?.description?.isNotEmpty() == true) {
-                        Spacer(modifier = Modifier.height(4.dp))
-                        Text(
-                            groupInfo.description,
-                            style = MaterialTheme.typography.bodySmall,
-                            color = Color.White.copy(alpha = 0.8f),
-                            modifier = Modifier.padding(horizontal = 16.dp)
-                        )
+                    if (!state.groupInfo?.inviteCode.isNullOrBlank()) {
+                        IconButton(onClick = { showQrDialog = true }) {
+                            Icon(Icons.Default.QrCode2, contentDescription = stringResource(R.string.group_detail_qr_code), tint = Color.White)
+                        }
+                        IconButton(onClick = {
+                            val clipboard = context.getSystemService(android.content.Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
+                            clipboard.setPrimaryClip(android.content.ClipData.newPlainText(context.getString(R.string.group_detail_invite_code_label), state.groupInfo?.inviteCode))
+                            Toast.makeText(context, context.getString(R.string.group_detail_invite_code_copied), Toast.LENGTH_SHORT).show()
+                        }) {
+                            Icon(Icons.Default.ContentCopy, contentDescription = stringResource(R.string.group_detail_copy_code), tint = Color.White)
+                        }
+                        IconButton(onClick = { shareInviteLink() }) {
+                            Icon(Icons.Default.Share, contentDescription = stringResource(R.string.group_detail_share_invite), tint = Color.White)
+                        }
                     }
-                    Spacer(modifier = Modifier.height(12.dp))
-                    Row(
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                }
+            ) {
+                if (groupInfo?.archived == true) {
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Surface(
+                        color = Color.White.copy(alpha = 0.2f),
+                        shape = RoundedCornerShape(6.dp),
                         modifier = Modifier.padding(horizontal = 16.dp)
                     ) {
-                        InfoChip("${groupInfo?.memberCount ?: 0} members")
-                        InfoChip(currencyFormatter.formatBase(groupInfo?.totalExpenses ?: 0.0))
-                        if (!groupInfo?.inviteCode.isNullOrBlank()) {
-                            InfoChip("Code: ${groupInfo?.inviteCode}")
-                        }
-                    }
-                    Spacer(modifier = Modifier.height(12.dp))
-                }
-            }
-
-            item {
-                // Household tabs: Today, Monthly, Insights, Members, Activity
-                // Regular tabs: Expenses, Balances, Insights, [Trip], Members, Activity
-                val householdMembersTabIndex = 3
-                val householdActivityTabIndex = 4
-                val regularMembersTabIndex = if (isTrip) 4 else 3
-                val regularActivityTabIndex = if (isTrip) 5 else 4
-                val membersTabIndex = if (isHousehold) householdMembersTabIndex else regularMembersTabIndex
-                val activityTabIndex = if (isHousehold) householdActivityTabIndex else regularActivityTabIndex
-
-                ScrollableTabRow(
-                    selectedTabIndex = selectedTab,
-                    containerColor = MaterialTheme.colorScheme.surface,
-                    edgePadding = 0.dp,
-                    divider = {},
-                    indicator = {
-                        TabRowDefaults.SecondaryIndicator(
-                            Modifier.tabIndicatorOffset(it[selectedTab]),
-                            color = MaterialTheme.colorScheme.primary,
-                            height = 3.dp
+                        Text(
+                            stringResource(R.string.group_detail_archived),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = Color.White,
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
                         )
                     }
+                }
+                if (groupInfo?.description?.isNotEmpty() == true) {
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        groupInfo.description,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = Color.White.copy(alpha = 0.8f),
+                        modifier = Modifier.padding(horizontal = 16.dp)
+                    )
+                }
+                Spacer(modifier = Modifier.height(12.dp))
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    modifier = Modifier.padding(horizontal = 16.dp)
                 ) {
-                    if (isHousehold) {
-                        // Household tabs
+                    InfoChip(stringResource(R.string.group_detail_members_count, groupInfo?.memberCount ?: 0))
+                    InfoChip(currencyFormatter.formatBase(groupInfo?.totalExpenses ?: 0.0))
+                    if (!groupInfo?.inviteCode.isNullOrBlank()) {
+                        InfoChip(stringResource(R.string.group_detail_code, groupInfo?.inviteCode ?: ""))
+                    }
+                }
+                Spacer(modifier = Modifier.height(12.dp))
+            }
+
+            // ── Fixed Tab Bar (does not scroll) ──
+            val householdMembersTabIndex = 3
+            val householdActivityTabIndex = 4
+            val regularMembersTabIndex = if (isTrip) 4 else 3
+            val regularActivityTabIndex = if (isTrip) 5 else 4
+            val membersTabIndex = if (isHousehold) householdMembersTabIndex else regularMembersTabIndex
+            val activityTabIndex = if (isHousehold) householdActivityTabIndex else regularActivityTabIndex
+
+            ScrollableTabRow(
+                selectedTabIndex = selectedTab,
+                containerColor = MaterialTheme.colorScheme.surface,
+                edgePadding = 0.dp,
+                divider = {},
+                indicator = {
+                    TabRowDefaults.SecondaryIndicator(
+                        Modifier.tabIndicatorOffset(it[selectedTab]),
+                        color = MaterialTheme.colorScheme.primary,
+                        height = 3.dp
+                    )
+                }
+            ) {
+                if (isHousehold) {
+                    Tab(
+                        selected = selectedTab == 0,
+                        onClick = { selectedTab = 0 },
+                        text = { Text(stringResource(R.string.group_detail_today), maxLines = 1) },
+                        icon = { Icon(Icons.Default.Today, contentDescription = null, modifier = Modifier.size(18.dp)) }
+                    )
+                    Tab(
+                        selected = selectedTab == 1,
+                        onClick = { selectedTab = 1 },
+                        text = { Text(stringResource(R.string.group_detail_monthly), maxLines = 1) },
+                        icon = { Icon(Icons.Default.CalendarMonth, contentDescription = null, modifier = Modifier.size(18.dp)) }
+                    )
+                    Tab(
+                        selected = selectedTab == 2,
+                        onClick = { selectedTab = 2 },
+                        text = { Text(stringResource(R.string.group_detail_insights), maxLines = 1) },
+                        icon = { Icon(Icons.Default.BarChart, contentDescription = null, modifier = Modifier.size(18.dp)) }
+                    )
+                    Tab(
+                        selected = selectedTab == householdMembersTabIndex,
+                        onClick = { selectedTab = householdMembersTabIndex },
+                        text = { Text(stringResource(R.string.group_detail_members), maxLines = 1) },
+                        icon = { Icon(Icons.Default.Group, contentDescription = null, modifier = Modifier.size(18.dp)) }
+                    )
+                    Tab(
+                        selected = selectedTab == householdActivityTabIndex,
+                        onClick = {
+                            selectedTab = householdActivityTabIndex
+                            if (state.activities.isEmpty() && !state.activitiesLoading) {
+                                viewModel.loadActivities()
+                            }
+                        },
+                        text = { Text(stringResource(R.string.group_detail_activity), maxLines = 1) },
+                        icon = { Icon(Icons.Default.Notifications, contentDescription = null, modifier = Modifier.size(18.dp)) }
+                    )
+                } else {
+                    Tab(
+                        selected = selectedTab == 0,
+                        onClick = { selectedTab = 0 },
+                        text = { Text(stringResource(R.string.group_detail_expenses), maxLines = 1) },
+                        icon = { Icon(Icons.Default.Receipt, contentDescription = null, modifier = Modifier.size(18.dp)) }
+                    )
+                    Tab(
+                        selected = selectedTab == 1,
+                        onClick = { selectedTab = 1 },
+                        text = { Text(stringResource(R.string.group_detail_balances), maxLines = 1) },
+                        icon = { Icon(Icons.Default.AccountBalanceWallet, contentDescription = null, modifier = Modifier.size(18.dp)) }
+                    )
+                    Tab(
+                        selected = selectedTab == 2,
+                        onClick = { selectedTab = 2 },
+                        text = { Text(stringResource(R.string.group_detail_insights), maxLines = 1) },
+                        icon = { Icon(Icons.Default.BarChart, contentDescription = null, modifier = Modifier.size(18.dp)) }
+                    )
+                    if (isTrip) {
                         Tab(
-                            selected = selectedTab == 0,
-                            onClick = { selectedTab = 0 },
-                            text = { Text("Today", maxLines = 1) },
-                            icon = { Icon(Icons.Default.Today, contentDescription = null, modifier = Modifier.size(18.dp)) }
-                        )
-                        Tab(
-                            selected = selectedTab == 1,
-                            onClick = { selectedTab = 1 },
-                            text = { Text("Monthly", maxLines = 1) },
-                            icon = { Icon(Icons.Default.CalendarMonth, contentDescription = null, modifier = Modifier.size(18.dp)) }
-                        )
-                        Tab(
-                            selected = selectedTab == 2,
-                            onClick = { selectedTab = 2 },
-                            text = { Text("Insights", maxLines = 1) },
-                            icon = { Icon(Icons.Default.BarChart, contentDescription = null, modifier = Modifier.size(18.dp)) }
-                        )
-                        Tab(
-                            selected = selectedTab == householdMembersTabIndex,
-                            onClick = { selectedTab = householdMembersTabIndex },
-                            text = { Text("Members", maxLines = 1) },
-                            icon = { Icon(Icons.Default.Group, contentDescription = null, modifier = Modifier.size(18.dp)) }
-                        )
-                        Tab(
-                            selected = selectedTab == householdActivityTabIndex,
-                            onClick = {
-                                selectedTab = householdActivityTabIndex
-                                if (state.activities.isEmpty() && !state.activitiesLoading) {
-                                    viewModel.loadActivities()
-                                }
-                            },
-                            text = { Text("Activity", maxLines = 1) },
-                            icon = { Icon(Icons.Default.Notifications, contentDescription = null, modifier = Modifier.size(18.dp)) }
-                        )
-                    } else {
-                        // Regular tabs
-                        Tab(
-                            selected = selectedTab == 0,
-                            onClick = { selectedTab = 0 },
-                            text = { Text("Expenses", maxLines = 1) },
-                            icon = { Icon(Icons.Default.Receipt, contentDescription = null, modifier = Modifier.size(18.dp)) }
-                        )
-                        Tab(
-                            selected = selectedTab == 1,
-                            onClick = { selectedTab = 1 },
-                            text = { Text("Balances", maxLines = 1) },
-                            icon = { Icon(Icons.Default.AccountBalanceWallet, contentDescription = null, modifier = Modifier.size(18.dp)) }
-                        )
-                        Tab(
-                            selected = selectedTab == 2,
-                            onClick = { selectedTab = 2 },
-                            text = { Text("Insights", maxLines = 1) },
-                            icon = { Icon(Icons.Default.BarChart, contentDescription = null, modifier = Modifier.size(18.dp)) }
-                        )
-                        if (isTrip) {
-                            Tab(
-                                selected = selectedTab == 3,
-                                onClick = { selectedTab = 3 },
-                                text = { Text("Trip", maxLines = 1) },
-                                icon = { Icon(Icons.Default.Place, contentDescription = null, modifier = Modifier.size(18.dp)) }
-                            )
-                        }
-                        Tab(
-                            selected = selectedTab == regularMembersTabIndex,
-                            onClick = { selectedTab = regularMembersTabIndex },
-                            text = { Text("Members", maxLines = 1) },
-                            icon = { Icon(Icons.Default.Group, contentDescription = null, modifier = Modifier.size(18.dp)) }
-                        )
-                        Tab(
-                            selected = selectedTab == regularActivityTabIndex,
-                            onClick = {
-                                selectedTab = regularActivityTabIndex
-                                if (state.activities.isEmpty() && !state.activitiesLoading) {
-                                    viewModel.loadActivities()
-                                }
-                            },
-                            text = { Text("Activity", maxLines = 1) },
-                            icon = { Icon(Icons.Default.Notifications, contentDescription = null, modifier = Modifier.size(18.dp)) }
+                            selected = selectedTab == 3,
+                            onClick = { selectedTab = 3 },
+                            text = { Text(stringResource(R.string.group_detail_trip), maxLines = 1) },
+                            icon = { Icon(Icons.Default.Place, contentDescription = null, modifier = Modifier.size(18.dp)) }
                         )
                     }
+                    Tab(
+                        selected = selectedTab == regularMembersTabIndex,
+                        onClick = { selectedTab = regularMembersTabIndex },
+                        text = { Text(stringResource(R.string.group_detail_members), maxLines = 1) },
+                        icon = { Icon(Icons.Default.Group, contentDescription = null, modifier = Modifier.size(18.dp)) }
+                    )
+                    Tab(
+                        selected = selectedTab == regularActivityTabIndex,
+                        onClick = {
+                            selectedTab = regularActivityTabIndex
+                            if (state.activities.isEmpty() && !state.activitiesLoading) {
+                                viewModel.loadActivities()
+                            }
+                        },
+                        text = { Text(stringResource(R.string.group_detail_activity), maxLines = 1) },
+                        icon = { Icon(Icons.Default.Notifications, contentDescription = null, modifier = Modifier.size(18.dp)) }
+                    )
                 }
             }
 
-            val membersTabIndex = if (isHousehold) 3 else if (isTrip) 4 else 3
-            val activityTabIndex = if (isHousehold) 4 else if (isTrip) 5 else 4
-
+            // ── Scrollable Tab Content ──
+            LazyColumn(modifier = Modifier.weight(1f).fillMaxWidth()) {
             when (selectedTab) {
                 0 -> if (isHousehold) item {
                     com.trevio.android.ui.household.DailyTab(
@@ -771,9 +785,9 @@ fun GroupDetailScreen(
                         onPayViaUpi = { debt ->
                             val vpa = getUpiVpa(debt)
                             if (vpa.isNotEmpty()) {
-                                val upiUri = "upi://pay?pa=${android.net.Uri.encode(vpa)}&pn=${android.net.Uri.encode(debt.toName)}&am=${debt.amount}&cu=INR&tn=${android.net.Uri.encode("Trevio")}"
+                                val upiUri = "upi://pay?pa=${android.net.Uri.encode(vpa)}&pn=${android.net.Uri.encode(debt.toName)}&am=${debt.amount}&cu=${com.trevio.android.util.AppConstants.BASE_CURRENCY}&tn=${android.net.Uri.encode("Trevio")}"
                                 val intent = android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(upiUri))
-                                context.startActivity(android.content.Intent.createChooser(intent, "Pay with..."))
+                                context.startActivity(android.content.Intent.createChooser(intent, context.getString(R.string.pay_with)))
                             }
                         }
                     )
@@ -781,7 +795,7 @@ fun GroupDetailScreen(
                 2 -> item {
                     AnalyticsTab(
                         groupId = state.groupInfo?.groupId ?: "",
-                        groupName = state.groupInfo?.name ?: "Group",
+                        groupName = state.groupInfo?.name ?: stringResource(R.string.group_detail_title),
                         expenses = state.expenses,
                         members = state.members
                     )
@@ -838,6 +852,7 @@ fun GroupDetailScreen(
                 }
             }
         }
+        } // end Column
 
         if (showInviteDialog) {
             AlertDialog(
@@ -847,13 +862,13 @@ fun GroupDetailScreen(
                     debouncedQuery = ""
                     viewModel.clearSearch()
                 },
-                title = { Text("Invite Member") },
+                title = { Text(stringResource(R.string.group_detail_invite_member)) },
                 text = {
                     Column {
                         OutlinedTextField(
                             value = searchQuery,
                             onValueChange = { searchQuery = it },
-                            label = { Text("Search by username") },
+                            label = { Text(stringResource(R.string.group_detail_search_by_username)) },
                             leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
                             modifier = Modifier.fillMaxWidth(),
                             singleLine = true
@@ -868,21 +883,21 @@ fun GroupDetailScreen(
                                     MemberAvatar(name = user.displayName, photoURL = user.photoURL, size = 32)
                                     Spacer(modifier = Modifier.width(8.dp))
                                     Column(modifier = Modifier.weight(1f)) {
-                                        Text(user.displayName + if (user.uid == state.currentUserId) " (You)" else "", style = MaterialTheme.typography.bodyMedium)
+                                        Text(user.displayName + if (user.uid == state.currentUserId) stringResource(R.string.group_detail_you_suffix) else "", style = MaterialTheme.typography.bodyMedium)
                                         Text("@${user.username}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                                     }
                                     IconButton(onClick = {
                                         viewModel.inviteMember(user.username)
                                         searchQuery = ""
                                     }) {
-                                        Icon(Icons.Default.PersonAdd, contentDescription = "Invite", tint = MaterialTheme.colorScheme.primary)
+                                        Icon(Icons.Default.PersonAdd, contentDescription = stringResource(R.string.group_detail_invite_btn), tint = MaterialTheme.colorScheme.primary)
                                     }
                                 }
                             }
                         }
                         if (state.inviteError != null) {
                             Spacer(modifier = Modifier.height(8.dp))
-                            Text(state.inviteError!!, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
+                            Text(stringResource(state.inviteError!!), color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
                         }
                     }
                 },
@@ -891,7 +906,7 @@ fun GroupDetailScreen(
                         showInviteDialog = false
                         searchQuery = ""
                         viewModel.clearSearch()
-                    }) { Text("Done") }
+                    }) { Text(stringResource(R.string.common_done)) }
                 }
             )
         }
@@ -902,11 +917,11 @@ fun GroupDetailScreen(
                     showAddOfflineDialog = false
                     offlineName = ""
                 },
-                title = { Text("Add Offline Member") },
+                title = { Text(stringResource(R.string.group_detail_add_offline)) },
                 text = {
                     Column {
                         Text(
-                            "Add someone who isn't on the app yet. They can claim their profile later.",
+                            stringResource(R.string.group_detail_add_offline_msg),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -914,14 +929,14 @@ fun GroupDetailScreen(
                         OutlinedTextField(
                             value = offlineName,
                             onValueChange = { offlineName = it },
-                            label = { Text("Name") },
+                            label = { Text(stringResource(R.string.create_group_offline_name)) },
                             leadingIcon = { Icon(Icons.Default.Person, contentDescription = null) },
                             modifier = Modifier.fillMaxWidth(),
                             singleLine = true
                         )
                         if (state.inviteError != null) {
                             Spacer(modifier = Modifier.height(8.dp))
-                            Text(state.inviteError!!, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
+                            Text(stringResource(state.inviteError!!), color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
                         }
                     }
                 },
@@ -935,20 +950,20 @@ fun GroupDetailScreen(
                             }
                         },
                         enabled = offlineName.isNotBlank()
-                    ) { Text("Add") }
+                    ) { Text(stringResource(R.string.group_detail_add)) }
                 },
                 dismissButton = {
                     TextButton(onClick = {
                         showAddOfflineDialog = false
                         offlineName = ""
-                    }) { Text("Cancel") }
+                    }) { Text(stringResource(R.string.group_detail_cancel)) }
                 }
             )
         }
 
         if (showQrDialog && state.groupInfo?.inviteCode != null) {
             GroupQrCodeDialog(
-                groupName = state.groupInfo?.name ?: "Group",
+                groupName = state.groupInfo?.name ?: stringResource(R.string.group_detail_title),
                 inviteCode = state.groupInfo?.inviteCode ?: "",
                 onDismiss = { showQrDialog = false }
             )
@@ -957,13 +972,13 @@ fun GroupDetailScreen(
         if (state.deleteExpenseId != null) {
             AlertDialog(
                 onDismissRequest = { viewModel.setDeleteExpenseId(null) },
-                title = { Text("Delete Expense?") },
+                title = { Text(stringResource(R.string.group_detail_delete_expense_title)) },
                 text = {
                     Column {
-                        Text("This action cannot be undone. Balances will be recalculated.")
+                        Text(stringResource(R.string.group_detail_delete_expense_msg))
                         if (state.deleteError != null) {
                             Spacer(modifier = Modifier.height(8.dp))
-                            Text(state.deleteError!!, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
+                            Text(stringResource(state.deleteError!!), color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
                         }
                     }
                 },
@@ -971,10 +986,10 @@ fun GroupDetailScreen(
                     TextButton(
                         onClick = { viewModel.deleteExpense(state.deleteExpenseId!!) },
                         colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)
-                    ) { Text("Delete") }
+                    ) { Text(stringResource(R.string.group_detail_delete)) }
                 },
                 dismissButton = {
-                    TextButton(onClick = { viewModel.setDeleteExpenseId(null) }) { Text("Cancel") }
+                    TextButton(onClick = { viewModel.setDeleteExpenseId(null) }) { Text(stringResource(R.string.group_detail_cancel)) }
                 }
             )
         }
@@ -1041,22 +1056,20 @@ private fun ExpensesTab(
     onDeleteExpense: (String) -> Unit = {},
     hasMore: Boolean = false,
     loadingMore: Boolean = false,
-    loadMoreError: String? = null,
+    @StringRes loadMoreError: Int? = null,
     onLoadMore: () -> Unit = {}
 ) {
     val categories = listOf("all", "food", "transport", "shopping", "turf", "accommodation", "other")
     val hasExpenses = expenses.isNotEmpty() || expenseSearch.isNotBlank() || categoryFilter != "all"
 
-    val scrollState = rememberScrollState()
-    val shouldLoadMore by remember {
-        derivedStateOf {
-            hasMore && !loadingMore && expenseSearch.isBlank() && categoryFilter == "all" &&
-            expenses.isNotEmpty() &&
-            scrollState.value >= scrollState.maxValue - 300
+    // Load more when all current expenses are shown and there are more available.
+    // (Previously used scroll position detection, but this tab is rendered inside
+    // a LazyColumn so verticalScroll is not allowed — we trigger load more
+    // immediately when we have expenses and hasMore is true.)
+    LaunchedEffect(hasMore, loadingMore, expenses.size, expenseSearch, categoryFilter) {
+        if (hasMore && !loadingMore && expenseSearch.isBlank() && categoryFilter == "all" && expenses.isNotEmpty()) {
+            onLoadMore()
         }
-    }
-    LaunchedEffect(shouldLoadMore) {
-        if (shouldLoadMore) onLoadMore()
     }
 
     if (expenses.isEmpty() && expenseSearch.isBlank() && categoryFilter == "all") {
@@ -1069,21 +1082,21 @@ private fun ExpensesTab(
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 Icon(Icons.Default.Receipt, contentDescription = null, modifier = Modifier.size(64.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f))
                 Spacer(modifier = Modifier.height(16.dp))
-                Text("No expenses yet", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(stringResource(R.string.group_detail_no_expenses), style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 Spacer(modifier = Modifier.height(4.dp))
-                Text("Tap + to add your first expense", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f))
+                Text(stringResource(R.string.group_detail_no_expenses_tap), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f))
             }
         }
     } else {
         Column(
-            modifier = Modifier.fillMaxWidth().padding(16.dp).verticalScroll(scrollState),
+            modifier = Modifier.fillMaxWidth().padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
             if (hasExpenses) {
                 OutlinedTextField(
                     value = expenseSearch,
                     onValueChange = onExpenseSearchChange,
-                    placeholder = { Text("Search expenses...") },
+                    placeholder = { Text(stringResource(R.string.group_detail_search_expenses)) },
                     leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
                     modifier = Modifier.fillMaxWidth(),
                     singleLine = true,
@@ -1104,9 +1117,9 @@ private fun ExpensesTab(
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
                         Icon(Icons.Default.Search, contentDescription = null, modifier = Modifier.size(48.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f))
                         Spacer(modifier = Modifier.height(8.dp))
-                        Text("No expenses match your filters", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text(stringResource(R.string.group_detail_no_expenses_filters), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         Spacer(modifier = Modifier.height(4.dp))
-                        TextButton(onClick = { onExpenseSearchChange(""); onCategoryFilterChange("all") }) { Text("Clear filters") }
+                        TextButton(onClick = { onExpenseSearchChange(""); onCategoryFilterChange("all") }) { Text(stringResource(R.string.group_detail_clear_filters)) }
                     }
                 }
             } else {
@@ -1122,13 +1135,13 @@ private fun ExpensesTab(
                         horizontalAlignment = Alignment.CenterHorizontally
                     ) {
                         Text(
-                            loadMoreError,
+                            stringResource(loadMoreError),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.error
                         )
                         Spacer(modifier = Modifier.height(4.dp))
                         TextButton(onClick = onLoadMore) {
-                            Text("Retry")
+                            Text(stringResource(R.string.group_detail_retry))
                         }
                     }
                 }
@@ -1147,9 +1160,9 @@ private fun ExpenseCard(
     onDeleteExpense: (String) -> Unit = {}
 ) {
     val payer = members.find { it.uid == expense.paidBy }
-    val payerName = payer?.displayName?.split(" ")?.firstOrNull() ?: "Someone"
+    val payerName = payer?.displayName?.split(" ")?.firstOrNull() ?: stringResource(R.string.someone)
     val isPayerMe = payer?.uid == currentUserId
-    val displayPayerName = if (isPayerMe) "You" else payerName
+    val displayPayerName = if (isPayerMe) stringResource(R.string.you) else payerName
     val myShare = currentUserId?.let { expense.splits[it]?.amount }
     val canEdit = expense.createdBy == currentUserId || members.find { it.uid == currentUserId }?.role == MemberRole.ADMIN
     val categoryIcon = when (expense.category) {
@@ -1162,14 +1175,23 @@ private fun ExpenseCard(
     }
     val isDark = isSystemInDarkTheme()
     val categoryColor = when (expense.category) {
-        "food" -> if (isDark) Color(0xFFFBBF24) else Color(0xFFF59E0B)
-        "transport" -> if (isDark) Color(0xFF818CF8) else Color(0xFF6366F1)
-        "shopping" -> if (isDark) Color(0xFFF472B6) else Color(0xFFEC4899)
-        "turf" -> if (isDark) Color(0xFF4ADE80) else Color(0xFF22C55E)
-        "accommodation" -> if (isDark) Color(0xFF2DD4BF) else Color(0xFF0D9488)
-        else -> if (isDark) Color(0xFF9CA3AF) else Color(0xFF6B7280)
+        "food" -> if (isDark) CategoryFoodDark else CategoryFood
+        "transport" -> if (isDark) CategoryTransportDark else CategoryTransport
+        "shopping" -> if (isDark) CategoryShoppingDark else CategoryShopping
+        "turf" -> if (isDark) CategoryTurfDark else CategoryTurf
+        "accommodation" -> if (isDark) CategoryAccommodationDark else CategoryAccommodation
+        else -> if (isDark) CategoryOtherDark else CategoryOther
     }
     val iconBgAlpha = if (isDark) 0.15f else 0.12f
+    val categoryLabelResId = when (expense.category) {
+        "food" -> R.string.cat_food
+        "transport" -> R.string.cat_transport
+        "shopping" -> R.string.cat_shopping
+        "turf" -> R.string.cat_turf
+        "accommodation" -> R.string.cat_accommodation
+        else -> R.string.cat_other
+    }
+    val displayDescription = expense.description.ifBlank { stringResource(categoryLabelResId) }
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(14.dp),
@@ -1191,10 +1213,10 @@ private fun ExpenseCard(
             Spacer(modifier = Modifier.width(12.dp))
             Column(modifier = Modifier.weight(1f)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(expense.description, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
+                    Text(displayDescription, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
                     if (expense.recurring != null) {
                         Spacer(modifier = Modifier.width(4.dp))
-                        Icon(Icons.Default.Repeat, contentDescription = "Recurring", modifier = Modifier.size(12.dp), tint = MaterialTheme.colorScheme.primary)
+                        Icon(Icons.Default.Repeat, contentDescription = stringResource(R.string.group_detail_recurring), modifier = Modifier.size(12.dp), tint = MaterialTheme.colorScheme.primary)
                     }
                 }
                 Spacer(modifier = Modifier.height(2.dp))
@@ -1224,10 +1246,10 @@ private fun ExpenseCard(
                 Spacer(modifier = Modifier.width(4.dp))
                 Column {
                     IconButton(onClick = { onEditExpense(expense.expenseId) }, modifier = Modifier.size(28.dp)) {
-                        Icon(Icons.Default.Edit, contentDescription = "Edit", modifier = Modifier.size(16.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Icon(Icons.Default.Edit, contentDescription = stringResource(R.string.common_edit), modifier = Modifier.size(16.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                     IconButton(onClick = { onDeleteExpense(expense.expenseId) }, modifier = Modifier.size(28.dp)) {
-                        Icon(Icons.Default.Delete, contentDescription = "Delete", modifier = Modifier.size(16.dp), tint = MaterialTheme.colorScheme.error.copy(alpha = 0.6f))
+                        Icon(Icons.Default.Delete, contentDescription = stringResource(R.string.group_detail_delete), modifier = Modifier.size(16.dp), tint = MaterialTheme.colorScheme.error.copy(alpha = 0.6f))
                     }
                 }
             }
@@ -1269,7 +1291,7 @@ private fun BalancesTab(
                 )
             ) {
                 Column(modifier = Modifier.padding(16.dp)) {
-                    Text("Your balance", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(stringResource(R.string.group_detail_your_balance), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     Spacer(modifier = Modifier.height(4.dp))
                     Text(
                         text = formatBase(myBalance),
@@ -1284,21 +1306,21 @@ private fun BalancesTab(
                     Spacer(modifier = Modifier.height(8.dp))
                     if (myDebts.isNotEmpty()) {
                         Text(
-                            "You owe ${myDebts.size} ${if (myDebts.size == 1) "person" else "people"} ${formatBase(totalOwed)}",
+                            stringResource(R.string.group_detail_you_owe_count, myDebts.size, if (myDebts.size == 1) stringResource(R.string.group_detail_person) else stringResource(R.string.group_detail_people), formatBase(totalOwed)),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.error
                         )
                     }
                     if (myCredits.isNotEmpty()) {
                         Text(
-                            "${myCredits.size} ${if (myCredits.size == 1) "person owes" else "people owe"} you ${formatBase(totalOwing)}",
+                            stringResource(R.string.group_detail_owes_you_count, myCredits.size, if (myCredits.size == 1) stringResource(R.string.group_detail_person_owes) else stringResource(R.string.group_detail_people_owe), formatBase(totalOwing)),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.primary
                         )
                     }
                     if (myDebts.isEmpty() && myCredits.isEmpty()) {
                         Text(
-                            "All settled up in this group",
+                            stringResource(R.string.group_detail_all_settled_group),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -1315,13 +1337,13 @@ private fun BalancesTab(
             ) {
                 Icon(Icons.Default.AccountBalanceWallet, contentDescription = null, modifier = Modifier.size(20.dp))
                 Spacer(modifier = Modifier.width(8.dp))
-                Text("Settle Up")
+                Text(stringResource(R.string.group_detail_settle_up))
             }
         }
 
         // Suggested settlements header
         if (debts.isNotEmpty()) {
-            Text("Suggested Settlements", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(top = 4.dp))
+            Text(stringResource(R.string.group_detail_suggested_settlements), style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(top = 4.dp))
 
             debts.forEach { debt ->
                 val isMyDebt = debt.fromUid == currentUserId
@@ -1349,9 +1371,9 @@ private fun BalancesTab(
                             Column(modifier = Modifier.weight(1f)) {
                                 Text(
                                     text = when {
-                                        isMyDebt -> "You owe $toFirstName"
-                                        isMyCredit -> "$fromFirstName owes you"
-                                        else -> "$fromFirstName owes $toFirstName"
+                                        isMyDebt -> stringResource(R.string.group_detail_you_owe_name, toFirstName)
+                                        isMyCredit -> stringResource(R.string.group_detail_name_owes_you, fromFirstName)
+                                        else -> stringResource(R.string.group_detail_name_owes_name, fromFirstName, toFirstName)
                                     },
                                     style = MaterialTheme.typography.bodyMedium,
                                     color = when {
@@ -1374,7 +1396,7 @@ private fun BalancesTab(
                                 if (paymentVpa.isNotEmpty() && isMyDebt) {
                                     Spacer(modifier = Modifier.height(2.dp))
                                     Text(
-                                        "Pay to: $paymentVpa",
+                                        stringResource(R.string.group_detail_pay_to, paymentVpa),
                                         style = MaterialTheme.typography.bodySmall,
                                         color = MaterialTheme.colorScheme.onSurfaceVariant
                                     )
@@ -1390,14 +1412,14 @@ private fun BalancesTab(
                                         modifier = Modifier.weight(1f),
                                         shape = RoundedCornerShape(12.dp)
                                     ) {
-                                        Text("Pay via UPI", style = MaterialTheme.typography.labelMedium)
+                                        Text(stringResource(R.string.group_detail_pay_via_upi), style = MaterialTheme.typography.labelMedium)
                                     }
                                     Button(
                                         onClick = { onSettleDebt(debt) },
                                         modifier = Modifier.weight(1f),
                                         shape = RoundedCornerShape(12.dp)
                                     ) {
-                                        Text("Mark Settled", style = MaterialTheme.typography.labelMedium)
+                                        Text(stringResource(R.string.group_detail_mark_settled), style = MaterialTheme.typography.labelMedium)
                                     }
                                 } else {
                                     Button(
@@ -1405,7 +1427,7 @@ private fun BalancesTab(
                                         modifier = Modifier.fillMaxWidth(),
                                         shape = RoundedCornerShape(12.dp)
                                     ) {
-                                        Text("Mark Settled", style = MaterialTheme.typography.labelMedium)
+                                        Text(stringResource(R.string.group_detail_mark_settled), style = MaterialTheme.typography.labelMedium)
                                     }
                                 }
                             }
@@ -1416,7 +1438,7 @@ private fun BalancesTab(
         }
 
         // Member balances header
-        Text("Member Balances", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(top = 4.dp))
+        Text(stringResource(R.string.group_detail_member_balances), style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(top = 4.dp))
 
         members.forEach { member ->
             val isMe = member.uid == currentUserId
@@ -1437,7 +1459,7 @@ private fun BalancesTab(
                     Spacer(modifier = Modifier.width(12.dp))
                     Column(modifier = Modifier.weight(1f)) {
                         Text(
-                            member.displayName + if (isMe) " (You)" else "",
+                            member.displayName + if (isMe) stringResource(R.string.group_detail_you_suffix) else "",
                             style = MaterialTheme.typography.titleSmall,
                             fontWeight = FontWeight.Medium
                         )
@@ -1447,7 +1469,7 @@ private fun BalancesTab(
                         AssistChip(
                             onClick = {},
                             leadingIcon = { Icon(Icons.Default.Schedule, contentDescription = null, modifier = Modifier.size(14.dp)) },
-                            label = { Text("pending", style = MaterialTheme.typography.labelSmall) }
+                            label = { Text(stringResource(R.string.group_detail_pending_label), style = MaterialTheme.typography.labelSmall) }
                         )
                     } else {
                         val color = when {
@@ -1456,9 +1478,9 @@ private fun BalancesTab(
                             else -> MaterialTheme.colorScheme.onSurfaceVariant
                         }
                         val text = when {
-                            member.balance > 0.01 -> if (isMe) "you'll get ${formatBase(member.balance)}" else "gets ${formatBase(member.balance)}"
-                            member.balance < -0.01 -> if (isMe) "you'll pay ${formatBase(-member.balance)}" else "owes ${formatBase(-member.balance)}"
-                            else -> "settled"
+                            member.balance > 0.01 -> if (isMe) stringResource(R.string.balance_youll_get, formatBase(member.balance)) else stringResource(R.string.balance_gets, formatBase(member.balance))
+                            member.balance < -0.01 -> if (isMe) stringResource(R.string.balance_youll_pay, formatBase(-member.balance)) else stringResource(R.string.balance_owes, formatBase(-member.balance))
+                            else -> stringResource(R.string.balance_settled_up)
                         }
                         Surface(
                             color = color.copy(alpha = 0.12f),
@@ -1489,17 +1511,17 @@ private fun MembersTab(members: List<Member>, currentUserId: String?, onInvite: 
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Text("Members (${members.size})", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
+            Text(stringResource(R.string.group_detail_members_with_count, members.size), style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 Button(onClick = onAddOffline, shape = RoundedCornerShape(12.dp)) {
                     Icon(Icons.Default.PersonAdd, contentDescription = null, modifier = Modifier.size(18.dp))
                     Spacer(modifier = Modifier.width(4.dp))
-                    Text("Add")
+                    Text(stringResource(R.string.group_detail_add))
                 }
                 Button(onClick = onInvite, shape = RoundedCornerShape(12.dp)) {
                     Icon(Icons.Default.PersonAdd, contentDescription = null, modifier = Modifier.size(18.dp))
                     Spacer(modifier = Modifier.width(4.dp))
-                    Text("Invite")
+                    Text(stringResource(R.string.group_detail_invite_btn))
                 }
             }
         }
@@ -1519,9 +1541,9 @@ private fun MembersTab(members: List<Member>, currentUserId: String?, onInvite: 
                     MemberAvatar(name = member.displayName, photoURL = member.photoURL, size = 40)
                     Spacer(modifier = Modifier.width(12.dp))
                     Column(modifier = Modifier.weight(1f)) {
-                        Text(member.displayName + if (member.uid == currentUserId) " (You)" else "", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Medium)
+                        Text(member.displayName + if (member.uid == currentUserId) stringResource(R.string.group_detail_you_suffix) else "", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Medium)
                         if (member.isOffline) {
-                            Text("Offline member", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text(stringResource(R.string.group_detail_offline_member), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         } else {
                             Text("@${member.username}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
@@ -1530,19 +1552,19 @@ private fun MembersTab(members: List<Member>, currentUserId: String?, onInvite: 
                         AssistChip(
                             onClick = {},
                             leadingIcon = { Icon(Icons.Default.CloudOff, contentDescription = null, modifier = Modifier.size(14.dp)) },
-                            label = { Text("offline", style = MaterialTheme.typography.labelSmall) }
+                            label = { Text(stringResource(R.string.group_detail_offline_label), style = MaterialTheme.typography.labelSmall) }
                         )
                     }
                     if (member.status == "pending") {
                         AssistChip(
                             onClick = {},
                             leadingIcon = { Icon(Icons.Default.Schedule, contentDescription = null, modifier = Modifier.size(14.dp)) },
-                            label = { Text("pending", style = MaterialTheme.typography.labelSmall) }
+                            label = { Text(stringResource(R.string.group_detail_pending_label), style = MaterialTheme.typography.labelSmall) }
                         )
                     }
                     if (member.role == MemberRole.ADMIN) {
                         Spacer(modifier = Modifier.width(4.dp))
-                        AssistChip(onClick = {}, label = { Text("admin", style = MaterialTheme.typography.labelSmall) })
+                        AssistChip(onClick = {}, label = { Text(stringResource(R.string.group_detail_admin_label), style = MaterialTheme.typography.labelSmall) })
                     }
                     val isCurrentUserAdmin = members.find { it.uid == currentUserId }?.role == MemberRole.ADMIN
                     if (isCurrentUserAdmin && !member.isOffline && member.uid != currentUserId && member.role != MemberRole.ADMIN) {
@@ -1550,7 +1572,7 @@ private fun MembersTab(members: List<Member>, currentUserId: String?, onInvite: 
                             onClick = { memberToRemove = member.uid to member.displayName },
                             modifier = Modifier.size(28.dp)
                         ) {
-                            Icon(Icons.Default.PersonRemove, contentDescription = "Remove member", modifier = Modifier.size(18.dp), tint = MaterialTheme.colorScheme.error.copy(alpha = 0.6f))
+                            Icon(Icons.Default.PersonRemove, contentDescription = stringResource(R.string.group_detail_remove_member), modifier = Modifier.size(18.dp), tint = MaterialTheme.colorScheme.error.copy(alpha = 0.6f))
                         }
                     }
                 }
@@ -1561,9 +1583,9 @@ private fun MembersTab(members: List<Member>, currentUserId: String?, onInvite: 
     memberToRemove?.let { (uid, name) ->
         AlertDialog(
             onDismissRequest = { memberToRemove = null },
-            title = { Text("Remove $name?") },
+            title = { Text(stringResource(R.string.group_detail_remove_confirm, name)) },
             text = {
-                Text("If they have any entries, they'll be converted to an offline member to preserve transaction history.")
+                Text(stringResource(R.string.group_detail_remove_msg))
             },
             confirmButton = {
                 TextButton(
@@ -1572,10 +1594,10 @@ private fun MembersTab(members: List<Member>, currentUserId: String?, onInvite: 
                         memberToRemove = null
                     },
                     colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)
-                ) { Text("Remove") }
+                ) { Text(stringResource(R.string.common_remove)) }
             },
             dismissButton = {
-                TextButton(onClick = { memberToRemove = null }) { Text("Cancel") }
+                TextButton(onClick = { memberToRemove = null }) { Text(stringResource(R.string.group_detail_cancel)) }
             }
         )
     }
@@ -1586,10 +1608,10 @@ private fun ActivityTab(
     activities: List<Activity>,
     settlements: List<Settlement>,
     settlementsLoading: Boolean,
-    settlementsError: String?,
+    @StringRes settlementsError: Int?,
     currentUserId: String?,
     isLoading: Boolean,
-    errorMessage: String? = null,
+    @StringRes errorMessage: Int? = null,
     formatBase: (Double) -> String,
     formatDate: (Long, Boolean) -> String,
     onLoadSettlements: () -> Unit,
@@ -1601,7 +1623,6 @@ private fun ActivityTab(
     onLoadMoreSettlements: () -> Unit = {}
 ) {
     var activityFilter by remember { mutableStateOf("all") }
-    val scrollState = rememberScrollState()
 
     LaunchedEffect(activityFilter) {
         if (activityFilter == "settlements" && settlements.isEmpty() && !settlementsLoading) {
@@ -1609,20 +1630,19 @@ private fun ActivityTab(
         }
     }
 
-    val shouldLoadMore by remember {
-        derivedStateOf {
-            scrollState.value >= scrollState.maxValue - 400 &&
-            if (activityFilter == "settlements") {
-                settlementsHasMore && !settlementsLoadingMore && settlements.isNotEmpty()
-            } else {
-                activitiesHasMore && !activitiesLoadingMore && activities.isNotEmpty()
+    // Load more when there are more items available. Previously used scroll
+    // position detection, but this tab is inside a LazyColumn so verticalScroll
+    // is not allowed — we trigger load more immediately when items exist and
+    // hasMore is true.
+    LaunchedEffect(activityFilter, settlementsHasMore, settlementsLoadingMore, settlements.size, activitiesHasMore, activitiesLoadingMore, activities.size) {
+        if (activityFilter == "settlements") {
+            if (settlementsHasMore && !settlementsLoadingMore && settlements.isNotEmpty()) {
+                onLoadMoreSettlements()
             }
-        }
-    }
-    LaunchedEffect(shouldLoadMore) {
-        if (shouldLoadMore) {
-            if (activityFilter == "settlements") onLoadMoreSettlements()
-            else onLoadMoreActivities()
+        } else {
+            if (activitiesHasMore && !activitiesLoadingMore && activities.isNotEmpty()) {
+                onLoadMoreActivities()
+            }
         }
     }
 
@@ -1635,12 +1655,12 @@ private fun ActivityTab(
             FilterChip(
                 selected = activityFilter == "all",
                 onClick = { activityFilter = "all" },
-                label = { Text("All") }
+                label = { Text(stringResource(R.string.group_detail_all)) }
             )
             FilterChip(
                 selected = activityFilter == "settlements",
                 onClick = { activityFilter = "settlements" },
-                label = { Text("Settlements") }
+                label = { Text(stringResource(R.string.group_detail_settlements)) }
             )
         }
 
@@ -1649,7 +1669,7 @@ private fun ActivityTab(
                 LoadingIndicator(modifier = Modifier.fillMaxWidth().padding(40.dp))
             } else if (settlementsError != null) {
                 Box(modifier = Modifier.fillMaxWidth().padding(top = 60.dp), contentAlignment = Alignment.Center) {
-                    Text(settlementsError, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodyMedium)
+                    Text(stringResource(settlementsError), color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodyMedium)
                 }
             } else if (settlements.isEmpty()) {
                 Box(
@@ -1659,21 +1679,23 @@ private fun ActivityTab(
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
                         Icon(Icons.Default.AccountBalanceWallet, contentDescription = null, modifier = Modifier.size(32.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f))
                         Spacer(modifier = Modifier.height(8.dp))
-                        Text("No settlements yet", fontSize = 14.sp, color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f))
+                        Text(stringResource(R.string.group_detail_no_settlements), fontSize = 14.sp, color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f))
                     }
                 }
             } else {
                 val isDark = isSystemInDarkTheme()
-                val settlementColor = if (isDark) Color(0xFF4ADE80) else Color(0xFF22C55E)
+                val settlementColor = if (isDark) BalancePositiveDark else BalancePositive
                 Column(
-                    modifier = Modifier.verticalScroll(scrollState),
+                    modifier = Modifier.fillMaxWidth(),
                     verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
                     settlements.forEach { s ->
                         val isFromMe = currentUserId == s.fromUid
                         val isToMe = currentUserId == s.toUid
-                        val fromName = if (isFromMe) "You" else s.fromName.split(" ").firstOrNull() ?: s.fromName
-                        val toName = if (isToMe) "you" else s.toName.split(" ").firstOrNull() ?: s.toName
+                        val fromName = if (isFromMe) stringResource(R.string.you) else s.fromName.split(" ").firstOrNull() ?: s.fromName
+                        val toName = if (isToMe) stringResource(R.string.you_lowercase) else s.toName.split(" ").firstOrNull() ?: s.toName
+                        val paidText = stringResource(R.string.settlement_paid, fromName, toName)
+                        val refText = if (s.upiRefId.isNotBlank()) stringResource(R.string.settlement_ref, s.upiRefId) else null
                         Card(
                             modifier = Modifier.fillMaxWidth(),
                             shape = RoundedCornerShape(14.dp),
@@ -1691,13 +1713,13 @@ private fun ActivityTab(
                                 }
                                 Spacer(modifier = Modifier.width(12.dp))
                                 Column(modifier = Modifier.weight(1f)) {
-                                    Text("$fromName paid $toName", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
+                                    Text(paidText, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
                                     Spacer(modifier = Modifier.height(2.dp))
                                     Text(
                                         buildString {
                                             if (s.date > 0) append(formatDate(s.date, false))
                                             append(" · ${s.method.name.lowercase()}")
-                                            if (s.upiRefId.isNotBlank()) append(" · Ref: ${s.upiRefId}")
+                                            if (refText != null) append(" · $refText")
                                         },
                                         style = MaterialTheme.typography.bodySmall,
                                         color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -1723,9 +1745,9 @@ private fun ActivityTab(
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
                         Icon(Icons.Default.Warning, contentDescription = null, modifier = Modifier.size(48.dp), tint = MaterialTheme.colorScheme.error)
                         Spacer(modifier = Modifier.height(12.dp))
-                        Text("Failed to load activity", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.error)
+                        Text(stringResource(R.string.group_detail_failed_load_activity), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.error)
                         Spacer(modifier = Modifier.height(4.dp))
-                        Text(errorMessage, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text(stringResource(errorMessage), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 }
             } else if (activities.isEmpty()) {
@@ -1736,12 +1758,12 @@ private fun ActivityTab(
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
                         Icon(Icons.AutoMirrored.Filled.List, contentDescription = null, modifier = Modifier.size(32.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f))
                         Spacer(modifier = Modifier.height(8.dp))
-                        Text("No recent activity", fontSize = 14.sp, color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f))
+                        Text(stringResource(R.string.group_detail_no_recent_activity), fontSize = 14.sp, color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f))
                     }
                 }
             } else {
                 Column(
-                    modifier = Modifier.verticalScroll(scrollState),
+                    modifier = Modifier.fillMaxWidth(),
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     activities.forEach { activity ->
@@ -1773,11 +1795,11 @@ private fun ActivityTab(
                                             MemberAvatar(name = activity.userName, photoURL = activity.userPhotoURL, size = 16)
                                             Spacer(modifier = Modifier.width(4.dp))
                                         }
-                                        Text(activity.userName + if (activity.userId == currentUserId) " (You)" else "", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                        Text(activity.userName + if (activity.userId == currentUserId) stringResource(R.string.group_detail_you_suffix) else "", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                                         Spacer(modifier = Modifier.width(4.dp))
                                         Text("·", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                                         Spacer(modifier = Modifier.width(4.dp))
-                                        Text(DateUtils.formatRelativeTime(activity.createdAt), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                        Text(formatRelativeTimeText(activity.createdAt), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                                     }
                                 }
                             }
@@ -1796,14 +1818,14 @@ private fun ActivityTab(
 private fun activityIcon(type: String): Pair<androidx.compose.ui.graphics.vector.ImageVector, Color> {
     val isDark = isSystemInDarkTheme()
     return when (type) {
-        "expense_added", "expense_updated", "expense_deleted" -> Icons.Default.Receipt to if (isDark) Color(0xFFFBBF24) else Color(0xFFF59E0B)
-        "income_added", "income_updated", "income_deleted" -> Icons.Default.TrendingUp to if (isDark) Color(0xFF4ADE80) else Color(0xFF22C55E)
-        "settlement_added" -> Icons.Default.AccountBalanceWallet to if (isDark) Color(0xFF4ADE80) else Color(0xFF22C55E)
-        "member_joined" -> Icons.Default.PersonAdd to if (isDark) Color(0xFF818CF8) else Color(0xFF6366F1)
-        "member_left" -> Icons.Default.PersonRemove to if (isDark) Color(0xFFF87171) else Color(0xFFEF4444)
-        "member_removed" -> Icons.Default.PersonRemove to if (isDark) Color(0xFFF87171) else Color(0xFFEF4444)
-        "group_created" -> Icons.Default.Group to if (isDark) Color(0xFF2DD4BF) else Color(0xFF0D9488)
-        else -> Icons.Default.Info to if (isDark) Color(0xFF9CA3AF) else Color(0xFF6B7280)
+        "expense_added", "expense_updated", "expense_deleted" -> Icons.Default.Receipt to if (isDark) TemplateCasualDark else TemplateCasual
+        "income_added", "income_updated", "income_deleted" -> Icons.Default.TrendingUp to if (isDark) BalancePositiveDark else BalancePositive
+        "settlement_added" -> Icons.Default.AccountBalanceWallet to if (isDark) BalancePositiveDark else BalancePositive
+        "member_joined" -> Icons.Default.PersonAdd to if (isDark) TemplateTripDark else TemplateTrip
+        "member_left" -> Icons.Default.PersonRemove to if (isDark) BalanceNegativeDark else BalanceNegative
+        "member_removed" -> Icons.Default.PersonRemove to if (isDark) BalanceNegativeDark else BalanceNegative
+        "group_created" -> Icons.Default.Group to if (isDark) TemplateHouseholdDark else TemplateHousehold
+        else -> Icons.Default.Info to if (isDark) CategoryOtherDark else CategoryOther
     }
 }
 

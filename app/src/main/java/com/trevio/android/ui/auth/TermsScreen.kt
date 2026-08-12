@@ -1,5 +1,6 @@
 package com.trevio.android.ui.auth
 
+import androidx.annotation.StringRes
 import androidx.compose.foundation.background
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
@@ -22,11 +23,14 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.trevio.android.R
+import com.trevio.android.core.designsystem.theme.*
 import com.trevio.android.core.navigation.TrevioRoute
 import com.trevio.android.domain.repository.UserService
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -44,7 +48,7 @@ class TermsViewModel @Inject constructor(
         data object Idle : TermsState()
         data object Loading : TermsState()
         data object Accepted : TermsState()
-        data class Error(val message: String) : TermsState()
+        data class Error(@StringRes val resId: Int) : TermsState()
     }
 
     private val _state = MutableStateFlow<TermsState>(TermsState.Idle)
@@ -55,7 +59,7 @@ class TermsViewModel @Inject constructor(
         viewModelScope.launch {
             userService.acceptTnC()
                 .onSuccess { _state.value = TermsState.Accepted }
-                .onFailure { _state.value = TermsState.Error(it.message ?: "Failed to accept") }
+                .onFailure { _state.value = TermsState.Error(R.string.terms_failed_accept) }
         }
     }
 }
@@ -71,7 +75,7 @@ fun TermsScreen(
 
     LaunchedEffect(state) {
         if (state is TermsViewModel.TermsState.Accepted) {
-            navController.navigate(TrevioRoute.Main.route) {
+            navController.navigate(TrevioRoute.PhoneSetup.route) {
                 popUpTo(0) { inclusive = true }
             }
         }
@@ -97,14 +101,14 @@ fun TermsScreen(
         ) {
             Column {
                 Text(
-                    text = "Welcome to Trevio",
+                    text = stringResource(R.string.terms_welcome),
                     style = MaterialTheme.typography.headlineMedium,
                     fontWeight = FontWeight.Bold,
                     color = Color.White
                 )
                 Spacer(modifier = Modifier.height(8.dp))
                 Text(
-                    text = "Before you get started, please review and accept our terms.",
+                    text = stringResource(R.string.terms_intro),
                     style = MaterialTheme.typography.bodyMedium,
                     color = Color.White.copy(alpha = 0.85f)
                 )
@@ -120,33 +124,33 @@ fun TermsScreen(
             val isDark = isSystemInDarkTheme()
             TermsSectionCard(
                 icon = Icons.Default.VerifiedUser,
-                iconColor = if (isDark) Color(0xFF818CF8) else Color(0xFF6366F1),
-                title = "1. Acceptance of Terms",
-                body = "By using Trevio, you agree to these terms and conditions. If you do not agree, please do not use the app."
+                iconColor = if (isDark) TrevioSecondaryDarkTheme else TrevioSecondary,
+                title = stringResource(R.string.terms_acceptance_title),
+                body = stringResource(R.string.terms_acceptance_body)
             )
             TermsSectionCard(
                 icon = Icons.Default.Lock,
-                iconColor = if (isDark) Color(0xFF4ADE80) else Color(0xFF22C55E),
-                title = "2. Privacy & Data",
-                body = "Trevio stores your name, email, and profile photo from your Google account. We use this to identify you and facilitate group expense splitting. Your data is stored securely in Firebase."
+                iconColor = if (isDark) BalancePositiveDark else BalancePositive,
+                title = stringResource(R.string.terms_privacy_title),
+                body = stringResource(R.string.terms_privacy_body)
             )
             TermsSectionCard(
                 icon = Icons.Default.Payments,
-                iconColor = if (isDark) Color(0xFFFBBF24) else Color(0xFFF59E0B),
-                title = "3. Financial Data",
-                body = "Trevio helps track expenses and settlements between users. We do not process actual payments. All settlements are tracked in-app. UPI deep links redirect you to your preferred payment app."
+                iconColor = if (isDark) TrevioWarningDarkTheme else TrevioWarning,
+                title = stringResource(R.string.terms_financial_title),
+                body = stringResource(R.string.terms_financial_body)
             )
             TermsSectionCard(
                 icon = Icons.Default.Gavel,
-                iconColor = if (isDark) Color(0xFFF472B6) else Color(0xFFEC4899),
-                title = "4. User Conduct",
-                body = "You are responsible for the expenses and settlements you add. Do not create fraudulent or misleading expense entries."
+                iconColor = if (isDark) CategoryShoppingDark else CategoryShopping,
+                title = stringResource(R.string.terms_conduct_title),
+                body = stringResource(R.string.terms_conduct_body)
             )
             TermsSectionCard(
                 icon = Icons.Default.PersonOff,
-                iconColor = if (isDark) Color(0xFFF87171) else Color(0xFFEF4444),
-                title = "5. Account Termination",
-                body = "You can delete your account at any time. Upon deletion, your data will be removed from our servers."
+                iconColor = if (isDark) BalanceNegativeDark else BalanceNegative,
+                title = stringResource(R.string.terms_termination_title),
+                body = stringResource(R.string.terms_termination_body)
             )
 
             Spacer(modifier = Modifier.height(8.dp))
@@ -169,7 +173,7 @@ fun TermsScreen(
                         )
                     )
                     Text(
-                        text = "I have read and agree to the Terms & Conditions",
+                        text = stringResource(R.string.terms_agree),
                         style = MaterialTheme.typography.bodyMedium,
                         fontWeight = FontWeight.Medium
                     )
@@ -195,14 +199,14 @@ fun TermsScreen(
                 } else {
                     Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(20.dp))
                     Spacer(modifier = Modifier.width(8.dp))
-                    Text("Accept & Continue", style = MaterialTheme.typography.titleMedium)
+                    Text(stringResource(R.string.terms_accept), style = MaterialTheme.typography.titleMedium)
                 }
             }
 
             if (state is TermsViewModel.TermsState.Error) {
                 Spacer(modifier = Modifier.height(8.dp))
                 Text(
-                    text = (state as TermsViewModel.TermsState.Error).message,
+                    text = stringResource((state as TermsViewModel.TermsState.Error).resId),
                     color = MaterialTheme.colorScheme.error,
                     style = MaterialTheme.typography.bodySmall
                 )

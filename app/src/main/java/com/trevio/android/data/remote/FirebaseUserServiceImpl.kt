@@ -6,6 +6,7 @@ import com.google.firebase.firestore.FirebaseFirestore
 import com.trevio.android.domain.model.User
 import com.trevio.android.domain.model.UserSearchResult
 import com.trevio.android.domain.repository.UserService
+import com.trevio.android.util.AppConstants
 import com.trevio.android.util.Calculations
 import com.trevio.android.util.friendlyNetworkMessage
 import kotlinx.coroutines.tasks.await
@@ -31,7 +32,7 @@ class FirebaseUserServiceImpl @Inject constructor(
                     lastName = data["lastName"] as? String ?: "",
                     username = data["username"] as? String ?: "",
                     photoURL = data["photoURL"] as? String ?: "",
-                    defaultCurrency = data["defaultCurrency"] as? String ?: "INR",
+                    defaultCurrency = data["defaultCurrency"] as? String ?: AppConstants.BASE_CURRENCY,
                     acceptedTnC = data["acceptedTnC"] as? Boolean ?: false,
                     role = data["role"] as? String ?: "user",
                     blocked = data["blocked"] as? Boolean ?: false,

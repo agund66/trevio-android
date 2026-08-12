@@ -1,5 +1,6 @@
 package com.trevio.android.ui.expense
 
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -13,6 +14,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.Category
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Repeat
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -20,14 +22,17 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.annotation.StringRes
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.trevio.android.core.designsystem.components.TrevioHeader
+import com.trevio.android.core.designsystem.theme.*
 import com.trevio.android.domain.model.BillItem
 import com.trevio.android.domain.model.ItemizedSplitData
 import com.trevio.android.domain.model.SplitEntry
@@ -38,10 +43,16 @@ import com.trevio.android.domain.repository.ExpenseService
 import com.trevio.android.domain.repository.GroupService
 import com.trevio.android.domain.repository.SettlementService
 import com.trevio.android.util.CurrencyConverter
+import com.trevio.android.util.ExpressionParser
+import com.trevio.android.util.AppConstants
+import com.trevio.android.util.SplitBuilder
 import com.trevio.android.util.HouseholdCategories
 import com.trevio.android.util.MemberStatus
+import com.trevio.android.util.toStringResId
 import com.trevio.android.util.rememberCurrencyFormatter
+import com.trevio.android.R
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
@@ -63,7 +74,7 @@ class ExpenseViewModel @Inject constructor(
 
     data class ExpenseFormState(
         val isLoading: Boolean = false,
-        val error: String? = null,
+        @StringRes val error: Int? = null,
         val saved: Boolean = false,
         val members: List<com.trevio.android.domain.model.Member> = emptyList(),
         val isHousehold: Boolean = false,
@@ -90,7 +101,7 @@ class ExpenseViewModel @Inject constructor(
         viewModelScope.launch {
             settlementService.getGroupBalances(groupId)
                 .onSuccess { members -> _state.value = _state.value.copy(members = members) }
-                .onFailure { e -> _state.value = _state.value.copy(error = e.message) }
+                .onFailure { e -> _state.value = _state.value.copy(error = e.toStringResId()) }
         }
     }
 
@@ -105,6 +116,95 @@ class ExpenseViewModel @Inject constructor(
         }
     }
 
+    // ---- SplitBuilder wrappers (UI should call these, not SplitBuilder) ----
+
+    /**
+     * Compute a split summary (total entered vs. target) for the given split configuration.
+     * Returns null for EQUAL splits or when there is nothing to summarize.
+     */
+    fun computeSplitSummary(
+        splitType: SplitType,
+        splitValues: Map<String, String>,
+        amount: Double,
+        excludedMemberUids: Set<String> = emptySet()
+    ): SplitBuilder.SplitSummary? {
+        val memberUids = includedMemberUids(excludedMemberUids)
+        return SplitBuilder.computeSummary(splitType, splitValues, memberUids, amount)
+    }
+
+    /**
+     * Validate the current split configuration.
+     */
+    fun isSplitValid(
+        splitType: SplitType,
+        splitValues: Map<String, String>,
+        amount: Double,
+        itemizedData: ItemizedSplitData,
+        excludedMemberUids: Set<String> = emptySet()
+    ): Boolean {
+        val memberUids = includedMemberUids(excludedMemberUids)
+        return SplitBuilder.isValid(splitType, splitValues, memberUids, amount, itemizedData)
+    }
+
+    /**
+     * Build the [SplitEntry] map for the given split configuration.
+     */
+    fun buildSplits(
+        splitType: SplitType,
+        splitValues: Map<String, String>,
+        excludedMemberUids: Set<String> = emptySet()
+    ): Map<String, SplitEntry> {
+        val memberUids = includedMemberUids(excludedMemberUids)
+        return SplitBuilder.buildSplits(splitType, splitValues, memberUids)
+    }
+
+    /**
+     * Validate the split, build the splits, and call [addExpense] in one step.
+     * Sets [ExpenseFormState.error] and returns early when the split is invalid.
+     */
+    fun prepareAndSaveExpense(
+        description: String,
+        amount: Double,
+        currency: String,
+        paidBy: String,
+        splitType: SplitType,
+        splitValues: Map<String, String>,
+        category: String,
+        date: Long = System.currentTimeMillis(),
+        note: String = "",
+        recurring: com.trevio.android.domain.model.RecurringConfig? = null,
+        itemizedData: ItemizedSplitData? = null,
+        transactionType: TransactionType = TransactionType.EXPENSE,
+        excludedMemberUids: Set<String> = emptySet()
+    ) {
+        val memberUids = includedMemberUids(excludedMemberUids)
+        if (!SplitBuilder.isValid(splitType, splitValues, memberUids, amount, itemizedData ?: ItemizedSplitData())) {
+            _state.value = _state.value.copy(isLoading = false, error = R.string.add_expense_split_incomplete)
+            return
+        }
+        val splits = SplitBuilder.buildSplits(splitType, splitValues, memberUids)
+        addExpense(
+            description = description,
+            amount = amount,
+            currency = currency,
+            paidBy = paidBy,
+            splitType = splitType,
+            splits = splits,
+            memberUids = memberUids,
+            category = category,
+            date = date,
+            note = note,
+            recurring = recurring,
+            itemizedData = itemizedData,
+            transactionType = transactionType
+        )
+    }
+
+    private fun includedMemberUids(excludedMemberUids: Set<String>): List<String> =
+        _state.value.members
+            .filter { it.status == MemberStatus.ACTIVE && it.uid !in excludedMemberUids }
+            .map { it.uid }
+
     fun addExpense(
         description: String,
         amount: Double,
@@ -112,6 +212,7 @@ class ExpenseViewModel @Inject constructor(
         paidBy: String,
         splitType: SplitType,
         splits: Map<String, SplitEntry>,
+        memberUids: List<String>,
         category: String,
         date: Long = System.currentTimeMillis(),
         note: String = "",
@@ -121,7 +222,6 @@ class ExpenseViewModel @Inject constructor(
     ) {
         _state.value = _state.value.copy(isLoading = true, error = null)
         viewModelScope.launch {
-            val memberUids = _state.value.members.filter { it.status == MemberStatus.ACTIVE }.map { it.uid }
             expenseService.addExpense(
                 groupId = groupId,
                 description = description,
@@ -140,7 +240,7 @@ class ExpenseViewModel @Inject constructor(
             ).onSuccess {
                 _state.value = _state.value.copy(isLoading = false, saved = true)
             }.onFailure { e ->
-                _state.value = _state.value.copy(isLoading = false, error = e.message)
+                _state.value = _state.value.copy(isLoading = false, error = e.toStringResId())
             }
         }
     }
@@ -163,6 +263,7 @@ fun AddExpenseScreen(
     val state by viewModel.state.collectAsState()
     val currencyFormatter = rememberCurrencyFormatter()
     var currency by remember { mutableStateOf(currencyFormatter.userCurrency) }
+    var userChangedCurrency by remember { mutableStateOf(false) }
     val members = state.members
     val isHousehold = state.isHousehold
     var isIncome by remember { mutableStateOf(false) }
@@ -170,6 +271,7 @@ fun AddExpenseScreen(
     val splitValues = remember { mutableStateMapOf<String, String>() }
     val currentUserId = state.currentUserId
     var saveAndAddAnother by remember { mutableStateOf(false) }
+    var showSuccess by remember { mutableStateOf(false) }
     var note by remember { mutableStateOf("") }
     var isRecurring by remember { mutableStateOf(false) }
     var recurringFrequency by remember { mutableStateOf(com.trevio.android.domain.model.RecurringFrequency.MONTHLY) }
@@ -185,14 +287,26 @@ fun AddExpenseScreen(
         CurrencyConverter.getCurrencySymbol(currency)
     }
 
+    // Sync the form's currency with the formatter's user currency once it loads
+    // asynchronously. Only update when the user hasn't manually chosen a currency,
+    // so the expense is saved in the user's actual currency instead of the default.
+    LaunchedEffect(currencyFormatter.userCurrency) {
+        if (!userChangedCurrency && currency != currencyFormatter.userCurrency) {
+            currency = currencyFormatter.userCurrency
+        }
+    }
+
     LaunchedEffect(state.saved) {
         if (state.saved) {
             navController.previousBackStackEntry?.savedStateHandle?.set("needsRefresh", true)
+            showSuccess = true
             if (saveAndAddAnother) {
+                delay(AppConstants.SAVE_AND_ADD_DELAY_MS)
+                showSuccess = false
                 viewModel.resetSaved()
                 description = ""
                 amountStr = ""
-                category = "other"
+                category = AppConstants.DEFAULT_CATEGORY
                 splitType = SplitType.EQUAL
                 splitValues.clear()
                 excludedMembers.clear()
@@ -203,6 +317,7 @@ fun AddExpenseScreen(
                 itemizedData = ItemizedSplitData()
                 saveAndAddAnother = false
             } else {
+                delay(AppConstants.SAVE_AND_ADD_DELAY_MS)
                 navController.popBackStack()
             }
         }
@@ -216,68 +331,22 @@ fun AddExpenseScreen(
     }
 
     val amount = remember(amountStr) {
-        val cleaned = amountStr.replace(Regex("[^0-9.+\\-*/]"), "")
-        if (cleaned.isEmpty()) 0.0
-        else if (!cleaned.any { it == '+' || it == '-' || it == '*' || it == '/' }) {
-            cleaned.toDoubleOrNull() ?: 0.0
-        } else {
-            try {
-                evaluateExpression(cleaned)
-            } catch (e: Exception) {
-                cleaned.toDoubleOrNull() ?: 0.0
-            }
-        }
+        ExpressionParser.parseAmount(amountStr)
     }
     val activeMembers = members.filter { it.status == MemberStatus.ACTIVE }
     val includedMembers = activeMembers.filter { excludedMembers[it.uid] != true }
     val equalPerPerson = if (splitType == SplitType.EQUAL && amount > 0.0 && includedMembers.isNotEmpty()) amount / includedMembers.size else 0.0
 
-    val splitSummary = remember(splitType, splitValues.toMap(), amount, includedMembers) {
-        if (splitType == SplitType.EQUAL || amount <= 0.0) null
-        else {
-            var totalEntered = 0.0
-            for (m in includedMembers) {
-                totalEntered += splitValues[m.uid]?.toDoubleOrNull() ?: 0.0
-            }
-            when (splitType) {
-                SplitType.PERCENT -> Pair(totalEntered, 100.0)
-                SplitType.EXACT -> Pair(totalEntered, amount)
-                SplitType.SHARES -> Pair(totalEntered, 0.0)
-                else -> null
-            }
-        }
+    val excludedUids = remember(excludedMembers.toMap()) {
+        excludedMembers.filterValues { it }.keys
     }
 
-    val isSplitValid = remember(splitType, splitValues.toMap(), amount, includedMembers, splitSummary, itemizedData) {
-        if (splitType == SplitType.EQUAL) includedMembers.isNotEmpty()
-        else if (splitType == SplitType.ITEMIZED) {
-            if (itemizedData.items.isEmpty()) false
-            else itemizedData.items.all { it.name.isNotBlank() && it.amount > 0.0 && it.assignedTo.isNotEmpty() }
-        }
-        else if (amount <= 0.0 || includedMembers.isEmpty()) false
-        else if (splitType == SplitType.SHARES) {
-            splitValues.values.any { (it.toDoubleOrNull() ?: 0.0) > 0.0 }
-        }
-        else splitSummary != null && kotlin.math.abs(splitSummary.first - splitSummary.second) < 0.01
+    val splitSummary = remember(splitType, splitValues.toMap(), amount, excludedUids) {
+        viewModel.computeSplitSummary(splitType, splitValues.toMap(), amount, excludedUids)
     }
 
-    val buildSplits: () -> Map<String, SplitEntry> = {
-        if (splitType == SplitType.EQUAL || splitType == SplitType.ITEMIZED) emptyMap()
-        else {
-            val result = mutableMapOf<String, SplitEntry>()
-            for (m in includedMembers) {
-                val v = splitValues[m.uid]?.toDoubleOrNull() ?: 0.0
-                if (v > 0.0) {
-                    when (splitType) {
-                        SplitType.SHARES -> result[m.uid] = SplitEntry(amount = 0.0, shareValue = v)
-                        SplitType.PERCENT -> result[m.uid] = SplitEntry(amount = 0.0, shareValue = v)
-                        SplitType.EXACT -> result[m.uid] = SplitEntry(amount = v)
-                        else -> {}
-                    }
-                }
-            }
-            result
-        }
+    val isSplitValid = remember(splitType, splitValues.toMap(), amount, excludedUids, itemizedData) {
+        viewModel.isSplitValid(splitType, splitValues.toMap(), amount, itemizedData, excludedUids)
     }
 
     val effectivePaidBy = paidByUid.ifEmpty {
@@ -294,7 +363,7 @@ fun AddExpenseScreen(
 
     Column(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
         TrevioHeader(
-            title = if (isHousehold) "Add Entry" else "Add Expense",
+            title = if (isHousehold) stringResource(R.string.add_expense_title_household) else stringResource(R.string.add_expense_title),
             onBack = { navController.popBackStack() }
         )
         Column(
@@ -306,7 +375,7 @@ fun AddExpenseScreen(
             OutlinedTextField(
                 value = amountStr,
                 onValueChange = { amountStr = it.filter { c -> c.isDigit() || c == '.' || c == '+' || c == '-' || c == '*' || c == '/' } },
-                label = { Text("Amount ($currencySymbol)") },
+                label = { Text(stringResource(R.string.add_expense_amount_label, currencySymbol)) },
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                 modifier = Modifier.fillMaxWidth(),
                 textStyle = MaterialTheme.typography.headlineMedium,
@@ -314,7 +383,7 @@ fun AddExpenseScreen(
             )
             if (amount > 0.0 && amountStr.any { it == '+' || it == '-' || it == '*' || it == '/' }) {
                 Spacer(modifier = Modifier.height(4.dp))
-                Text("= $currencySymbol${String.format(Locale.getDefault(), "%,.2f", amount)}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary)
+                Text(stringResource(R.string.add_expense_calc_result, currencySymbol, String.format(Locale.getDefault(), "%,.2f", amount)), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary)
             }
             Spacer(modifier = Modifier.height(8.dp))
             Row(
@@ -322,11 +391,11 @@ fun AddExpenseScreen(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Text("Quick calc:", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(stringResource(R.string.add_expense_quick_calc), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 listOf("+" to "+", "−" to "-", "×" to "*", "÷" to "/").forEach { (label, op) ->
                     OutlinedButton(
                         onClick = { amountStr = amountStr + op },
-                        modifier = Modifier.size(36.dp),
+                        modifier = Modifier.size(40.dp),
                         contentPadding = PaddingValues(0.dp),
                         shape = RoundedCornerShape(8.dp)
                     ) {
@@ -338,7 +407,7 @@ fun AddExpenseScreen(
                         onClick = { amountStr = "" },
                         contentPadding = PaddingValues(horizontal = 8.dp)
                     ) {
-                        Text("Clear", style = MaterialTheme.typography.bodySmall)
+                        Text(stringResource(R.string.add_expense_clear), style = MaterialTheme.typography.bodySmall)
                     }
                 }
             }
@@ -347,7 +416,7 @@ fun AddExpenseScreen(
             OutlinedTextField(
                 value = description,
                 onValueChange = { if (it.length <= 500) description = it },
-                label = { Text("Description") },
+                label = { Text(stringResource(R.string.add_expense_description)) },
                 modifier = Modifier.fillMaxWidth(),
                 singleLine = true,
                 shape = RoundedCornerShape(12.dp)
@@ -357,14 +426,14 @@ fun AddExpenseScreen(
             OutlinedTextField(
                 value = expenseDateStr,
                 onValueChange = { },
-                label = { Text("Date") },
+                label = { Text(stringResource(R.string.add_expense_date)) },
                 modifier = Modifier.fillMaxWidth(),
                 readOnly = true,
                 singleLine = true,
                 shape = RoundedCornerShape(12.dp),
                 trailingIcon = {
                     IconButton(onClick = { showDatePicker = true }) {
-                        Icon(Icons.Default.CalendarMonth, contentDescription = "Pick date")
+                        Icon(Icons.Default.CalendarMonth, contentDescription = stringResource(R.string.add_expense_pick_date))
                     }
                 }
             )
@@ -389,7 +458,7 @@ fun AddExpenseScreen(
                         contentAlignment = Alignment.Center
                     ) {
                         Text(
-                            "Spent",
+                            stringResource(R.string.add_expense_spent),
                             color = if (!isIncome) Color.White else MaterialTheme.colorScheme.onSurfaceVariant,
                             fontWeight = if (!isIncome) FontWeight.SemiBold else FontWeight.Normal
                         )
@@ -404,7 +473,7 @@ fun AddExpenseScreen(
                         contentAlignment = Alignment.Center
                     ) {
                         Text(
-                            "Received",
+                            stringResource(R.string.add_expense_received),
                             color = if (isIncome) Color.White else MaterialTheme.colorScheme.onSurfaceVariant,
                             fontWeight = if (isIncome) FontWeight.SemiBold else FontWeight.Normal
                         )
@@ -413,7 +482,7 @@ fun AddExpenseScreen(
                 Spacer(modifier = Modifier.height(12.dp))
             }
 
-            SectionLabel("Category")
+            SectionLabel(stringResource(R.string.add_expense_category))
             Spacer(modifier = Modifier.height(8.dp))
             if (isHousehold) {
                 // Household categories with icons
@@ -423,7 +492,7 @@ fun AddExpenseScreen(
                         FilterChip(
                             selected = category == cat.key,
                             onClick = { category = cat.key },
-                            label = { Text(cat.label) },
+                            label = { Text(stringResource(cat.labelResId)) },
                             leadingIcon = {
                                 Icon(
                                     imageVector = cat.icon,
@@ -437,18 +506,8 @@ fun AddExpenseScreen(
                 }
             } else {
                 val categories = listOf("food", "transport", "shopping", "turf", "accommodation", "other")
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    categories.take(3).forEach { cat ->
-                        FilterChip(
-                            selected = category == cat,
-                            onClick = { category = cat },
-                            label = { Text(cat.replaceFirstChar { it.uppercase() }) }
-                        )
-                    }
-                }
-                Spacer(modifier = Modifier.height(8.dp))
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    categories.drop(3).forEach { cat ->
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    categories.forEach { cat ->
                         FilterChip(
                             selected = category == cat,
                             onClick = { category = cat },
@@ -459,10 +518,10 @@ fun AddExpenseScreen(
             }
 
             Spacer(modifier = Modifier.height(16.dp))
-            SectionLabel("Paid by")
+            SectionLabel(stringResource(R.string.add_expense_paid_by))
             Spacer(modifier = Modifier.height(8.dp))
             if (members.isEmpty()) {
-                Text("Loading members...", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(stringResource(R.string.add_expense_loading_members), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             } else {
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     activeMembers.forEach { member ->
@@ -471,7 +530,7 @@ fun AddExpenseScreen(
                             onClick = { paidByUid = member.uid },
                             label = {
                                 val name = member.displayName.split(" ").firstOrNull() ?: ""
-                                Text(if (member.uid == currentUserId) "$name (You)" else name)
+                                Text(if (member.uid == currentUserId) "$name (${stringResource(R.string.add_expense_you)})" else name)
                             }
                         )
                     }
@@ -481,14 +540,24 @@ fun AddExpenseScreen(
             // Split section — hidden for household groups
             if (!isHousehold) {
             Spacer(modifier = Modifier.height(16.dp))
-            SectionLabel("Split method")
+            SectionLabel(stringResource(R.string.add_expense_split_method))
             Spacer(modifier = Modifier.height(8.dp))
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 SplitType.values().forEach { st ->
                     FilterChip(
                         selected = splitType == st,
                         onClick = { splitType = st },
-                        label = { Text(st.name.lowercase().replaceFirstChar { it.uppercase() }) }
+                        label = {
+                            Text(
+                                when (st) {
+                                    SplitType.EQUAL -> stringResource(R.string.add_expense_equal)
+                                    SplitType.EXACT -> stringResource(R.string.add_expense_exact)
+                                    SplitType.PERCENT -> stringResource(R.string.add_expense_percent)
+                                    SplitType.SHARES -> stringResource(R.string.add_expense_shares)
+                                    SplitType.ITEMIZED -> stringResource(R.string.add_expense_itemized)
+                                }
+                            )
+                        }
                     )
                 }
             }
@@ -506,12 +575,12 @@ fun AddExpenseScreen(
                             horizontalArrangement = Arrangement.SpaceBetween
                         ) {
                             Text(
-                                "$currencySymbol${String.format(Locale.getDefault(), "%,.2f", equalPerPerson)} per person",
+                                stringResource(R.string.add_expense_per_person, "$currencySymbol${String.format(Locale.getDefault(), "%,.2f", equalPerPerson)}"),
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.primary
                             )
                             Text(
-                                "${includedMembers.size} of ${activeMembers.size} members",
+                                stringResource(R.string.add_expense_members_count, includedMembers.size, activeMembers.size),
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
@@ -527,7 +596,7 @@ fun AddExpenseScreen(
                                     },
                                     label = {
                                         val name = member.displayName.split(" ").firstOrNull() ?: ""
-                                        Text(if (member.uid == currentUserId) "$name (You)" else name)
+                                        Text(if (member.uid == currentUserId) "$name (${stringResource(R.string.add_expense_you)})" else name)
                                     }
                                 )
                             }
@@ -560,16 +629,16 @@ fun AddExpenseScreen(
                         ) {
                             Text(
                                 when (splitType) {
-                                    SplitType.EXACT -> "Enter exact amount per member"
-                                    SplitType.PERCENT -> "Enter percentage per member"
-                                    SplitType.SHARES -> "Enter shares per member"
+                                    SplitType.EXACT -> stringResource(R.string.add_expense_enter_exact)
+                                    SplitType.PERCENT -> stringResource(R.string.add_expense_enter_percent)
+                                    SplitType.SHARES -> stringResource(R.string.add_expense_enter_shares)
                                     else -> ""
                                 },
                                 style = MaterialTheme.typography.bodySmall
                             )
                             if (splitSummary != null && splitType != SplitType.SHARES) {
                                 Text(
-                                    "${splitSummary.first}/${splitSummary.second}" + if (splitType == SplitType.PERCENT) "%" else "",
+                                    "${splitSummary.totalEntered}/${splitSummary.target}" + if (splitType == SplitType.PERCENT) "%" else "",
                                     style = MaterialTheme.typography.bodySmall,
                                     color = if (isSplitValid) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error
                                 )
@@ -589,7 +658,7 @@ fun AddExpenseScreen(
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 val name = member.displayName.split(" ").firstOrNull() ?: ""
-                                Text(if (member.uid == currentUserId) "$name (You)" else name, modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)
+                                Text(if (member.uid == currentUserId) "$name (${stringResource(R.string.add_expense_you)})" else name, modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)
                                 if (displayAmount.isNotEmpty()) {
                                     Text(displayAmount, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                                     Spacer(modifier = Modifier.width(4.dp))
@@ -607,16 +676,16 @@ fun AddExpenseScreen(
                         }
                         if (includedMembers.size < activeMembers.size) {
                             Spacer(modifier = Modifier.height(8.dp))
-                            Text("Excluded members (tap to include):", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text(stringResource(R.string.add_expense_excluded), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                             Spacer(modifier = Modifier.height(4.dp))
                             FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                                 activeMembers.filter { excludedMembers[it.uid] == true }.forEach { member ->
                                     FilterChip(
                                         selected = false,
                                         onClick = { excludedMembers.remove(member.uid) },
-                                        label = { 
+                                        label = {
                                             val name = member.displayName.split(" ").firstOrNull() ?: ""
-                                            Text(if (member.uid == currentUserId) "$name (You)" else name)
+                                            Text(if (member.uid == currentUserId) "$name (${stringResource(R.string.add_expense_you)})" else name)
                                         }
                                     )
                                 }
@@ -624,7 +693,7 @@ fun AddExpenseScreen(
                         }
                         if (splitType == SplitType.SHARES) {
                             Spacer(modifier = Modifier.height(4.dp))
-                            Text("Amounts are split proportionally based on share values.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text(stringResource(R.string.add_expense_shares_note), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                     }
                 }
@@ -637,7 +706,7 @@ fun AddExpenseScreen(
             OutlinedTextField(
                 value = note,
                 onValueChange = { if (it.length <= 500) note = it },
-                label = { Text("Note (optional)") },
+                label = { Text(stringResource(R.string.add_expense_note)) },
                 modifier = Modifier.fillMaxWidth(),
                 minLines = 2,
                 maxLines = 3,
@@ -655,7 +724,7 @@ fun AddExpenseScreen(
                         Checkbox(checked = isRecurring, onCheckedChange = { isRecurring = it })
                         Icon(Icons.Default.Repeat, contentDescription = null, modifier = Modifier.size(18.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
                         Spacer(modifier = Modifier.width(8.dp))
-                        Text("Make this a recurring expense", style = MaterialTheme.typography.bodyMedium)
+                        Text(stringResource(R.string.add_expense_recurring), style = MaterialTheme.typography.bodyMedium)
                     }
                     if (isRecurring) {
                         Spacer(modifier = Modifier.height(8.dp))
@@ -663,12 +732,12 @@ fun AddExpenseScreen(
                             FilterChip(
                                 selected = recurringFrequency == com.trevio.android.domain.model.RecurringFrequency.WEEKLY,
                                 onClick = { recurringFrequency = com.trevio.android.domain.model.RecurringFrequency.WEEKLY },
-                                label = { Text("Weekly") }
+                                label = { Text(stringResource(R.string.add_expense_weekly)) }
                             )
                             FilterChip(
                                 selected = recurringFrequency == com.trevio.android.domain.model.RecurringFrequency.MONTHLY,
                                 onClick = { recurringFrequency = com.trevio.android.domain.model.RecurringFrequency.MONTHLY },
-                                label = { Text("Monthly") }
+                                label = { Text(stringResource(R.string.add_expense_monthly)) }
                             )
                         }
                     }
@@ -677,7 +746,7 @@ fun AddExpenseScreen(
 
             Spacer(modifier = Modifier.height(8.dp))
             if (state.error != null) {
-                Text(state.error!!, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
+                Text(stringResource(state.error!!), color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
                 Spacer(modifier = Modifier.height(8.dp))
             }
 
@@ -685,19 +754,20 @@ fun AddExpenseScreen(
                 Button(
                     onClick = {
                         if (description.isNotBlank() && amount > 0 && effectivePaidBy.isNotEmpty()) {
-                            viewModel.addExpense(
+                            viewModel.prepareAndSaveExpense(
                                 description = description,
                                 amount = amount,
                                 currency = currency,
                                 paidBy = effectivePaidBy,
                                 splitType = splitType,
-                                splits = buildSplits(),
+                                splitValues = splitValues.toMap(),
                                 category = category,
                                 date = expenseDateMillis,
                                 note = note,
                                 recurring = if (isRecurring) com.trevio.android.domain.model.RecurringConfig(frequency = recurringFrequency) else null,
                                 itemizedData = if (splitType == SplitType.ITEMIZED) itemizedData else null,
-                                transactionType = if (isIncome) TransactionType.INCOME else TransactionType.EXPENSE
+                                transactionType = if (isIncome) TransactionType.INCOME else TransactionType.EXPENSE,
+                                excludedMemberUids = excludedUids
                             )
                         }
                     },
@@ -708,26 +778,27 @@ fun AddExpenseScreen(
                     if (state.isLoading) {
                         CircularProgressIndicator(color = MaterialTheme.colorScheme.onPrimary, strokeWidth = 2.dp, modifier = Modifier.size(24.dp))
                     } else {
-                        Text("Save", style = MaterialTheme.typography.titleMedium)
+                        Text(stringResource(R.string.add_expense_save), style = MaterialTheme.typography.titleMedium)
                     }
                 }
                 OutlinedButton(
                     onClick = {
                         saveAndAddAnother = true
                         if (description.isNotBlank() && amount > 0 && effectivePaidBy.isNotEmpty()) {
-                            viewModel.addExpense(
+                            viewModel.prepareAndSaveExpense(
                                 description = description,
                                 amount = amount,
                                 currency = currency,
                                 paidBy = effectivePaidBy,
                                 splitType = splitType,
-                                splits = buildSplits(),
+                                splitValues = splitValues.toMap(),
                                 category = category,
                                 date = expenseDateMillis,
                                 note = note,
                                 recurring = if (isRecurring) com.trevio.android.domain.model.RecurringConfig(frequency = recurringFrequency) else null,
                                 itemizedData = if (splitType == SplitType.ITEMIZED) itemizedData else null,
-                                transactionType = if (isIncome) TransactionType.INCOME else TransactionType.EXPENSE
+                                transactionType = if (isIncome) TransactionType.INCOME else TransactionType.EXPENSE,
+                                excludedMemberUids = excludedUids
                             )
                         }
                     },
@@ -737,7 +808,7 @@ fun AddExpenseScreen(
                 ) {
                     Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(20.dp))
                     Spacer(modifier = Modifier.width(4.dp))
-                    Text("Save & Add", style = MaterialTheme.typography.titleMedium)
+                    Text(stringResource(R.string.add_expense_save_add), style = MaterialTheme.typography.titleMedium)
                 }
             }
 
@@ -762,13 +833,57 @@ fun AddExpenseScreen(
                         }
                         showDatePicker = false
                     }
-                ) { Text("OK") }
+                ) { Text(stringResource(R.string.common_ok)) }
             },
             dismissButton = {
-                TextButton(onClick = { showDatePicker = false }) { Text("Cancel") }
+                TextButton(onClick = { showDatePicker = false }) { Text(stringResource(R.string.common_cancel)) }
             }
         ) {
             DatePicker(state = datePickerState)
+        }
+    }
+
+    if (showSuccess) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(Color.Black.copy(alpha = 0.32f)),
+            contentAlignment = Alignment.Center
+        ) {
+            AnimatedVisibility(visible = showSuccess) {
+                Surface(
+                    shape = RoundedCornerShape(20.dp),
+                    color = MaterialTheme.colorScheme.surface,
+                    tonalElevation = 6.dp,
+                    shadowElevation = 8.dp
+                ) {
+                    Column(
+                        modifier = Modifier.padding(28.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(56.dp)
+                                .clip(RoundedCornerShape(28.dp))
+                                .background(SaveButtonGreen),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = Icons.Filled.Check,
+                                contentDescription = null,
+                                tint = Color.White,
+                                modifier = Modifier.size(32.dp)
+                            )
+                        }
+                        Spacer(modifier = Modifier.height(12.dp))
+                        Text(
+                            text = stringResource(R.string.add_expense_saved),
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                }
+            }
         }
     }
 }
@@ -781,49 +896,4 @@ private fun SectionLabel(text: String) {
         fontWeight = FontWeight.SemiBold,
         color = MaterialTheme.colorScheme.onSurfaceVariant
     )
-}
-
-private fun evaluateExpression(expr: String): Double {
-    val tokens = mutableListOf<String>()
-    var currentNum = StringBuilder()
-    for (c in expr) {
-        if (c == '+' || c == '-' || c == '*' || c == '/') {
-            if (currentNum.isNotEmpty()) {
-                tokens.add(currentNum.toString())
-                currentNum = StringBuilder()
-            }
-            tokens.add(c.toString())
-        } else {
-            currentNum.append(c)
-        }
-    }
-    if (currentNum.isNotEmpty()) tokens.add(currentNum.toString())
-
-    if (tokens.isEmpty()) return 0.0
-
-    val parsed = mutableListOf<Any>()
-    var i = 0
-    while (i < tokens.size) {
-        val t = tokens[i]
-        if (t == "*" || t == "/") {
-            val prev = parsed.removeAt(parsed.lastIndex) as Double
-            val next = tokens[++i].toDoubleOrNull() ?: 0.0
-            parsed.add(if (t == "*") prev * next else if (next != 0.0) prev / next else 0.0)
-        } else if (t == "+" || t == "-") {
-            parsed.add(t)
-        } else {
-            parsed.add(t.toDoubleOrNull() ?: 0.0)
-        }
-        i++
-    }
-
-    var result = parsed[0] as Double
-    var j = 1
-    while (j < parsed.size) {
-        val op = parsed[j] as String
-        val next = parsed[++j] as Double
-        result = if (op == "+") result + next else result - next
-        j++
-    }
-    return result
 }

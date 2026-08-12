@@ -15,21 +15,24 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.trevio.android.R
 import com.trevio.android.core.designsystem.theme.BalanceNegative
 import com.trevio.android.core.designsystem.theme.BalanceNeutral
 import com.trevio.android.core.designsystem.theme.BalancePositive
 import com.trevio.android.core.designsystem.theme.TrevioBorder
 import com.trevio.android.core.designsystem.theme.TrevioBorderDark
+import com.trevio.android.util.AppConstants
 import com.trevio.android.util.CurrencyConverter
 
 @Composable
 fun BalanceChip(
     balance: Double,
-    currency: String = "INR",
+    currency: String = AppConstants.BASE_CURRENCY,
     modifier: Modifier = Modifier
 ) {
     val color = when {
@@ -38,9 +41,9 @@ fun BalanceChip(
         else -> BalanceNeutral
     }
     val text = when {
-        balance > 0.01 -> "you'll get ${CurrencyConverter.formatCurrency(balance, currency)}"
-        balance < -0.01 -> "you'll pay ${CurrencyConverter.formatCurrency(-balance, currency)}"
-        else -> "settled up"
+        balance > 0.01 -> stringResource(R.string.balance_youll_get, CurrencyConverter.formatCurrency(balance, currency))
+        balance < -0.01 -> stringResource(R.string.balance_youll_pay, CurrencyConverter.formatCurrency(-balance, currency))
+        else -> stringResource(R.string.balance_settled_up)
     }
     Surface(
         color = color.copy(alpha = 0.12f),
@@ -171,7 +174,7 @@ fun TrevioHeader(
                 IconButton(onClick = onBack) {
                     Icon(
                         Icons.AutoMirrored.Filled.ArrowBack,
-                        contentDescription = "Back",
+                        contentDescription = stringResource(R.string.back),
                         tint = Color.White
                     )
                 }

@@ -1,5 +1,6 @@
 package com.trevio.android.ui.group
 
+import androidx.annotation.StringRes
 import androidx.compose.foundation.background
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
@@ -13,14 +14,20 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.trevio.android.R
 import com.trevio.android.core.designsystem.components.MemberAvatar
 import com.trevio.android.core.designsystem.components.TrevioHeader
+import com.trevio.android.core.designsystem.theme.BalancePositive
+import com.trevio.android.core.designsystem.theme.BalancePositiveDark
+import com.trevio.android.core.designsystem.theme.SuccessTextDark
+import com.trevio.android.core.designsystem.theme.SuccessTextLight
 import com.trevio.android.core.navigation.TrevioRoute
 import com.trevio.android.domain.repository.AuthService
 import com.trevio.android.domain.repository.GroupInfo
@@ -30,6 +37,7 @@ import com.trevio.android.domain.model.Member
 import com.trevio.android.util.CurrencyConverter
 import com.trevio.android.util.MemberRole
 import com.trevio.android.util.MemberStatus
+import com.trevio.android.util.toStringResId
 import com.trevio.android.util.rememberCurrencyFormatter
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -56,11 +64,11 @@ class GroupSettingsViewModel @Inject constructor(
         val name: String = "",
         val description: String = "",
         val monthlyBudget: String = "",
-        val userCurrency: String = "INR",
+        val userCurrency: String = com.trevio.android.util.AppConstants.BASE_CURRENCY,
         val currencySymbol: String = "₹",
         val rates: Map<String, Double> = emptyMap(),
-        val error: String? = null,
-        val success: String? = null,
+        @StringRes val error: Int? = null,
+        @StringRes val success: Int? = null,
         val transferTargetUid: String? = null,
         val showDeleteConfirm: Boolean = false,
         val showLeaveConfirm: Boolean = false,
@@ -77,7 +85,7 @@ class GroupSettingsViewModel @Inject constructor(
         viewModelScope.launch {
             val uid = authService.getCurrentUserId()
             val user = authService.getCurrentUser()
-            val userCurrency = user?.defaultCurrency ?: "INR"
+            val userCurrency = user?.defaultCurrency ?: com.trevio.android.util.AppConstants.BASE_CURRENCY
             val currencySymbol = CurrencyConverter.getCurrencySymbol(userCurrency)
             val rates = exchangeRateService.getRates().getOrNull()?.rates ?: emptyMap()
             val info = groupService.getGroupInfo(groupId).getOrNull()
@@ -139,7 +147,7 @@ class GroupSettingsViewModel @Inject constructor(
         val s = _state.value
         val budgetInUserCurrency = s.monthlyBudget.toDoubleOrNull()
         if (budgetInUserCurrency == null || budgetInUserCurrency < 0) {
-            _state.value = s.copy(error = "Budget must be a positive number")
+            _state.value = s.copy(error = R.string.group_settings_budget_error)
             return
         }
         // Convert from user's currency to INR base for storage
@@ -150,11 +158,11 @@ class GroupSettingsViewModel @Inject constructor(
         viewModelScope.launch {
             groupService.updateGroupBudget(groupId, budgetInBase, null)
                 .onSuccess {
-                    _state.value = s.copy(isSaving = false, success = "Budget updated")
+                    _state.value = s.copy(isSaving = false, success = R.string.group_settings_budget_updated)
                     refreshData()
                 }
                 .onFailure { e ->
-                    _state.value = s.copy(isSaving = false, error = e.message)
+                    _state.value = s.copy(isSaving = false, error = e.toStringResId())
                 }
         }
     }
@@ -171,11 +179,11 @@ class GroupSettingsViewModel @Inject constructor(
         viewModelScope.launch {
             groupService.updateGroup(groupId, s.name, s.description)
                 .onSuccess {
-                    _state.value = s.copy(isSaving = false, success = "Group settings updated")
+                    _state.value = s.copy(isSaving = false, success = R.string.group_settings_updated)
                     refreshData()
                 }
                 .onFailure { e ->
-                    _state.value = s.copy(isSaving = false, error = e.message)
+                    _state.value = s.copy(isSaving = false, error = e.toStringResId())
                 }
         }
     }
@@ -187,11 +195,11 @@ class GroupSettingsViewModel @Inject constructor(
         viewModelScope.launch {
             groupService.transferAdminRole(groupId, targetUid)
                 .onSuccess {
-                    _state.value = s.copy(isSaving = false, success = "Admin role transferred", transferTargetUid = null)
+                    _state.value = s.copy(isSaving = false, success = R.string.group_settings_admin_transferred, transferTargetUid = null)
                     refreshData()
                 }
                 .onFailure { e ->
-                    _state.value = s.copy(isSaving = false, error = e.message)
+                    _state.value = s.copy(isSaving = false, error = e.toStringResId())
                 }
         }
     }
@@ -205,7 +213,7 @@ class GroupSettingsViewModel @Inject constructor(
                     _state.value = s.copy(isSaving = false, showDeleteConfirm = false, groupInfo = null)
                 }
                 .onFailure { e ->
-                    _state.value = s.copy(isSaving = false, error = e.message, showDeleteConfirm = false)
+                    _state.value = s.copy(isSaving = false, error = e.toStringResId(), showDeleteConfirm = false)
                 }
         }
     }
@@ -219,7 +227,7 @@ class GroupSettingsViewModel @Inject constructor(
                     _state.value = s.copy(isSaving = false, showLeaveConfirm = false, groupInfo = null)
                 }
                 .onFailure { e ->
-                    _state.value = s.copy(isSaving = false, error = e.message, showLeaveConfirm = false)
+                    _state.value = s.copy(isSaving = false, error = e.toStringResId(), showLeaveConfirm = false)
                 }
         }
     }
@@ -235,7 +243,7 @@ fun GroupSettingsScreen(
     if (state.isLoading) {
         Column(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
             TrevioHeader(
-                title = "Group Settings",
+                title = stringResource(R.string.group_settings_title),
                 onBack = { navController.popBackStack() }
             )
             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -248,14 +256,14 @@ fun GroupSettingsScreen(
     if (!viewModel.isAdmin) {
         Column(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
             TrevioHeader(
-                title = "Group Settings",
+                title = stringResource(R.string.group_settings_title),
                 onBack = { navController.popBackStack() }
             )
             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     Icon(Icons.Default.Settings, contentDescription = null, modifier = Modifier.size(48.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f))
                     Spacer(modifier = Modifier.height(12.dp))
-                    Text("Only group admins can access group settings.", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(stringResource(R.string.group_settings_admin_only), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
         }
@@ -266,7 +274,7 @@ fun GroupSettingsScreen(
 
     Column(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
         TrevioHeader(
-            title = "Group Settings",
+            title = stringResource(R.string.group_settings_title),
             onBack = { navController.popBackStack() }
         )
         Column(
@@ -275,33 +283,33 @@ fun GroupSettingsScreen(
         ) {
             if (state.error != null) {
                 Surface(color = MaterialTheme.colorScheme.errorContainer, shape = RoundedCornerShape(12.dp), modifier = Modifier.fillMaxWidth()) {
-                    Text(state.error!!, modifier = Modifier.padding(12.dp), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onErrorContainer)
+                    Text(stringResource(state.error!!), modifier = Modifier.padding(12.dp), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onErrorContainer)
                 }
             }
             if (state.success != null) {
                 val isDark = isSystemInDarkTheme()
-                val successColor = if (isDark) Color(0xFF4ADE80) else Color(0xFF22C55E)
-                val successTextColor = if (isDark) Color(0xFF86EFAC) else Color(0xFF16A34A)
+                val successColor = if (isDark) BalancePositiveDark else BalancePositive
+                val successTextColor = if (isDark) SuccessTextDark else SuccessTextLight
                 Surface(color = successColor.copy(alpha = 0.12f), shape = RoundedCornerShape(12.dp), modifier = Modifier.fillMaxWidth()) {
-                    Text(state.success!!, modifier = Modifier.padding(12.dp), style = MaterialTheme.typography.bodySmall, color = successTextColor)
+                    Text(stringResource(state.success!!), modifier = Modifier.padding(12.dp), style = MaterialTheme.typography.bodySmall, color = successTextColor)
                 }
             }
 
             // Group Details Section
             Surface(shape = RoundedCornerShape(16.dp), tonalElevation = 1.dp, modifier = Modifier.fillMaxWidth()) {
                 Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Text("Group Details", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                    Text(stringResource(R.string.group_settings_group_details), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
                     OutlinedTextField(
                         value = state.name,
                         onValueChange = { viewModel.updateName(it) },
-                        label = { Text("Group Name") },
+                        label = { Text(stringResource(R.string.group_settings_name)) },
                         modifier = Modifier.fillMaxWidth(),
                         singleLine = true
                     )
                     OutlinedTextField(
                         value = state.description,
                         onValueChange = { viewModel.updateDescription(it) },
-                        label = { Text("Description") },
+                        label = { Text(stringResource(R.string.group_settings_description_label)) },
                         modifier = Modifier.fillMaxWidth(),
                         minLines = 2
                     )
@@ -311,7 +319,7 @@ fun GroupSettingsScreen(
                         modifier = Modifier.fillMaxWidth()
                     ) {
                         if (state.isSaving) CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp, color = MaterialTheme.colorScheme.onPrimary)
-                        else Text("Save Changes")
+                        else Text(stringResource(R.string.group_settings_save))
                     }
                 }
             }
@@ -321,12 +329,12 @@ fun GroupSettingsScreen(
                 Spacer(modifier = Modifier.height(8.dp))
                 Surface(shape = RoundedCornerShape(16.dp), tonalElevation = 1.dp, modifier = Modifier.fillMaxWidth()) {
                     Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                        Text("Monthly Budget", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-                        Text("Set a monthly spending budget. You'll see progress in the Monthly report.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text(stringResource(R.string.group_settings_monthly_budget), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                        Text(stringResource(R.string.group_settings_budget_desc), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         OutlinedTextField(
                             value = state.monthlyBudget,
                             onValueChange = { viewModel.updateMonthlyBudget(it) },
-                            label = { Text("Monthly budget amount") },
+                            label = { Text(stringResource(R.string.group_settings_budget_amount)) },
                             prefix = { Text(state.currencySymbol) },
                             modifier = Modifier.fillMaxWidth(),
                             singleLine = true,
@@ -338,7 +346,7 @@ fun GroupSettingsScreen(
                             modifier = Modifier.fillMaxWidth()
                         ) {
                             if (state.isSaving) CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp, color = MaterialTheme.colorScheme.onPrimary)
-                            else Text("Save Budget")
+                            else Text(stringResource(R.string.group_settings_save_budget))
                         }
                     }
                 }
@@ -347,8 +355,8 @@ fun GroupSettingsScreen(
             // Transfer Admin Section
             Surface(shape = RoundedCornerShape(16.dp), tonalElevation = 1.dp, modifier = Modifier.fillMaxWidth()) {
                 Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Text("Transfer Admin Role", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-                    Text("Transfer admin rights to another member. You will become a regular member.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(stringResource(R.string.group_settings_transfer_admin_role), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                    Text(stringResource(R.string.group_settings_transfer_desc), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     if (activeMembers.isNotEmpty()) {
                         activeMembers.forEach { m ->
                             Surface(
@@ -373,11 +381,11 @@ fun GroupSettingsScreen(
                             ) {
                                 Icon(Icons.Default.AdminPanelSettings, contentDescription = null, modifier = Modifier.size(18.dp))
                                 Spacer(modifier = Modifier.width(8.dp))
-                                if (state.isSaving) Text("Transferring...") else Text("Transfer Admin Role")
+                                if (state.isSaving) Text(stringResource(R.string.group_settings_transferring)) else Text(stringResource(R.string.group_settings_transfer_admin_role))
                             }
                         }
                     } else {
-                        Text("No other active members to transfer admin role to.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f))
+                        Text(stringResource(R.string.group_settings_no_transfer_members), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f))
                     }
                 }
             }
@@ -389,9 +397,9 @@ fun GroupSettingsScreen(
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Text("Danger Zone", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.error)
-                    Text("Delete this group permanently. All expenses, settlements, and activity will be removed.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error.copy(alpha = 0.8f))
-                    Text("Only works if you are the sole active member. Remove other members first.", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.error.copy(alpha = 0.6f))
+                    Text(stringResource(R.string.group_settings_danger_zone), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.error)
+                    Text(stringResource(R.string.group_settings_delete_desc), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error.copy(alpha = 0.8f))
+                    Text(stringResource(R.string.group_settings_delete_sole_member), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.error.copy(alpha = 0.6f))
                     if (!state.showDeleteConfirm) {
                         OutlinedButton(
                             onClick = { viewModel.setShowDeleteConfirm(true) },
@@ -400,10 +408,10 @@ fun GroupSettingsScreen(
                         ) {
                             Icon(Icons.Default.Delete, contentDescription = null, modifier = Modifier.size(18.dp))
                             Spacer(modifier = Modifier.width(8.dp))
-                            Text("Delete Group")
+                            Text(stringResource(R.string.group_settings_delete))
                         }
                     } else {
-                        Text("Are you absolutely sure? This cannot be undone.", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium, color = MaterialTheme.colorScheme.error)
+                        Text(stringResource(R.string.group_settings_delete_absolute), style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium, color = MaterialTheme.colorScheme.error)
                         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                             Button(
                                 onClick = { viewModel.deleteGroup() },
@@ -411,9 +419,9 @@ fun GroupSettingsScreen(
                                 colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
                             ) {
                                 if (state.isSaving) CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp, color = Color.White)
-                                else Text("Yes, Delete")
+                                else Text(stringResource(R.string.group_settings_yes_delete))
                             }
-                            OutlinedButton(onClick = { viewModel.setShowDeleteConfirm(false) }) { Text("Cancel") }
+                            OutlinedButton(onClick = { viewModel.setShowDeleteConfirm(false) }) { Text(stringResource(R.string.group_detail_cancel)) }
                         }
                     }
                 }
@@ -427,8 +435,8 @@ fun GroupSettingsScreen(
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                        Text("Leave Group", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.tertiary)
-                        Text("You will no longer have access to this group's expenses and activity.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.tertiary.copy(alpha = 0.8f))
+                        Text(stringResource(R.string.group_settings_leave), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.tertiary)
+                        Text(stringResource(R.string.group_settings_leave_desc), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.tertiary.copy(alpha = 0.8f))
                         if (!state.showLeaveConfirm) {
                             OutlinedButton(
                                 onClick = { viewModel.setShowLeaveConfirm(true) },
@@ -436,10 +444,10 @@ fun GroupSettingsScreen(
                             ) {
                                 Icon(Icons.Default.Logout, contentDescription = null, modifier = Modifier.size(18.dp))
                                 Spacer(modifier = Modifier.width(8.dp))
-                                Text("Leave Group")
+                                Text(stringResource(R.string.group_settings_leave))
                             }
                         } else {
-                            Text("Are you sure you want to leave this group?", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium, color = MaterialTheme.colorScheme.tertiary)
+                            Text(stringResource(R.string.group_settings_leave_confirm), style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium, color = MaterialTheme.colorScheme.tertiary)
                             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                                 Button(
                                     onClick = { viewModel.leaveGroup() },
@@ -447,9 +455,9 @@ fun GroupSettingsScreen(
                                     colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.tertiary)
                                 ) {
                                     if (state.isSaving) CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp, color = Color.White)
-                                    else Text("Yes, Leave")
+                                    else Text(stringResource(R.string.group_settings_yes_leave))
                                 }
-                                OutlinedButton(onClick = { viewModel.setShowLeaveConfirm(false) }) { Text("Cancel") }
+                                OutlinedButton(onClick = { viewModel.setShowLeaveConfirm(false) }) { Text(stringResource(R.string.group_detail_cancel)) }
                             }
                         }
                     }

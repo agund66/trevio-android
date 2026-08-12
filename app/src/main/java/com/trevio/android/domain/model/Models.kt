@@ -9,6 +9,11 @@ enum class InvitationStatus { PENDING, ACCEPTED, DECLINED, EXPIRED }
 enum class SettlementMethod { UPI, CASH, OTHER }
 enum class RecurringFrequency { WEEKLY, MONTHLY }
 
+data class LocalizedString(
+    val resId: Int,
+    val args: List<Any> = emptyList()
+)
+
 data class RecurringConfig(
     val frequency: RecurringFrequency = RecurringFrequency.MONTHLY,
     val endDate: Long? = null,
@@ -97,7 +102,9 @@ data class Expense(
     val note: String = "",
     val recurring: RecurringConfig? = null,
     val itemizedData: ItemizedSplitData? = null,
-    val transactionType: TransactionType = TransactionType.EXPENSE
+    val transactionType: TransactionType = TransactionType.EXPENSE,
+    val originalAmount: Double = 0.0,
+    val originalCurrency: String = "INR"
 )
 
 data class Settlement(
@@ -135,7 +142,8 @@ data class Activity(
     val userId: String = "",
     val userName: String = "",
     val userPhotoURL: String = "",
-    val createdAt: Long = 0
+    val createdAt: Long = 0,
+    val data: Map<String, Any>? = null
 )
 
 data class AppNotification(
@@ -196,6 +204,7 @@ data class CategoryBreakdown(
 data class MonthlyTrend(
     val month: String = "",
     val label: String = "",
+    val labelText: LocalizedString? = null,
     val totalAmount: Double = 0.0,
     val expenseCount: Int = 0
 )
@@ -363,6 +372,7 @@ data class HelpArticle(
 data class DailySummary(
     val date: Long = 0,
     val dateLabel: String = "",
+    val dateLabelText: LocalizedString? = null,
     val totalSpent: Double = 0.0,
     val totalReceived: Double = 0.0,
     val netAmount: Double = 0.0,
@@ -399,6 +409,7 @@ data class MonthComparison(
 data class MonthlyReport(
     val month: String = "",
     val monthLabel: String = "",
+    val monthLabelText: LocalizedString? = null,
     val totalSpent: Double = 0.0,
     val totalReceived: Double = 0.0,
     val netAmount: Double = 0.0,
@@ -416,9 +427,9 @@ data class MonthlyReport(
 data class HouseholdGamification(
     val loggingStreak: Int = 0,
     val streakStartDate: Long? = null,
-    val monthlyBadge: String? = null,
+    val monthlyBadge: LocalizedString? = null,
     val participationToday: Double = 0.0,
     val membersLoggedToday: Int = 0,
     val totalMembers: Int = 0,
-    val insightMessage: String? = null
+    val insightMessageText: LocalizedString? = null
 )

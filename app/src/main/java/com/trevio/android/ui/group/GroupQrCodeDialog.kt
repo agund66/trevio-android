@@ -17,10 +17,12 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
+import com.trevio.android.R
 import com.trevio.android.util.QrCodeGenerator
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -70,12 +72,12 @@ fun GroupQrCodeDialog(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        text = "Group QR Code",
+                        text = stringResource(R.string.qr_code_title),
                         style = MaterialTheme.typography.titleLarge,
                         fontWeight = FontWeight.Bold
                     )
                     IconButton(onClick = onDismiss) {
-                        Icon(Icons.Default.Close, contentDescription = "Close")
+                        Icon(Icons.Default.Close, contentDescription = stringResource(R.string.qr_code_close))
                     }
                 }
 
@@ -101,7 +103,7 @@ fun GroupQrCodeDialog(
                     qrBitmap?.let { bitmap ->
                         Image(
                             bitmap = bitmap.asImageBitmap(),
-                            contentDescription = "QR Code for $groupName",
+                            contentDescription = stringResource(R.string.qr_code_content_desc, groupName),
                             modifier = Modifier.fillMaxSize()
                         )
                     } ?: CircularProgressIndicator()
@@ -114,7 +116,7 @@ fun GroupQrCodeDialog(
                     shape = RoundedCornerShape(10.dp)
                 ) {
                     Text(
-                        text = "Code: $inviteCode",
+                        text = stringResource(R.string.qr_code_label, inviteCode),
                         style = MaterialTheme.typography.labelLarge,
                         color = MaterialTheme.colorScheme.onPrimaryContainer,
                         fontWeight = FontWeight.SemiBold,
@@ -125,7 +127,7 @@ fun GroupQrCodeDialog(
                 Spacer(modifier = Modifier.height(8.dp))
 
                 Text(
-                    text = "Ask a friend to scan this code or use the code to join",
+                    text = stringResource(R.string.qr_code_instruction),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     textAlign = TextAlign.Center
@@ -141,17 +143,17 @@ fun GroupQrCodeDialog(
                         onClick = {
                             val shareIntent = Intent(Intent.ACTION_SEND).apply {
                                 type = "text/plain"
-                                putExtra(Intent.EXTRA_SUBJECT, "Join \"$groupName\" on Trevio")
-                                putExtra(Intent.EXTRA_TEXT, "You've been invited to join \"$groupName\" on Trevio. Tap to join and start splitting bills!\n\nhttps://trevio.app/join/$inviteCode")
+                                putExtra(Intent.EXTRA_SUBJECT, context.getString(R.string.qr_code_share_subject, groupName))
+                                putExtra(Intent.EXTRA_TEXT, context.getString(R.string.qr_code_share_text, groupName, inviteCode))
                             }
-                            context.startActivity(Intent.createChooser(shareIntent, "Share Invite"))
+                            context.startActivity(Intent.createChooser(shareIntent, context.getString(R.string.group_detail_share_chooser)))
                         },
                         modifier = Modifier.weight(1f),
                         shape = RoundedCornerShape(12.dp)
                     ) {
                         Icon(Icons.Default.Share, contentDescription = null, modifier = Modifier.size(18.dp))
                         Spacer(modifier = Modifier.width(6.dp))
-                        Text("Share")
+                        Text(stringResource(R.string.qr_code_share))
                     }
 
                     Button(
@@ -172,16 +174,16 @@ fun GroupQrCodeDialog(
                                 val shareIntent = Intent(Intent.ACTION_SEND).apply {
                                     type = "image/png"
                                     putExtra(Intent.EXTRA_STREAM, uri)
-                                    putExtra(Intent.EXTRA_TEXT, "Scan this QR code to join \"$groupName\" on Trevio!")
+                                    putExtra(Intent.EXTRA_TEXT, context.getString(R.string.qr_code_share_qr_text, groupName))
                                     addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
                                 }
-                                context.startActivity(Intent.createChooser(shareIntent, "Share QR Code"))
+                                context.startActivity(Intent.createChooser(shareIntent, context.getString(R.string.qr_code_share_qr_chooser)))
                             }
                         },
                         modifier = Modifier.weight(1f),
                         shape = RoundedCornerShape(12.dp)
                     ) {
-                        Text("Share QR")
+                        Text(stringResource(R.string.qr_code_share_qr))
                     }
                 }
             }

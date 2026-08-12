@@ -1,6 +1,8 @@
 package com.trevio.android.util
 
 import com.google.firebase.Timestamp
+import com.trevio.android.R
+import com.trevio.android.domain.model.LocalizedString
 import java.util.Calendar
 import java.util.Date
 import java.util.Locale
@@ -15,11 +17,22 @@ object DateUtils {
     const val MS_PER_DAY: Long = 24 * MS_PER_HOUR
 
     // ─── Month labels ────────────────────────────────────────────
-    val MONTH_LABELS = listOf("Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec")
-    val FULL_MONTH_LABELS = listOf(
-        "January", "February", "March", "April", "May", "June",
-        "July", "August", "September", "October", "November", "December"
+
+    private val shortMonthResIds = intArrayOf(
+        R.string.month_jan, R.string.month_feb, R.string.month_mar, R.string.month_apr,
+        R.string.month_may, R.string.month_jun, R.string.month_jul, R.string.month_aug,
+        R.string.month_sep, R.string.month_oct, R.string.month_nov, R.string.month_dec
     )
+
+    private val fullMonthResIds = intArrayOf(
+        R.string.month_january, R.string.month_february, R.string.month_march, R.string.month_april,
+        R.string.month_may_full, R.string.month_june, R.string.month_july, R.string.month_august,
+        R.string.month_september, R.string.month_october, R.string.month_november, R.string.month_december
+    )
+
+    fun getMonthLabelResId(month: Int): Int = shortMonthResIds.getOrElse(month) { R.string.month_jan }
+
+    fun getFullMonthLabelResId(month: Int): Int = fullMonthResIds.getOrElse(month) { R.string.month_january }
 
     // ─── Core helpers ────────────────────────────────────────────
 
@@ -93,6 +106,12 @@ object DateUtils {
         return sdf.format(Date(timestamp))
     }
 
+    fun formatWeekday(timestamp: Long): String {
+        if (timestamp <= 0) return ""
+        val calendar = Calendar.getInstance().apply { timeInMillis = timestamp }
+        return calendar.getDisplayName(Calendar.DAY_OF_WEEK, Calendar.SHORT, Locale.getDefault()).orEmpty()
+    }
+
     /** Formats a timestamp as a full date with time (e.g., "Mon, Jan 15, 2024 · 3:45 PM"). */
     fun formatFullDate(timestamp: Long): String {
         if (timestamp <= 0) return ""
@@ -107,20 +126,19 @@ object DateUtils {
         return sdf.format(Date(timestamp))
     }
 
-    /** Formats a timestamp as a relative time string (e.g., "just now", "5m ago", "3h ago", "2d ago"). */
-    fun formatRelativeTime(timestamp: Long): String {
-        if (timestamp <= 0) return ""
+    fun formatRelativeTime(timestamp: Long): LocalizedString? {
+        if (timestamp <= 0) return null
         val now = System.currentTimeMillis()
         val diffMs = now - timestamp
         val diffMins = diffMs / MS_PER_MINUTE
         val diffHours = diffMs / MS_PER_HOUR
         val diffDays = diffMs / MS_PER_DAY
         return when {
-            diffMins < 1 -> "just now"
-            diffMins < 60 -> "${diffMins}m ago"
-            diffHours < 24 -> "${diffHours}h ago"
-            diffDays < 7 -> "${diffDays}d ago"
-            else -> formatShortDate(timestamp)
+            diffMins < 1 -> LocalizedString(R.string.time_just_now)
+            diffMins < 60 -> LocalizedString(R.string.time_minutes_ago, listOf(diffMins))
+            diffHours < 24 -> LocalizedString(R.string.time_hours_ago, listOf(diffHours))
+            diffDays < 7 -> LocalizedString(R.string.time_days_ago, listOf(diffDays))
+            else -> null
         }
     }
 

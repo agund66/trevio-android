@@ -5,6 +5,7 @@ import android.content.pm.PackageManager
 import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.annotation.StringRes
 import androidx.compose.foundation.background
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
@@ -28,6 +29,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
@@ -36,9 +38,23 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 
+import com.trevio.android.R
 import com.trevio.android.core.designsystem.components.LoadingIndicator
 import com.trevio.android.core.designsystem.components.TrevioCard
 import com.trevio.android.core.designsystem.components.TrevioHeader
+import com.trevio.android.core.designsystem.components.formatRelativeTimeText
+import com.trevio.android.core.designsystem.theme.BalanceNegative
+import com.trevio.android.core.designsystem.theme.BalanceNegativeDark
+import com.trevio.android.core.designsystem.theme.BalancePositive
+import com.trevio.android.core.designsystem.theme.BalancePositiveDark
+import com.trevio.android.core.designsystem.theme.InfoBlue
+import com.trevio.android.core.designsystem.theme.InfoBlueDark
+import com.trevio.android.core.designsystem.theme.TemplateCasual
+import com.trevio.android.core.designsystem.theme.TemplateCasualDark
+import com.trevio.android.core.designsystem.theme.TemplateHousehold
+import com.trevio.android.core.designsystem.theme.TemplateHouseholdDark
+import com.trevio.android.core.designsystem.theme.TemplateTrip
+import com.trevio.android.core.designsystem.theme.TemplateTripDark
 import com.trevio.android.core.designsystem.theme.TrevioBorder
 import com.trevio.android.domain.model.AppNotification
 import com.trevio.android.domain.model.BroadcastMessage
@@ -50,6 +66,7 @@ import com.trevio.android.domain.repository.NotificationService
 import com.trevio.android.core.navigation.TrevioRoute
 import com.trevio.android.util.DateUtils
 import com.trevio.android.util.rememberCurrencyFormatter
+import com.trevio.android.util.toStringResId
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -70,7 +87,7 @@ class NotificationsViewModel @Inject constructor(
         val hasMore: Boolean = false,
         val loadingMore: Boolean = false,
         val broadcasts: List<BroadcastMessage> = emptyList(),
-        val error: String? = null,
+        @StringRes val error: Int? = null,
         val invitationLoading: String? = null,
         val invitationResult: Map<String, String> = emptyMap()
     )
@@ -88,7 +105,7 @@ class NotificationsViewModel @Inject constructor(
                     _state.value = _state.value.copy(isLoading = false, notifications = result.items, hasMore = result.hasMore)
                 }
                 .onFailure { e ->
-                    _state.value = NotificationsState(isLoading = false, error = e.message)
+                    _state.value = NotificationsState(isLoading = false, error = e.toStringResId())
                 }
             val uid = authService.getCurrentUserId()
             val user = authService.getCurrentUser()
@@ -125,7 +142,7 @@ class NotificationsViewModel @Inject constructor(
             notificationService.markAllNotificationsRead()
                 .onSuccess { loadNotifications() }
                 .onFailure { e ->
-                    _state.value = _state.value.copy(error = e.message)
+                    _state.value = _state.value.copy(error = e.toStringResId())
                 }
         }
     }
@@ -143,7 +160,7 @@ class NotificationsViewModel @Inject constructor(
                     loadNotifications()
                 }
                 .onFailure { e ->
-                    _state.value = _state.value.copy(invitationLoading = null, error = e.message)
+                    _state.value = _state.value.copy(invitationLoading = null, error = e.toStringResId())
                 }
         }
     }
@@ -161,7 +178,7 @@ class NotificationsViewModel @Inject constructor(
                     loadNotifications()
                 }
                 .onFailure { e ->
-                    _state.value = _state.value.copy(invitationLoading = null, error = e.message)
+                    _state.value = _state.value.copy(invitationLoading = null, error = e.toStringResId())
                 }
         }
     }
@@ -201,7 +218,7 @@ fun NotificationsScreen(
 
     if (state.isLoading) {
         Column(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
-            TrevioHeader(title = "Activity")
+            TrevioHeader(title = stringResource(R.string.notifications_title))
             Box(modifier = Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
                 CircularProgressIndicator()
             }
@@ -211,14 +228,14 @@ fun NotificationsScreen(
 
     state.error?.let { errMsg ->
         Column(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
-            TrevioHeader(title = "Activity")
+            TrevioHeader(title = stringResource(R.string.notifications_title))
             Box(modifier = Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     Icon(Icons.Default.Warning, contentDescription = null, modifier = Modifier.size(48.dp), tint = MaterialTheme.colorScheme.error)
                     Spacer(modifier = Modifier.height(12.dp))
-                    Text("Failed to load notifications", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                    Text(stringResource(R.string.notifications_failed), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                     Spacer(modifier = Modifier.height(4.dp))
-                    Text(errMsg, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(stringResource(errMsg), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
         }
@@ -227,7 +244,7 @@ fun NotificationsScreen(
 
     Column(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
         TrevioHeader(
-            title = if (unreadCount > 0) "Activity ($unreadCount)" else "Activity",
+            title = if (unreadCount > 0) "${stringResource(R.string.notifications_title)} ($unreadCount)" else stringResource(R.string.notifications_title),
             actions = {
                 if (unreadCount > 0) {
                     TextButton(
@@ -236,7 +253,7 @@ fun NotificationsScreen(
                             contentColor = MaterialTheme.colorScheme.primary
                         )
                     ) {
-                        Text("Mark all read", fontWeight = FontWeight.Medium)
+                        Text(stringResource(R.string.notifications_mark_all_read), fontWeight = FontWeight.Medium)
                     }
                 }
             }
@@ -258,13 +275,13 @@ fun NotificationsScreen(
                     )
                     Spacer(modifier = Modifier.height(16.dp))
                     Text(
-                        "No notifications yet",
+                        stringResource(R.string.notifications_no_notifications),
                         style = MaterialTheme.typography.titleMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                     Spacer(modifier = Modifier.height(4.dp))
                     Text(
-                        "You'll see group activity here",
+                        stringResource(R.string.notifications_empty),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
                     )
@@ -364,7 +381,7 @@ private fun NotificationCard(
                     if (notification.createdAt > 0) {
                         Spacer(modifier = Modifier.height(4.dp))
                         Text(
-                            DateUtils.formatRelativeTime(notification.createdAt),
+                            formatRelativeTimeText(notification.createdAt),
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
                         )
@@ -402,7 +419,7 @@ private fun NotificationCard(
                                 color = Color.White
                             )
                         } else {
-                            Text("Accept & Join", style = MaterialTheme.typography.labelMedium)
+                            Text(stringResource(R.string.notifications_accept), style = MaterialTheme.typography.labelMedium)
                         }
                     }
                     OutlinedButton(
@@ -411,7 +428,7 @@ private fun NotificationCard(
                         shape = RoundedCornerShape(8.dp),
                         contentPadding = PaddingValues(horizontal = 16.dp, vertical = 6.dp)
                     ) {
-                        Text("Decline", style = MaterialTheme.typography.labelMedium)
+                        Text(stringResource(R.string.notifications_decline), style = MaterialTheme.typography.labelMedium)
                     }
                 }
             }
@@ -422,14 +439,14 @@ private fun NotificationCard(
                     onClick = { navController.navigate(TrevioRoute.GroupDetail.createRoute(groupId)) },
                     modifier = Modifier.padding(start = 52.dp)
                 ) {
-                    Text("Open Group →", color = MaterialTheme.colorScheme.primary)
+                    Text(stringResource(R.string.notifications_open_group), color = MaterialTheme.colorScheme.primary)
                 }
             }
 
             if (isInvitation && result == "declined") {
                 Spacer(modifier = Modifier.height(8.dp))
                 Text(
-                    "Declined",
+                    stringResource(R.string.notifications_declined),
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(start = 52.dp)
@@ -442,7 +459,7 @@ private fun NotificationCard(
                     onClick = { navController.navigate(TrevioRoute.GroupDetail.createRoute(groupId)) },
                     modifier = Modifier.padding(start = 52.dp)
                 ) {
-                    Text("View Group →", color = MaterialTheme.colorScheme.primary)
+                    Text(stringResource(R.string.notifications_view_group), color = MaterialTheme.colorScheme.primary)
                 }
             }
         }
@@ -453,10 +470,10 @@ private fun NotificationCard(
 private fun notificationIcon(type: String): Pair<androidx.compose.ui.graphics.vector.ImageVector, Color> {
     val isDark = isSystemInDarkTheme()
     return when (type) {
-        "expense_added", "expense_updated", "expense_deleted" -> Icons.Default.Receipt to if (isDark) Color(0xFFFBBF24) else Color(0xFFF59E0B)
-        "settlement_added" -> Icons.Default.Payments to if (isDark) Color(0xFF4ADE80) else Color(0xFF22C55E)
-        "member_joined", "member_left", "group_invitation", "invitation" -> Icons.Default.Group to if (isDark) Color(0xFF818CF8) else Color(0xFF6366F1)
-        else -> Icons.Default.Notifications to if (isDark) Color(0xFF2DD4BF) else Color(0xFF0D9488)
+        "expense_added", "expense_updated", "expense_deleted" -> Icons.Default.Receipt to if (isDark) TemplateCasualDark else TemplateCasual
+        "settlement_added" -> Icons.Default.Payments to if (isDark) BalancePositiveDark else BalancePositive
+        "member_joined", "member_left", "group_invitation", "invitation" -> Icons.Default.Group to if (isDark) TemplateTripDark else TemplateTrip
+        else -> Icons.Default.Notifications to if (isDark) TemplateHouseholdDark else TemplateHousehold
     }
 }
 
@@ -466,14 +483,14 @@ private fun BroadcastNotificationCard(broadcast: BroadcastMessage) {
 
     val isDark = isSystemInDarkTheme()
     val priorityColor = when (broadcast.priority) {
-        BroadcastPriority.CRITICAL -> if (isDark) Color(0xFFF87171) else Color(0xFFEF4444)
-        BroadcastPriority.MAINTENANCE -> if (isDark) Color(0xFFFBBF24) else Color(0xFFF59E0B)
-        BroadcastPriority.INFO -> if (isDark) Color(0xFF60A5FA) else Color(0xFF3B82F6)
+        BroadcastPriority.CRITICAL -> if (isDark) BalanceNegativeDark else BalanceNegative
+        BroadcastPriority.MAINTENANCE -> if (isDark) TemplateCasualDark else TemplateCasual
+        BroadcastPriority.INFO -> if (isDark) InfoBlueDark else InfoBlue
     }
     val priorityLabel = when (broadcast.priority) {
-        BroadcastPriority.CRITICAL -> "Critical"
-        BroadcastPriority.MAINTENANCE -> "Maintenance"
-        BroadcastPriority.INFO -> "Info"
+        BroadcastPriority.CRITICAL -> stringResource(R.string.priority_critical)
+        BroadcastPriority.MAINTENANCE -> stringResource(R.string.priority_maintenance)
+        BroadcastPriority.INFO -> stringResource(R.string.priority_info)
     }
     val priorityIcon = when (broadcast.priority) {
         BroadcastPriority.CRITICAL -> Icons.Default.Warning
@@ -548,7 +565,7 @@ private fun BroadcastNotificationCard(broadcast: BroadcastMessage) {
                 }
                 Icon(
                     imageVector = if (isExpanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
-                    contentDescription = if (isExpanded) "Show less" else "Read more",
+                    contentDescription = if (isExpanded) stringResource(R.string.notifications_show_less) else stringResource(R.string.notifications_read_more),
                     tint = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.size(20.dp)
                 )
@@ -557,7 +574,7 @@ private fun BroadcastNotificationCard(broadcast: BroadcastMessage) {
                 onClick = { isExpanded = !isExpanded },
                 modifier = Modifier.padding(start = 52.dp)
             ) {
-                Text(if (isExpanded) "Show less" else "Read more")
+                Text(if (isExpanded) stringResource(R.string.notifications_show_less) else stringResource(R.string.notifications_read_more))
             }
         }
     }

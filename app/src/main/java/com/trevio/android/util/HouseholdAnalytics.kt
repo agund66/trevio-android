@@ -1,50 +1,40 @@
 package com.trevio.android.util
 
+import com.trevio.android.R
 import com.trevio.android.domain.model.CategoryBreakdown
 import com.trevio.android.domain.model.DailySummary
 import com.trevio.android.domain.model.DailyTrend
 import com.trevio.android.domain.model.Expense
 import com.trevio.android.domain.model.HouseholdGamification
+import com.trevio.android.domain.model.LocalizedString
 import com.trevio.android.domain.model.Member
 import com.trevio.android.domain.model.MemberContribution
 import com.trevio.android.domain.model.MonthComparison
 import com.trevio.android.domain.model.MonthlyReport
 import com.trevio.android.domain.model.TransactionType
 import java.util.Calendar
-import java.util.Locale
 
-private fun formatDateLabel(timestamp: Long): String {
+private fun formatDateLabel(timestamp: Long): LocalizedString {
     val cal = Calendar.getInstance().apply { timeInMillis = timestamp }
     val now = Calendar.getInstance()
     val yesterday = Calendar.getInstance().apply { add(Calendar.DAY_OF_YEAR, -1) }
+    val month = LocalizedString(DateUtils.getMonthLabelResId(cal.get(Calendar.MONTH)))
+    val day = cal.get(Calendar.DAY_OF_MONTH)
 
     return when {
-        DateUtils.isSameDay(timestamp, now.timeInMillis) -> {
-            val day = cal.get(Calendar.DAY_OF_MONTH)
-            val month = DateUtils.MONTH_LABELS[cal.get(Calendar.MONTH)]
-            "Today, $day $month"
-        }
-        DateUtils.isSameDay(timestamp, yesterday.timeInMillis) -> {
-            val day = cal.get(Calendar.DAY_OF_MONTH)
-            val month = DateUtils.MONTH_LABELS[cal.get(Calendar.MONTH)]
-            "Yesterday, $day $month"
-        }
-        else -> {
-            val day = cal.get(Calendar.DAY_OF_MONTH)
-            val month = DateUtils.MONTH_LABELS[cal.get(Calendar.MONTH)]
-            val weekday = cal.getDisplayName(Calendar.DAY_OF_WEEK, Calendar.SHORT, Locale.getDefault())
-            "$weekday, $day $month"
-        }
+        DateUtils.isSameDay(timestamp, now.timeInMillis) -> LocalizedString(
+            R.string.date_today,
+            listOf(day, month)
+        )
+        DateUtils.isSameDay(timestamp, yesterday.timeInMillis) -> LocalizedString(
+            R.string.date_yesterday,
+            listOf(day, month)
+        )
+        else -> LocalizedString(
+            R.string.date_weekday,
+            listOf(DateUtils.formatWeekday(timestamp), day, month)
+        )
     }
-}
-
-private fun formatTime(timestamp: Long): String {
-    val cal = Calendar.getInstance().apply { timeInMillis = timestamp }
-    val hour = cal.get(Calendar.HOUR_OF_DAY)
-    val minute = cal.get(Calendar.MINUTE)
-    val amPm = if (hour < 12) "AM" else "PM"
-    val hour12 = if (hour == 0) 12 else if (hour > 12) hour - 12 else hour
-    return String.format("%d:%02d %s", hour12, minute, amPm)
 }
 
 // ─── Daily Summary ──────────────────────────────────────────────
@@ -66,7 +56,7 @@ fun computeDailySummary(
 
     return DailySummary(
         date = date,
-        dateLabel = formatDateLabel(date),
+        dateLabelText = formatDateLabel(date),
         totalSpent = MathUtils.round2(totalSpent),
         totalReceived = MathUtils.round2(totalReceived),
         netAmount = MathUtils.round2(totalReceived - totalSpent),
@@ -107,11 +97,12 @@ fun computeMonthlyReport(
 
     val comparison = computeMonthComparison(allExpenses, year, month)
 
-    val monthLabel = "${DateUtils.FULL_MONTH_LABELS[month]} $year"
-
     return MonthlyReport(
         month = String.format("%04d-%02d", year, month + 1),
-        monthLabel = monthLabel,
+        monthLabelText = LocalizedString(
+            R.string.month_year,
+            listOf(LocalizedString(DateUtils.getFullMonthLabelResId(month)), year)
+        ),
         totalSpent = MathUtils.round2(totalSpent),
         totalReceived = MathUtils.round2(totalReceived),
         netAmount = MathUtils.round2(totalReceived - totalSpent),
@@ -306,7 +297,7 @@ fun computeGamification(
     members: List<Member>,
     monthlyBudget: Double? = null,
     monthlySpent: Double = 0.0,
-    currency: String = "INR"
+    currency: String = AppConstants.BASE_CURRENCY
 ): HouseholdGamification {
     val activeMembers = members.filter { it.status == MemberStatus.ACTIVE }
     val totalMembers = activeMembers.size
@@ -326,7 +317,7 @@ fun computeGamification(
     val monthlyBadge = computeMonthlyBadge(streak.count, monthlyBudget, monthlySpent, totalMembers, membersLoggedToday)
 
     // Insight message
-    val insightMessage = computeInsightMessage(allExpenses, monthlyBudget, monthlySpent, currency)
+    val insightMessageText = computeInsightMessage(allExpenses, monthlyBudget, monthlySpent, currency)
 
     return HouseholdGamification(
         loggingStreak = streak.count,
@@ -335,7 +326,7 @@ fun computeGamification(
         participationToday = participationToday,
         membersLoggedToday = membersLoggedToday,
         totalMembers = totalMembers,
-        insightMessage = insightMessage
+        insightMessageText = insightMessageText
     )
 }
 
@@ -399,47 +390,55 @@ private fun computeMonthlyBadge(
     monthlySpent: Double,
     totalMembers: Int,
     membersLoggedToday: Int
-): String? {
-    val badges = mutableListOf<String>()
-
-    if (streak >= 30) badges.add("streak_champion")
+): LocalizedString? {
+    if (streak >= 30) return LocalizedString(R.string.badge_streak_champion)
     if (monthlyBudget != null && monthlyBudget > 0 && monthlySpent <= monthlyBudget) {
-        badges.add("budget_master")
+        return LocalizedString(R.string.badge_budget_master)
     }
     if (totalMembers > 0 && membersLoggedToday == totalMembers) {
-        badges.add("all_stars")
+        return LocalizedString(R.string.badge_all_stars)
     }
-
-    return badges.firstOrNull()
+    return null
 }
 
 private fun computeInsightMessage(
     allExpenses: List<Expense>,
     monthlyBudget: Double?,
     monthlySpent: Double,
-    currency: String = "INR"
-): String? {
-    // Budget insight
+    currency: String = AppConstants.BASE_CURRENCY
+): LocalizedString? {
     if (monthlyBudget != null && monthlyBudget > 0) {
         val progress = (monthlySpent / monthlyBudget) * 100
         when {
-            progress >= 100 -> return "You've exceeded your monthly budget by ${CurrencyConverter.formatCurrency(MathUtils.round2(monthlySpent - monthlyBudget), currency)}"
-            progress >= 80 -> return "You've used ${MathUtils.round2(progress)}% of your budget. ${CurrencyConverter.formatCurrency(MathUtils.round2(monthlyBudget - monthlySpent), currency)} left."
+            progress >= 100 -> return LocalizedString(
+                R.string.insight_budget_exceeded,
+                listOf(CurrencyConverter.formatCurrency(MathUtils.round2(monthlySpent - monthlyBudget), currency))
+            )
+            progress >= 80 -> return LocalizedString(
+                R.string.insight_budget_used,
+                listOf(
+                    MathUtils.round2(progress).toString(),
+                    CurrencyConverter.formatCurrency(MathUtils.round2(monthlyBudget - monthlySpent), currency)
+                )
+            )
         }
     }
 
-    // Category insight
     val now = Calendar.getInstance()
     val monthExpenses = allExpenses.filter {
         DateUtils.isSameMonth(it.date, now.get(Calendar.YEAR), now.get(Calendar.MONTH)) &&
         it.transactionType == TransactionType.EXPENSE
     }
     if (monthExpenses.isNotEmpty()) {
-        val breakdown = computeHouseholdCategoryBreakdown(monthExpenses)
-        val topCategory = breakdown.firstOrNull()
+        val topCategory = computeHouseholdCategoryBreakdown(monthExpenses).firstOrNull()
         if (topCategory != null && topCategory.percentage >= 40) {
-            val label = HouseholdCategories.getCategoryLabel(topCategory.category)
-            return "$label is ${MathUtils.round2(topCategory.percentage)}% of your spending this month"
+            return LocalizedString(
+                R.string.insight_top_category,
+                listOf(
+                    LocalizedString(HouseholdCategories.getCategoryLabelResId(topCategory.category)),
+                    MathUtils.round2(topCategory.percentage).toString()
+                )
+            )
         }
     }
 

@@ -1,4 +1,1437 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <!-- App Name -->
     <string name="app_name">Trevio</string>
+
+    <!-- ==================== HOME SCREEN ==================== -->
+    <string name="home_welcome_back">Welcome back</string>
+    <string name="home_no_groups_yet">No groups yet</string>
+    <string name="home_no_groups_message">Create your first group to start splitting bills with friends. Perfect for trips, turf sessions, or casual splits!</string>
+    <string name="home_create_group">Create Group</string>
+    <string name="home_failed_to_load">Failed to load groups</string>
+    <string name="home_your_groups">Your Groups</string>
+    <string name="home_active_count">%1$d active</string>
+    <string name="home_join_group">Join Group</string>
+    <string name="home_new_group">New Group</string>
+    <string name="home_view_all_groups">View All Groups</string>
+    <string name="home_total_balance">Total Balance</string>
+    <string name="home_youre_owed">you\'re owed</string>
+    <string name="home_you_owe">you owe</string>
+    <string name="home_youll_get">You\'ll get</string>
+    <string name="home_youll_pay">You\'ll pay</string>
+    <string name="home_total_spent">Total Spent</string>
+    <string name="home_across_groups">Across %1$d active %2$s</string>
+    <string name="home_group">group</string>
+    <string name="home_groups">groups</string>
+    <string name="home_notifications">Notifications</string>
+
+    <!-- ==================== GROUPS LIST SCREEN ==================== -->
+    <string name="groups_title">Groups</string>
+    <string name="groups_failed_to_load">Failed to load groups</string>
+    <string name="groups_no_groups_yet">No groups yet</string>
+    <string name="groups_create_message">Create your first group to start splitting bills with friends.</string>
+    <string name="groups_create_group">Create Group</string>
+    <string name="groups_join_group">Join Group</string>
+    <string name="groups_join_group_desc">Join group</string>
+    <string name="groups_new_group">New Group</string>
+    <string name="groups_new_group_desc">Create group</string>
+    <string name="groups_active_count">%1$d active</string>
+
+    <!-- ==================== GROUP DETAIL SCREEN ==================== -->
+    <string name="group_detail_title">Group</string>
+    <string name="group_detail_archived">Archived</string>
+    <string name="group_detail_members_count">%1$d members</string>
+    <string name="group_detail_code">Code: %1$s</string>
+    <string name="group_detail_settings">Settings</string>
+    <string name="group_detail_archive">Archive</string>
+    <string name="group_detail_unarchive">Unarchive</string>
+    <string name="group_detail_qr_code">QR Code</string>
+    <string name="group_detail_copy_code">Copy Code</string>
+    <string name="group_detail_share_invite">Share Invite</string>
+    <string name="group_detail_invite_code_copied">Invite code copied</string>
+    <string name="group_detail_today">Today</string>
+    <string name="group_detail_monthly">Monthly</string>
+    <string name="group_detail_insights">Insights</string>
+    <string name="group_detail_expenses">Expenses</string>
+    <string name="group_detail_balances">Balances</string>
+    <string name="group_detail_trip">Trip</string>
+    <string name="group_detail_members">Members</string>
+    <string name="group_detail_activity">Activity</string>
+    <string name="group_detail_add_expense">Add Expense</string>
+    <string name="group_detail_add_entry">Add Entry</string>
+    <string name="group_detail_no_expenses">No expenses yet</string>
+    <string name="group_detail_no_expenses_msg">Add your first expense to start tracking.</string>
+    <string name="group_detail_no_expenses_search">No expenses found</string>
+    <string name="group_detail_search_expenses">Search expenses…</string>
+    <string name="group_detail_all_settled">All settled up!</string>
+    <string name="group_detail_no_balances">No outstanding balances</string>
+    <string name="group_detail_you_owe">You owe</string>
+    <string name="group_detail_owes_you">owes you</string>
+    <string name="group_detail_settle_up">Settle Up</string>
+    <string name="group_detail_pay_via_upi">Pay via UPI</string>
+    <string name="group_detail_mark_cash">Mark as Paid (Cash)</string>
+    <string name="group_detail_no_activity">No activity yet</string>
+    <string name="group_detail_no_activity_msg">Activity will appear here when members interact.</string>
+    <string name="group_detail_load_more">Load more</string>
+    <string name="group_detail_invite_member">Invite Member</string>
+    <string name="group_detail_search_users">Search users…</string>
+    <string name="group_detail_no_users">No users found</string>
+    <string name="group_detail_add_offline">Add Offline Member</string>
+    <string name="group_detail_offline_name">Member name</string>
+    <string name="group_detail_add">Add</string>
+    <string name="group_detail_invite_failed">Failed to invite member</string>
+    <string name="group_detail_delete_expense_confirm">Delete this expense?</string>
+    <string name="group_detail_delete">Delete</string>
+    <string name="group_detail_cancel">Cancel</string>
+    <string name="group_detail_retry">Retry</string>
+    <string name="group_detail_failed_load">Failed to load group</string>
+    <string name="group_detail_share_subject">Join \"%1$s\" on Trevio</string>
+    <string name="group_detail_share_text">You\'ve been invited to join \"%1$s\" on Trevio. Tap to join and start splitting bills!\n\nhttps://trevio.app/join/%2$s</string>
+    <string name="group_detail_share_chooser">Share Invite</string>
+    <string name="group_detail_transfer_admin">Transfer Admin</string>
+    <string name="group_detail_transfer_to">Transfer to</string>
+    <string name="group_detail_transfer_confirm">Transfer admin rights to %1$s?</string>
+    <string name="group_detail_transfer">Transfer</string>
+    <string name="group_detail_search_by_username">Search by username</string>
+    <string name="group_detail_invite_btn">Invite</string>
+    <string name="group_detail_add_offline_msg">Add someone who isn\'t on the app yet. They can claim their profile later.</string>
+    <string name="group_detail_delete_expense_title">Delete Expense?</string>
+    <string name="group_detail_delete_expense_msg">This action cannot be undone. Balances will be recalculated.</string>
+    <string name="group_detail_offline_member">Offline member</string>
+    <string name="group_detail_offline_label">offline</string>
+    <string name="group_detail_pending_label">pending</string>
+    <string name="group_detail_admin_label">admin</string>
+    <string name="group_detail_remove_member">Remove member</string>
+    <string name="group_detail_remove_confirm">Remove %1$s?</string>
+    <string name="group_detail_remove_msg">If they have any entries, they\'ll be converted to an offline member to preserve transaction history.</string>
+    <string name="group_detail_your_balance">Your balance</string>
+    <string name="group_detail_you_owe_count">You owe %1$d %2$s %3$s</string>
+    <string name="group_detail_owes_you_count">%1$d %2$s you %3$s</string>
+    <string name="group_detail_person">person</string>
+    <string name="group_detail_people">people</string>
+    <string name="group_detail_person_owes">person owes</string>
+    <string name="group_detail_people_owe">people owe</string>
+    <string name="group_detail_all_settled_group">All settled up in this group</string>
+    <string name="group_detail_suggested_settlements">Suggested Settlements</string>
+    <string name="group_detail_you_owe_name">You owe %1$s</string>
+    <string name="group_detail_name_owes_you">%1$s owes you</string>
+    <string name="group_detail_name_owes_name">%1$s owes %2$s</string>
+    <string name="group_detail_pay_to">Pay to: %1$s</string>
+    <string name="group_detail_mark_settled">Mark Settled</string>
+    <string name="group_detail_member_balances">Member Balances</string>
+    <string name="group_detail_members_with_count">Members (%1$d)</string>
+    <string name="group_detail_no_expenses_tap">Tap + to add your first expense</string>
+    <string name="group_detail_no_expenses_filters">No expenses match your filters</string>
+    <string name="group_detail_clear_filters">Clear filters</string>
+    <string name="group_detail_all">All</string>
+    <string name="group_detail_settlements">Settlements</string>
+    <string name="group_detail_no_settlements">No settlements yet</string>
+    <string name="group_detail_no_recent_activity">No recent activity</string>
+    <string name="group_detail_failed_load_activity">Failed to load activity</string>
+    <string name="group_detail_you_suffix"> (You)</string>
+    <string name="group_detail_recurring">Recurring</string>
+    <string name="group_detail_paid_by">%1$s paid · %2$s</string>
+    <string name="group_detail_your_share">your share: %1$s</string>
+    <string name="group_detail_paid_share">%1$s paid · %2$s · your share: %3$s</string>
+    <string name="group_detail_invite_code_label">Invite Code</string>
+
+    <!-- ==================== GROUP SETTINGS SCREEN ==================== -->
+    <string name="group_settings_title">Group Settings</string>
+    <string name="group_settings_name">Group Name</string>
+    <string name="group_settings_description">Description (optional)</string>
+    <string name="group_settings_monthly_budget">Monthly Budget</string>
+    <string name="group_settings_budget_help">Set to 0 for no budget</string>
+    <string name="group_settings_members">Members</string>
+    <string name="group_settings_admin">Admin</string>
+    <string name="group_settings_you">You</string>
+    <string name="group_settings_leave">Leave Group</string>
+    <string name="group_settings_delete">Delete Group</string>
+    <string name="group_settings_save">Save Changes</string>
+    <string name="group_settings_saving">Saving…</string>
+    <string name="group_settings_saved">Settings saved</string>
+    <string name="group_settings_budget_error">Budget must be a positive number</string>
+    <string name="group_settings_transfer_admin">Transfer Admin</string>
+    <string name="group_settings_transfer_to">Transfer to</string>
+    <string name="group_settings_no_admin">No admin selected</string>
+    <string name="group_settings_transfer_success">Admin transferred successfully</string>
+    <string name="group_settings_leave_confirm">Are you sure you want to leave this group?</string>
+    <string name="group_settings_delete_confirm">Are you sure you want to delete this group? This cannot be undone.</string>
+    <string name="group_settings_make_admin">Make Admin</string>
+    <string name="group_settings_remove_member">Remove Member</string>
+    <string name="group_settings_remove_confirm">Remove %1$s from the group?</string>
+    <string name="group_settings_member_since">Member since %1$s</string>
+    <string name="group_settings_leave_btn">Leave</string>
+    <string name="group_settings_delete_btn">Delete</string>
+    <string name="group_settings_admin_only">Only group admins can access group settings.</string>
+    <string name="group_settings_group_details">Group Details</string>
+    <string name="group_settings_description_label">Description</string>
+    <string name="group_settings_budget_desc">Set a monthly spending budget. You\'ll see progress in the Monthly report.</string>
+    <string name="group_settings_budget_amount">Monthly budget amount</string>
+    <string name="group_settings_save_budget">Save Budget</string>
+    <string name="group_settings_transfer_admin_role">Transfer Admin Role</string>
+    <string name="group_settings_transfer_desc">Transfer admin rights to another member. You will become a regular member.</string>
+    <string name="group_settings_transferring">Transferring…</string>
+    <string name="group_settings_no_transfer_members">No other active members to transfer admin role to.</string>
+    <string name="group_settings_danger_zone">Danger Zone</string>
+    <string name="group_settings_delete_desc">Delete this group permanently. All expenses, settlements, and activity will be removed.</string>
+    <string name="group_settings_delete_sole_member">Only works if you are the sole active member. Remove other members first.</string>
+    <string name="group_settings_delete_absolute">Are you absolutely sure? This cannot be undone.</string>
+    <string name="group_settings_yes_delete">Yes, Delete</string>
+    <string name="group_settings_leave_desc">You will no longer have access to this group\'s expenses and activity.</string>
+    <string name="group_settings_yes_leave">Yes, Leave</string>
+    <string name="group_settings_budget_updated">Budget updated</string>
+    <string name="group_settings_updated">Group settings updated</string>
+
+    <!-- ==================== CREATE GROUP SCREEN ==================== -->
+    <string name="create_group_title">Create Group</string>
+    <string name="create_group_name">Group Name</string>
+    <string name="create_group_description">Description (optional)</string>
+    <string name="create_group_template">Template</string>
+    <string name="create_group_members">Members</string>
+    <string name="create_group_search">Search users…</string>
+    <string name="create_group_add_offline">Add offline member</string>
+    <string name="create_group_offline_name">Name</string>
+    <string name="create_group_monthly_budget">Monthly Budget (optional)</string>
+    <string name="create_group_create">Create Group</string>
+    <string name="create_group_creating">Creating…</string>
+    <string name="create_group_template_casual">Casual</string>
+    <string name="create_group_template_household">Household</string>
+    <string name="create_group_template_trip">Trip</string>
+    <string name="create_group_template_turf">Turf</string>
+    <string name="create_group_template_casual_desc">For splitting bills with friends</string>
+    <string name="create_group_template_household_desc">Track household expenses</string>
+    <string name="create_group_template_trip_desc">Plan and split trip costs</string>
+    <string name="create_group_template_turf_desc">For turf bookings and sessions</string>
+    <string name="create_group_no_members">No members added</string>
+    <string name="create_group_add_members">Add members to continue</string>
+    <string name="create_group_name_required">Group name is required</string>
+    <string name="create_group_no_users">No users found</string>
+    <string name="create_group_choose_template">Choose a template</string>
+    <string name="create_group_template_hint">Pick a category that best fits your group</string>
+    <string name="create_group_template_trip_subtitle">Travel &amp; trips</string>
+    <string name="create_group_template_turf_subtitle">Sports &amp; turf</string>
+    <string name="create_group_template_casual_subtitle">Friends &amp; casual</string>
+    <string name="create_group_template_household_subtitle">Daily family expenses</string>
+    <string name="create_group_household_hint">Track daily family spending and income. No splitting — just log who paid what and see monthly reports.</string>
+    <string name="create_group_details_label">Group details</string>
+    <string name="create_group_details_hint">Give your group a name so members can identify it</string>
+    <string name="create_group_name_label">Group name</string>
+    <string name="create_group_add_members_label">Add members</string>
+    <string name="create_group_add_members_hint">Search by username or add someone not on the app</string>
+    <string name="create_group_search_placeholder">Search by username</string>
+    <string name="create_group_add_offline_hint">Add \"%1$s\" as offline member</string>
+    <string name="create_group_or_add_by_name">or add by name</string>
+    <string name="create_group_members_added">%1$d added</string>
+    <string name="create_group_you_suffix"> (You)</string>
+
+    <!-- ==================== JOIN GROUP SCREEN ==================== -->
+    <string name="join_group_title">Join Group</string>
+    <string name="join_group_joining">Joining group…</string>
+    <string name="join_group_success">Joined successfully!</string>
+    <string name="join_group_claim_message">Are any of these offline profiles you? Claim one to link your account.</string>
+    <string name="join_group_claim">Claim</string>
+    <string name="join_group_skip">Skip</string>
+    <string name="join_group_claiming">Claiming…</string>
+    <string name="join_group_claim_error">Failed to claim profile</string>
+    <string name="join_group_skip_for_now">Skip for now</string>
+    <string name="join_group_profile_claimed">Profile claimed!</string>
+    <string name="join_group_claimed_msg">All transactions have been linked to your account.</string>
+    <string name="join_group_invited">You\'ve been invited to join a group!</string>
+    <string name="join_group_sign_in_msg">Sign in with Google to accept the invitation and start splitting bills.</string>
+    <string name="join_group_redirecting">Redirecting to sign in…</string>
+    <string name="join_group_almost_there">Almost there!</string>
+    <string name="join_group_tnc_msg">Please accept the Terms &amp; Conditions to join the group.</string>
+    <string name="join_group_failed">Failed to join</string>
+    <string name="join_group_go_back">Go Back</string>
+
+    <!-- ==================== JOIN GROUP SHEET ==================== -->
+    <string name="join_sheet_title">Join Group</string>
+    <string name="join_sheet_code">Invite Code</string>
+    <string name="join_sheet_enter_code">Enter invite code</string>
+    <string name="join_sheet_scan">Scan QR Code</string>
+    <string name="join_sheet_join">Join</string>
+    <string name="join_sheet_joining">Joining…</string>
+    <string name="join_sheet_error">Please enter an invite code</string>
+    <string name="join_sheet_failed">Failed to join group</string>
+    <string name="join_sheet_claim_title">Claim a Profile</string>
+    <string name="join_sheet_claim_message">Are any of these offline profiles you?</string>
+    <string name="join_sheet_joined">Joined \"%1$s\"</string>
+    <string name="join_sheet_joined_default">Joined group</string>
+    <string name="join_sheet_enter_code_or_scan">Enter an invite code or scan a QR code</string>
+    <string name="join_sheet_code_example">e.g., ABC123</string>
+    <string name="join_sheet_or">OR</string>
+    <string name="join_sheet_play_services_error">QR scanning requires Google Play Services. Please update it and try again.</string>
+    <string name="join_sheet_scan_failed">Scan failed. Try entering the code manually.</string>
+    <string name="join_sheet_join_btn">Join Group</string>
+
+    <!-- ==================== GROUP QR CODE DIALOG ==================== -->
+    <string name="qr_code_title">Group QR Code</string>
+    <string name="qr_code_close">Close</string>
+    <string name="qr_code_label">Code: %1$s</string>
+    <string name="qr_code_instruction">Ask a friend to scan this code or use the code to join</string>
+    <string name="qr_code_share">Share</string>
+    <string name="qr_code_share_subject">Join \"%1$s\" on Trevio</string>
+    <string name="qr_code_share_text">You\'ve been invited to join \"%1$s\" on Trevio. Tap to join and start splitting bills!\n\nhttps://trevio.app/join/%2$s</string>
+    <string name="qr_code_content_desc">QR Code for %1$s</string>
+    <string name="qr_code_share_qr">Share QR</string>
+    <string name="qr_code_share_qr_chooser">Share QR Code</string>
+    <string name="qr_code_share_qr_text">Scan this QR code to join \"%1$s\" on Trevio!</string>
+
+    <!-- ==================== ADD EXPENSE SCREEN ==================== -->
+    <string name="add_expense_title">Add Expense</string>
+    <string name="add_expense_title_household">Add Entry</string>
+    <string name="add_expense_amount_label">Amount (%1$s)</string>
+    <string name="add_expense_quick_calc">Quick calc:</string>
+    <string name="add_expense_clear">Clear</string>
+    <string name="add_expense_description">Description</string>
+    <string name="add_expense_date">Date</string>
+    <string name="add_expense_pick_date">Pick date</string>
+    <string name="add_expense_spent">Spent</string>
+    <string name="add_expense_received">Received</string>
+    <string name="add_expense_category">Category</string>
+    <string name="add_expense_paid_by">Paid by</string>
+    <string name="add_expense_loading_members">Loading members…</string>
+    <string name="add_expense_split_method">Split method</string>
+    <string name="add_expense_per_person">%1$s per person</string>
+    <string name="add_expense_members_count">%1$d of %2$d members</string>
+    <string name="add_expense_enter_exact">Enter exact amount per member</string>
+    <string name="add_expense_enter_percent">Enter percentage per member</string>
+    <string name="add_expense_enter_shares">Enter shares per member</string>
+    <string name="add_expense_excluded">Excluded members (tap to include):</string>
+    <string name="add_expense_shares_note">Amounts are split proportionally based on share values.</string>
+    <string name="add_expense_note">Note (optional)</string>
+    <string name="add_expense_recurring">Make this a recurring expense</string>
+    <string name="add_expense_weekly">Weekly</string>
+    <string name="add_expense_monthly">Monthly</string>
+    <string name="add_expense_save">Save</string>
+    <string name="add_expense_save_add">Save &amp; Add</string>
+    <string name="add_expense_saved">Saved!</string>
+    <string name="add_expense_split_incomplete">Please complete the split before saving</string>
+    <string name="add_expense_calc_result">= %1$s%2$s</string>
+    <string name="add_expense_you">You</string>
+    <string name="add_expense_equal">Equal</string>
+    <string name="add_expense_exact">Exact</string>
+    <string name="add_expense_percent">Percent</string>
+    <string name="add_expense_shares">Shares</string>
+    <string name="add_expense_itemized">Itemized</string>
+
+    <!-- ==================== EDIT EXPENSE SCREEN ==================== -->
+    <string name="edit_expense_title">Edit Expense</string>
+    <string name="edit_expense_amount_label">Amount (%1$s)</string>
+    <string name="edit_expense_description">Description</string>
+    <string name="edit_expense_category">Category</string>
+    <string name="edit_expense_note">Note (optional)</string>
+    <string name="edit_expense_paid_by">Paid by</string>
+    <string name="edit_expense_split_method">Split method</string>
+    <string name="edit_expense_save">Save Changes</string>
+    <string name="edit_expense_saving">Saving…</string>
+    <string name="edit_expense_delete">Delete</string>
+    <string name="edit_expense_delete_confirm">Delete this expense?</string>
+    <string name="edit_expense_delete_message">This action cannot be undone. Balances will be recalculated.</string>
+    <string name="edit_expense_not_found">Expense not found.</string>
+    <string name="edit_expense_cannot_edit">You can only edit expenses you created.</string>
+    <string name="edit_expense_admin_can_edit">Group admins can also edit any expense.</string>
+    <string name="edit_expense_error">Description and amount are required</string>
+    <string name="edit_expense_itemized_error">All items must have a name, amount, and assigned member</string>
+    <string name="edit_expense_itemized_total_error">The itemized grand total must match the expense amount</string>
+    <string name="edit_expense_exact_total_error">Exact amounts must total the expense amount</string>
+    <string name="edit_expense_percent_total_error">Percent values must total 100</string>
+    <string name="edit_expense_shares_error">At least one share must be greater than zero</string>
+    <string name="edit_expense_equal">Equal</string>
+    <string name="edit_expense_exact">Exact</string>
+    <string name="edit_expense_percent">Percent</string>
+    <string name="edit_expense_shares">Shares</string>
+    <string name="edit_expense_itemized">Itemized</string>
+    <string name="edit_expense_you">You</string>
+
+    <!-- ==================== ITEMIZED SPLIT EDITOR ==================== -->
+    <string name="itemized_no_items">No items added yet.</string>
+    <string name="itemized_tap_add">Tap \"Add Item\" to start splitting your bill item by item.</string>
+    <string name="itemized_add_item">Add Item</string>
+    <string name="itemized_item_name">Item %1$d name</string>
+    <string name="itemized_amount">Amount (%1$s)</string>
+    <string name="itemized_assign">Assign to</string>
+    <string name="itemized_assign_all">All</string>
+    <string name="itemized_duplicate">Duplicate</string>
+    <string name="itemized_remove">Remove</string>
+    <string name="itemized_tax">Tax</string>
+    <string name="itemized_tip">Tip</string>
+    <string name="itemized_tax_split">Tax split</string>
+    <string name="itemized_tip_split">Tip split</string>
+    <string name="itemized_proportional">Proportional</string>
+    <string name="itemized_equal">Equal</string>
+    <string name="itemized_subtotal">Subtotal</string>
+    <string name="itemized_grand_total">Grand Total</string>
+    <string name="itemized_per_member">Per Member</string>
+    <string name="itemized_validation">Each item needs a name, amount, and at least one person assigned.</string>
+    <string name="itemized_total_mismatch_error">The itemized grand total (%1$s) does not match the expense amount (%2$s).</string>
+    <string name="itemized_per_person_each">%1$s each</string>
+    <string name="itemized_per_person_multiple">%1$s each × %2$d people</string>
+
+    <!-- ==================== SETTLE UP SCREEN ==================== -->
+    <string name="settle_up_title">Settle Up</string>
+    <string name="settle_up_failed">Failed to load settlements</string>
+    <string name="settle_up_retry">Retry</string>
+    <string name="settle_up_all_settled">You\'re all settled up!</string>
+    <string name="settle_up_no_debts">No outstanding balances in this group</string>
+    <string name="settle_up_you_owe">You owe</string>
+    <string name="settle_up_owes_you">owes you</string>
+    <string name="settle_up_settle">Settle</string>
+    <string name="settle_up_pay_upi">Pay via UPI</string>
+    <string name="settle_up_mark_cash">Mark as Paid (Cash)</string>
+    <string name="settle_up_settled">Settled</string>
+    <string name="settle_up_settle_confirm">Mark this debt as settled?</string>
+    <string name="settle_up_cash">Cash</string>
+    <string name="settle_up_upi">UPI</string>
+    <string name="settle_up_payment">Payment</string>
+    <string name="settle_up_all_settled_desc">All settled up</string>
+    <string name="settle_up_loading">Loading…</string>
+
+    <!-- ==================== NOTIFICATIONS SCREEN ==================== -->
+    <string name="notifications_title">Notifications</string>
+    <string name="notifications_mark_all_read">Mark All Read</string>
+    <string name="notifications_no_notifications">No notifications</string>
+    <string name="notifications_empty">You\'re all caught up!</string>
+    <string name="notifications_failed">Failed to load notifications</string>
+    <string name="notifications_invitation">Group Invitation</string>
+    <string name="notifications_invited_you">%1$s invited you to join %2$s</string>
+    <string name="notifications_accept">Accept</string>
+    <string name="notifications_decline">Decline</string>
+    <string name="notifications_accepted">Invitation accepted</string>
+    <string name="notifications_declined">Invitation declined</string>
+    <string name="notifications_expense_added">%1$s added an expense in %2$s</string>
+    <string name="notifications_settlement">%1$s settled up with %2$s</string>
+    <string name="notifications_joined">%1$s joined %2$s</string>
+    <string name="notifications_left">%1$s left %2$s</string>
+    <string name="notifications_broadcast">Broadcast</string>
+    <string name="notifications_load_more">Load more</string>
+
+    <!-- ==================== PROFILE SCREEN ==================== -->
+    <string name="profile_title">Profile</string>
+    <string name="profile_edit">Edit Profile</string>
+    <string name="profile_save">Save</string>
+    <string name="profile_saving">Saving…</string>
+    <string name="profile_saved">Profile updated</string>
+    <string name="profile_cancel">Cancel</string>
+    <string name="profile_display_name">Display Name</string>
+    <string name="profile_username">Username</string>
+    <string name="profile_email">Email</string>
+    <string name="profile_currency">Currency</string>
+    <string name="profile_upi_id">UPI ID</string>
+    <string name="profile_phone">Phone Number</string>
+    <string name="profile_country">Country</string>
+    <string name="profile_payment_info">Payment Info</string>
+    <string name="profile_not_set">Not set</string>
+    <string name="profile_sign_out">Sign Out</string>
+    <string name="profile_delete_account">Delete Account</string>
+    <string name="profile_delete_confirm">Are you sure you want to delete your account? This action cannot be undone.</string>
+    <string name="profile_delete_warning">Deleting your account will remove all your data from our servers.</string>
+    <string name="profile_theme">Theme</string>
+    <string name="profile_theme_light">Light</string>
+    <string name="profile_theme_dark">Dark</string>
+    <string name="profile_theme_system">System</string>
+    <string name="profile_upi_invalid">Invalid UPI ID format</string>
+    <string name="profile_phone_invalid">Invalid phone number</string>
+    <string name="phone_setup_title">Add Mobile Number</string>
+    <string name="phone_setup_subtitle">Required for UPI payments</string>
+    <string name="phone_setup_description">Your mobile number lets friends pay you via UPI directly from their payment app. It is also used as a fallback when you do not have a UPI ID.</string>
+    <string name="phone_setup_placeholder">%1$d-digit number</string>
+    <string name="phone_setup_continue">Continue</string>
+    <string name="phone_setup_failed">Failed to save phone number</string>
+    <string name="date_today">Today, %1$d %2$s</string>
+    <string name="date_yesterday">Yesterday, %1$d %2$s</string>
+    <string name="date_weekday">%1$s, %2$d %3$s</string>
+    <string name="profile_name_required">Display name is required</string>
+
+    <!-- ==================== PUBLIC PROFILE SCREEN ==================== -->
+    <string name="public_profile_title">Profile</string>
+    <string name="public_profile_not_found">User not found</string>
+    <string name="public_profile_username">Username</string>
+    <string name="public_profile_email">Email</string>
+    <string name="public_profile_pay_upi">Pay via UPI ID</string>
+    <string name="public_profile_pay_phone">Pay via Mobile Number</string>
+
+    <!-- ==================== HOUSEHOLD DAILY TAB ==================== -->
+    <string name="daily_today">Today</string>
+    <string name="daily_entries_count">%1$d %2$s</string>
+    <string name="daily_entry">entry</string>
+    <string name="daily_entries">entries</string>
+    <string name="daily_no_entries">No entries for this day</string>
+    <string name="daily_no_entries_msg">Add your first entry or check a previous day.</string>
+    <string name="daily_previous_day">Previous day</string>
+    <string name="daily_next_day">Next day</string>
+    <string name="daily_streak">Streak</string>
+    <string name="daily_days">days</string>
+    <string name="daily_budget">Budget</string>
+    <string name="daily_spent">Spent</string>
+    <string name="daily_received">Received</string>
+    <string name="daily_net">Net</string>
+    <string name="daily_remaining">Remaining</string>
+    <string name="daily_add_entry">Add Entry</string>
+    <string name="daily_full_form">Full Form</string>
+    <string name="daily_participation">Participation</string>
+    <string name="daily_logged_today">logged today</string>
+    <string name="daily_tap_add">Tap Add Entry to log a new entry</string>
+    <string name="daily_recent_entries">Recent Entries</string>
+    <string name="daily_view_all">View All</string>
+
+    <!-- ==================== HOUSEHOLD MONTHLY REPORT TAB ==================== -->
+    <string name="monthly_title">Monthly Report</string>
+    <string name="monthly_no_data">No data for this month</string>
+    <string name="monthly_previous_month">Previous month</string>
+    <string name="monthly_next_month">Next month</string>
+    <string name="monthly_entry_count">%1$d %2$s this month</string>
+    <string name="monthly_spent">Spent</string>
+    <string name="monthly_received">Received</string>
+    <string name="monthly_net">Net</string>
+    <string name="monthly_budget_progress">Budget Progress</string>
+    <string name="monthly_budget_remaining">Remaining</string>
+    <string name="monthly_comparison">Month Comparison</string>
+    <string name="monthly_vs_last_month">vs last month</string>
+    <string name="monthly_where_money_went">Where Money Went</string>
+    <string name="monthly_money_received">Money Received</string>
+    <string name="monthly_who_paid">Who Paid</string>
+    <string name="monthly_insight">Insight</string>
+    <string name="monthly_no_budget">No budget set</string>
+    <string name="insight_budget_exceeded">You\'ve exceeded your monthly budget by %1$s</string>
+    <string name="insight_budget_used">You\'ve used %1$s%% of your budget. %2$s left.</string>
+    <string name="insight_top_category">%1$s is %2$s%% of your spending this month</string>
+
+    <!-- ==================== HOUSEHOLD BADGES ==================== -->
+    <string name="badge_streak_champion">Streak Champion</string>
+    <string name="badge_budget_master">Budget Master</string>
+    <string name="badge_all_stars">All Stars</string>
+
+    <!-- ==================== HOUSEHOLD EDIT ENTRY SHEET ==================== -->
+    <string name="edit_entry_title">Edit Entry</string>
+    <string name="edit_entry_close">Close</string>
+    <string name="edit_entry_spent">Spent</string>
+    <string name="edit_entry_received">Received</string>
+    <string name="edit_entry_amount">Amount</string>
+    <string name="edit_entry_description">Description (optional)</string>
+    <string name="edit_entry_category">Category</string>
+    <string name="edit_entry_paid_by">Paid By</string>
+    <string name="edit_entry_note">Note (optional)</string>
+    <string name="edit_entry_save">Save</string>
+    <string name="edit_entry_saving">Saving…</string>
+    <string name="edit_entry_delete">Delete</string>
+    <string name="edit_entry_delete_confirm">Delete this entry?</string>
+
+    <!-- ==================== HOUSEHOLD ENTRY DETAIL SHEET ==================== -->
+    <string name="entry_detail_title">Entry Details</string>
+    <string name="entry_detail_close">Close</string>
+    <string name="entry_detail_category">Category</string>
+    <string name="entry_detail_description">Description</string>
+    <string name="entry_detail_paid_by">Paid by</string>
+    <string name="entry_detail_date">Date &amp; time</string>
+    <string name="entry_detail_note">Note</string>
+    <string name="entry_detail_edit">Edit</string>
+    <string name="entry_detail_delete">Delete</string>
+    <string name="entry_detail_spent">Spent</string>
+    <string name="entry_detail_received">Received</string>
+    <string name="entry_detail_someone">Someone</string>
+    <string name="entry_detail_delete_confirm">Delete this entry?</string>
+    <string name="entry_detail_no_note">No note</string>
+
+    <!-- ==================== TRIP TAB ==================== -->
+    <string name="trip_title">Trip</string>
+    <string name="trip_destination">Destination</string>
+    <string name="trip_dates">Dates</string>
+    <string name="trip_itinerary">Itinerary</string>
+    <string name="trip_locations">Locations</string>
+    <string name="trip_add_item">Add Item</string>
+    <string name="trip_add_location">Add Location</string>
+    <string name="trip_item_name">Item name</string>
+    <string name="trip_item_date">Date</string>
+    <string name="trip_item_time">Time</string>
+    <string name="trip_location_name">Location name</string>
+    <string name="trip_location_address">Address</string>
+    <string name="trip_save">Save</string>
+    <string name="trip_cancel">Cancel</string>
+    <string name="trip_delete">Delete</string>
+    <string name="trip_delete_confirm">Delete this item?</string>
+    <string name="trip_no_itinerary">No itinerary items yet</string>
+    <string name="trip_no_locations">No locations added yet</string>
+    <string name="trip_failed_to_load">Failed to load trip data</string>
+    <string name="trip_retry">Retry</string>
+    <string name="trip_completed">Completed</string>
+    <string name="trip_mark_complete">Mark as complete</string>
+    <string name="trip_est_cost">Est. cost</string>
+    <string name="trip_no_date">No date</string>
+    <string name="trip_unscheduled">Unscheduled</string>
+
+    <!-- ==================== ADMIN SCREENS ==================== -->
+    <string name="admin_title">Admin Dashboard</string>
+    <string name="admin_access_denied">Access Denied</string>
+    <string name="admin_superadmin_only">You need superadmin privileges to access this page.</string>
+    <string name="admin_go_back">Go Back</string>
+    <string name="admin_not_authenticated">Not authenticated</string>
+    <string name="admin_users">Users</string>
+    <string name="admin_broadcasts">Broadcasts</string>
+    <string name="admin_support">Support</string>
+    <string name="admin_block">Block</string>
+    <string name="admin_unblock">Unblock</string>
+    <string name="admin_promote">Promote</string>
+    <string name="admin_demote">Demote</string>
+    <string name="admin_block_confirm">Block %1$s?</string>
+    <string name="admin_unblock_confirm">Unblock %1$s?</string>
+    <string name="admin_promote_confirm">Promote %1$s to superadmin?</string>
+    <string name="admin_demote_confirm">Demote %1$s to user?</string>
+    <string name="admin_blocked">Blocked</string>
+    <string name="admin_superadmin">Superadmin</string>
+    <string name="admin_user">User</string>
+
+    <!-- ==================== BROADCASTS SCREEN ==================== -->
+    <string name="broadcasts_title">Broadcast Messages</string>
+    <string name="broadcasts_subtitle">Send HTML-formatted messages to users</string>
+    <string name="broadcasts_new">New</string>
+    <string name="broadcasts_total">Total</string>
+    <string name="broadcasts_active">Active</string>
+    <string name="broadcasts_stopped">Stopped</string>
+    <string name="broadcasts_no_broadcasts">No broadcasts yet</string>
+    <string name="broadcasts_create_title">Create Broadcast</string>
+    <string name="broadcasts_edit_title">Edit Broadcast</string>
+    <string name="broadcasts_title_label">Title</string>
+    <string name="broadcasts_content">Content (HTML)</string>
+    <string name="broadcasts_priority">Priority</string>
+    <string name="broadcasts_target">Target</string>
+    <string name="broadcasts_target_all">All Users</string>
+    <string name="broadcasts_target_except_blocked">All (except blocked)</string>
+    <string name="broadcasts_target_specific">Specific</string>
+    <string name="broadcasts_priority_critical">Critical</string>
+    <string name="broadcasts_priority_maintenance">Maintenance</string>
+    <string name="broadcasts_priority_info">Info</string>
+    <string name="broadcasts_send">Send</string>
+    <string name="broadcasts_sending">Sending…</string>
+    <string name="broadcasts_stop">Stop</string>
+    <string name="broadcasts_stopping">Stopping…</string>
+    <string name="broadcasts_detail_title">Broadcast Details</string>
+    <string name="broadcasts_read_count">Read by %1$d users</string>
+    <string name="broadcasts_created">Created</string>
+    <string name="broadcasts_started">Started</string>
+    <string name="broadcasts_stopped_label">Stopped</string>
+    <string name="broadcasts_back_to_list">Back to List</string>
+
+    <!-- ==================== ADMIN SUPPORT SCREEN ==================== -->
+    <string name="admin_support_title">Support</string>
+    <string name="admin_support_tickets">Tickets</string>
+    <string name="admin_support_articles">Articles</string>
+    <string name="admin_support_no_tickets">No tickets</string>
+    <string name="admin_support_no_articles">No articles</string>
+    <string name="admin_support_ticket_detail">Ticket #%1$d</string>
+    <string name="admin_support_status">Status</string>
+    <string name="admin_support_priority">Priority</string>
+    <string name="admin_support_category">Category</string>
+    <string name="admin_support_created">Created</string>
+    <string name="admin_support_send_reply">Send Reply</string>
+    <string name="admin_support_sending">Sending…</string>
+    <string name="admin_support_close_ticket">Close Ticket</string>
+    <string name="admin_support_reopen">Reopen</string>
+    <string name="admin_support_status_open">Open</string>
+    <string name="admin_support_status_in_progress">In Progress</string>
+    <string name="admin_support_status_resolved">Resolved</string>
+    <string name="admin_support_status_closed">Closed</string>
+    <string name="admin_support_priority_low">Low</string>
+    <string name="admin_support_priority_medium">Medium</string>
+    <string name="admin_support_priority_high">High</string>
+    <string name="admin_support_priority_critical">Critical</string>
+    <string name="admin_support_create_article">Create Article</string>
+    <string name="admin_support_edit_article">Edit Article</string>
+    <string name="admin_support_article_title">Title</string>
+    <string name="admin_support_article_content">Content</string>
+    <string name="admin_support_article_category">Category</string>
+    <string name="admin_support_article_tags">Tags</string>
+    <string name="admin_support_article_order">Order</string>
+    <string name="admin_support_save_article">Save Article</string>
+    <string name="admin_support_delete_article">Delete Article</string>
+    <string name="admin_support_toggle_active">Toggle Active</string>
+    <string name="admin_support_filter_all">All</string>
+    <string name="admin_support_filter_open">Open</string>
+    <string name="admin_support_filter_resolved">Resolved</string>
+
+    <!-- ==================== SUPPORT SCREEN ==================== -->
+    <string name="support_title">Support</string>
+    <string name="support_help_center">Help Center</string>
+    <string name="support_my_tickets">My Tickets</string>
+    <string name="support_new_ticket">New Ticket</string>
+    <string name="support_no_articles">No help articles available</string>
+    <string name="support_no_tickets">No support tickets</string>
+    <string name="support_create_ticket_title">Create Support Ticket</string>
+    <string name="support_subject">Subject</string>
+    <string name="support_description">Description</string>
+    <string name="support_category">Category</string>
+    <string name="support_submit">Submit</string>
+    <string name="support_submitting">Submitting…</string>
+    <string name="support_ticket_created">Ticket created successfully</string>
+    <string name="support_ticket_detail">Ticket #%1$d</string>
+    <string name="support_send_message">Send</string>
+    <string name="support_sending">Sending…</string>
+    <string name="support_status">Status</string>
+    <string name="support_priority">Priority</string>
+    <string name="support_category_general">General</string>
+    <string name="support_category_billing">Billing</string>
+    <string name="support_category_technical">Technical</string>
+    <string name="support_category_feature">Feature Request</string>
+    <string name="support_category_bug">Bug Report</string>
+    <string name="support_back">Back</string>
+    <string name="support_close">Close</string>
+
+    <!-- ==================== ANALYTICS TAB ==================== -->
+    <string name="analytics_title">Analytics</string>
+    <string name="analytics_no_data">No analytics data yet</string>
+    <string name="analytics_no_data_msg">Add expenses to see spending insights.</string>
+    <string name="analytics_total">Total</string>
+    <string name="analytics_avg">Avg</string>
+    <string name="analytics_expenses">Expenses</string>
+    <string name="analytics_recent">Recent</string>
+    <string name="analytics_monthly_spending">Monthly Spending</string>
+    <string name="analytics_by_category">By Category</string>
+    <string name="analytics_by_member">By Member</string>
+    <string name="analytics_food">Food</string>
+    <string name="analytics_transport">Transport</string>
+    <string name="analytics_shopping">Shopping</string>
+    <string name="analytics_turf">Turf</string>
+    <string name="analytics_stay">Stay</string>
+    <string name="analytics_other">Other</string>
+
+    <!-- ==================== BROADCAST POPUP ==================== -->
+    <string name="broadcast_critical_alert">Critical Alert</string>
+    <string name="broadcast_maintenance_notice">Maintenance Notice</string>
+    <string name="broadcast_information">Information</string>
+    <string name="broadcast_understood">Understood</string>
+    <string name="broadcast_ok_got_it">OK, Got it</string>
+    <string name="broadcast_dismiss">Dismiss</string>
+
+    <!-- ==================== TERMS SCREEN ==================== -->
+    <string name="terms_welcome">Welcome to Trevio</string>
+    <string name="terms_intro">Before you get started, please review and accept our terms.</string>
+    <string name="terms_acceptance_title">1. Acceptance of Terms</string>
+    <string name="terms_acceptance_body">By using Trevio, you agree to these terms and conditions. If you do not agree, please do not use the app.</string>
+    <string name="terms_privacy_title">2. Privacy &amp; Data</string>
+    <string name="terms_privacy_body">Trevio stores your name, email, and profile photo from your Google account. We use this to identify you and facilitate group expense splitting. Your data is stored securely in Firebase.</string>
+    <string name="terms_financial_title">3. Financial Data</string>
+    <string name="terms_financial_body">Trevio helps track expenses and settlements between users. We do not process actual payments. All settlements are tracked in-app. UPI deep links redirect you to your preferred payment app.</string>
+    <string name="terms_conduct_title">4. User Conduct</string>
+    <string name="terms_conduct_body">You are responsible for the expenses and settlements you add. Do not create fraudulent or misleading expense entries.</string>
+    <string name="terms_termination_title">5. Account Termination</string>
+    <string name="terms_termination_body">You can delete your account at any time. Upon deletion, your data will be removed from our servers.</string>
+    <string name="terms_agree">I have read and agree to the Terms &amp; Conditions</string>
+    <string name="terms_accept">Accept &amp; Continue</string>
+    <string name="terms_error">Failed to accept</string>
+
+    <!-- ==================== AUTH SCREEN ==================== -->
+    <string name="auth_tagline">Split bills. Simplify life.</string>
+    <string name="auth_feature_track">Track expenses with groups</string>
+    <string name="auth_feature_split">Split bills with friends instantly</string>
+    <string name="auth_feature_settle">Settle up easily</string>
+    <string name="auth_sign_in">Sign in with Google</string>
+    <string name="auth_signing_in">Signing in…</string>
+    <string name="auth_error">Sign-in failed</string>
+    <string name="auth_no_account">No Google accounts found. Please add a Google account in Settings.</string>
+    <string name="auth_blocked">Your account has been blocked. Please contact support.</string>
+
+    <!-- ==================== COMMON STRINGS ==================== -->
+    <string name="common_loading">Loading…</string>
+    <string name="common_error">Error</string>
+    <string name="common_retry">Retry</string>
+    <string name="notification_channel_general">General</string>
+    <string name="notification_channel_general_desc">General app notifications — group invites, expense updates, and settlements</string>
+    <string name="notification_channel_announcements">Announcements</string>
+    <string name="notification_channel_announcements_desc">Important announcements from the Trevio team</string>
+    <string name="common_cancel">Cancel</string>
+    <string name="common_save">Save</string>
+    <string name="common_delete">Delete</string>
+    <string name="common_edit">Edit</string>
+    <string name="common_close">Close</string>
+    <string name="common_back">Back</string>
+    <string name="common_done">Done</string>
+    <string name="common_yes">Yes</string>
+    <string name="common_no">No</string>
+    <string name="common_ok">OK</string>
+    <string name="common_search">Search</string>
+    <string name="common_optional">(optional)</string>
+    <string name="common_submit">Submit</string>
+    <string name="common_send">Send</string>
+    <string name="common_share">Share</string>
+    <string name="common_copy">Copy</string>
+    <string name="common_add">Add</string>
+    <string name="common_remove">Remove</string>
+    <string name="common_clear">Clear</string>
+    <string name="common_confirm">Confirm</string>
+    <string name="common_success">Success</string>
+    <string name="common_failed">Failed</string>
+    <string name="common_no_data">No data available</string>
+    <string name="common_copy_success">Copied to clipboard</string>
+
+    <!-- ==================== PROFILE EXTRAS ==================== -->
+    <string name="profile_payment_upi_hint">Friends can pay you via UPI ID</string>
+    <string name="profile_payment_phone_hint">Friends can pay you via mobile number</string>
+    <string name="profile_no_payment_info">No payment info set</string>
+    <string name="profile_set_up_payment">Set up payment info</string>
+    <string name="profile_terms_conditions">Terms &amp; Conditions</string>
+    <string name="profile_help_support">Help &amp; Support</string>
+    <string name="profile_add">Add</string>
+    <string name="profile_upi_hint">Used for receiving payments. Phone number used as fallback.</string>
+    <string name="profile_select_currency">Select currency</string>
+    <string name="profile_select_country">Select country</string>
+
+    <!-- ==================== EDIT ENTRY EXTRAS ==================== -->
+    <string name="edit_entry_view_only">You can only view this entry. Only the creator or an admin can edit or delete it.</string>
+    <string name="edit_entry_confirm_delete">Confirm Delete</string>
+    <string name="edit_entry_save_changes">Save Changes</string>
+
+    <!-- ==================== ENTRY DETAIL EXTRAS ==================== -->
+    <string name="entry_detail_cannot_undo">This cannot be undone.</string>
+    <string name="entry_detail_other">Other</string>
+
+    <!-- ==================== DAILY EXTRAS ==================== -->
+    <string name="daily_yesterday">Yesterday</string>
+    <string name="daily_other">Other</string>
+    <string name="daily_someone">Someone</string>
+    <string name="daily_badge">Badge</string>
+
+    <!-- ==================== MONTHLY EXTRAS ==================== -->
+    <string name="monthly_daily_trend">Daily Trend</string>
+    <string name="monthly_last_month_label">last month</string>
+    <string name="monthly_spent_suffix">spent</string>
+    <string name="monthly_over">over</string>
+    <string name="monthly_left">left</string>
+
+    <!-- ==================== TRIP EXTRAS ==================== -->
+    <string name="trip_set_destination">Set your destination</string>
+    <string name="trip_starts">Starts %1$s</string>
+    <string name="trip_ends">Ends %1$s</string>
+    <string name="trip_items">Items</string>
+    <string name="trip_done">Done</string>
+    <string name="trip_est_cost_label">Est. Cost</string>
+    <string name="trip_no_itinerary_msg">No itinerary items yet. Add your first activity!</string>
+    <string name="trip_no_locations_msg">No locations added yet.</string>
+    <string name="trip_mark_incomplete">Mark incomplete</string>
+    <string name="trip_mark_complete_label">Mark complete</string>
+    <string name="trip_remove">Remove</string>
+    <string name="trip_add_itinerary_item">Add Itinerary Item</string>
+    <string name="trip_title_field">Title</string>
+    <string name="trip_description_optional">Description (optional)</string>
+    <string name="trip_location_field">Location</string>
+    <string name="trip_category_field">Category</string>
+    <string name="trip_latitude">Latitude</string>
+    <string name="trip_longitude">Longitude</string>
+
+    <!-- ==================== BROADCASTS EXTRAS ==================== -->
+    <string name="broadcasts_title_placeholder">Broadcast title…</string>
+    <string name="broadcasts_select_users">Select users:</string>
+    <string name="broadcasts_schedule">Schedule</string>
+    <string name="broadcasts_start_date_time">Start Date &amp; Time</string>
+    <string name="broadcasts_end_optional">End (optional)</string>
+    <string name="broadcasts_end_empty_hint">Leave end empty to run until manually stopped</string>
+    <string name="broadcasts_select_time">Select Time</string>
+    <string name="broadcasts_preview">Preview:</string>
+    <string name="broadcasts_send_broadcast">Send Broadcast</string>
+    <string name="broadcasts_read">Read</string>
+    <string name="broadcasts_unread">Unread</string>
+    <string name="broadcasts_user_read_status">User Read Status</string>
+    <string name="broadcasts_pending">Pending</string>
+    <string name="broadcasts_no_target_users">No target users found</string>
+    <string name="broadcasts_selected">%1$d selected</string>
+    <string name="broadcasts_target_specific_users">Specific Users</string>
+    <string name="broadcasts_created_by">by %1$s</string>
+    <string name="broadcasts_start_label">Start: %1$s</string>
+    <string name="broadcasts_end_label">End: %1$s</string>
+
+    <!-- ==================== ADMIN SUPPORT EXTRAS ==================== -->
+    <string name="admin_support_total">Total</string>
+    <string name="admin_support_unread">Unread</string>
+    <string name="admin_support_search_placeholder">Search by subject, user, email…</string>
+    <string name="admin_support_all_status">All Status</string>
+    <string name="admin_support_all_categories">All Categories</string>
+    <string name="admin_support_no_tickets_found">No tickets found</string>
+    <string name="admin_support_ticket_detail_title">Ticket Detail</string>
+    <string name="admin_support_closed_notice">This ticket is closed. Change status to reopen, or send a message below.</string>
+    <string name="admin_support_type_response">Type your response…</string>
+    <string name="admin_support_you_admin">You (Admin)</string>
+    <string name="admin_support_help_articles">Help Articles</string>
+    <string name="admin_support_no_articles_msg">No articles yet. Create one to help your users.</string>
+    <string name="admin_support_hidden">Hidden</string>
+    <string name="admin_support_hide">Hide</string>
+    <string name="admin_support_show">Show</string>
+    <string name="admin_support_create_button">Create</string>
+    <string name="admin_support_from">From: %1$s @%2$s</string>
+    <string name="admin_support_context">Context: %1$s</string>
+    <string name="admin_search_placeholder">Search by name, email, username…</string>
+
+    <!-- ==================== SUPPORT EXTRAS ==================== -->
+    <string name="support_help_support">Help &amp; Support</string>
+    <string name="support_report_issue">Report an Issue</string>
+    <string name="support_search_articles">Search articles…</string>
+    <string name="support_no_articles_msg">No articles found. Try reporting your issue directly.</string>
+    <string name="support_article">Article</string>
+    <string name="support_still_need_help">Still need help? Report an issue</string>
+    <string name="support_what_type">What type of issue?</string>
+    <string name="support_describe_issue">Describe the issue</string>
+    <string name="support_min_description">Please describe your issue (at least 10 characters)</string>
+    <string name="support_no_tickets_msg">When you report an issue, it will appear here</string>
+    <string name="support_ticket">Ticket</string>
+    <string name="support_closed_notice">This ticket is closed. Send a message to reopen it.</string>
+    <string name="support_reopen_message">Send a message to reopen…</string>
+    <string name="support_type_reply">Type your reply…</string>
+    <string name="support_ticket_not_found">Ticket not found</string>
+    <string name="support_team">Support Team</string>
+    <string name="support_category_calculation">Balance &amp; Calculations</string>
+    <string name="support_category_settlement">Settlement Issue</string>
+    <string name="support_category_expense">Expense Issue</string>
+    <string name="support_category_group_access">Group Access</string>
+    <string name="support_category_payment_info">Payment Info</string>
+    <string name="support_category_account">Account Issue</string>
+    <string name="support_category_bug_crash">Bug / Crash</string>
+    <string name="support_category_other">Other</string>
+    <string name="support_category_calculation_desc">Balance looks wrong, split issues</string>
+    <string name="support_category_settlement_desc">Payment recording, settlement not updating</string>
+    <string name="support_category_expense_desc">Can\'t add/edit/delete expense</string>
+    <string name="support_category_group_access_desc">Can\'t join, create, or access a group</string>
+    <string name="support_category_payment_info_desc">UPI ID or phone number issues</string>
+    <string name="support_category_account_desc">Profile, currency, or account settings</string>
+    <string name="support_category_bug_crash_desc">App crashing, data not loading</string>
+    <string name="support_category_other_desc">Something else entirely</string>
+    <string name="support_context_label">📍 Context: %1$s</string>
+    <string name="support_characters_count">%1$d/2000 characters</string>
+
+    <!-- ==================== AUTH EXTRAS ==================== -->
+    <string name="auth_terms_notice">By continuing, you agree to our Terms &amp; Conditions</string>
+    <string name="auth_error_parse">Failed to parse sign-in token</string>
+
+    <!-- ==================== COMMON EXTRAS ==================== -->
+    <string name="common_next">Next</string>
+    <string name="common_new">NEW</string>
+    <string name="common_group">Group</string>
+
+    <!-- ==================== GROUP LIST ITEM ==================== -->
+    <string name="group_item_no_entries">No entries yet</string>
+    <string name="group_item_spent">%1$s spent</string>
+    <string name="group_item_owes_you">owes you %1$s</string>
+    <string name="group_item_you_owe">you owe %1$s</string>
+    <string name="group_item_settled_up">settled up</string>
+
+    <!-- ==================== NOTIFICATIONS EXTRAS ==================== -->
+    <string name="notifications_open_group">Open Group →</string>
+    <string name="notifications_view_group">View Group →</string>
+    <string name="notifications_show_less">Show less</string>
+    <string name="notifications_read_more">Read more</string>
+
+    <!-- ==================== ANALYTICS EXTRAS ==================== -->
+    <string name="analytics_top_spenders">Top Spenders</string>
+    <string name="analytics_biggest_expense">Biggest Expense</string>
+
+    <!-- ==================== SETTLE UP EXTRAS ==================== -->
+    <string name="settle_up_pay_to">Pay to: %1$s</string>
+    <string name="settle_up_pay_to_vpa">Pay to: %1$s</string>
+
+    <!-- ==================== ERROR MESSAGES (for ViewModels) ==================== -->
+    <string name="error_authentication_required">Authentication required</string>
+    <string name="error_failed_to_save">Failed to save</string>
+    <string name="error_failed_to_update">Failed to update</string>
+    <string name="error_failed_to_delete">Failed to delete</string>
+    <string name="entry_saved_msg">✓ Entry saved</string>
+    <string name="entry_updated_msg">✓ Entry updated</string>
+    <string name="entry_deleted_msg">✓ Entry deleted</string>
+    <string name="entry_logged_msg">✓ %1$s %2$s%3$s · %4$s</string>
+    <string name="amount_placeholder">0.00</string>
+    <string name="entry_type_received">Received</string>
+    <string name="entry_type_logged">Logged</string>
+    <string name="error_with_message">Error: %1$s</string>
+    <string name="error_access_denied_superadmin">Access denied: superadmin only</string>
+
+    <!-- ==================== GROUP SETTINGS VIEWMODEL ==================== -->
+    <string name="group_settings_admin_transferred">Admin role transferred</string>
+
+    <!-- ==================== BROADCAST VIEWMODEL ERRORS ==================== -->
+    <string name="broadcast_error_title_required">Title is required</string>
+    <string name="broadcast_error_content_required">Message content is required</string>
+    <string name="broadcast_error_start_required">Start date and time is required</string>
+    <string name="broadcast_error_select_users">Select at least one user</string>
+    <string name="broadcast_error_end_after_start">End time must be after start time</string>
+
+    <!-- ==================== TERMS EXTRAS ==================== -->
+    <string name="terms_failed_accept">Failed to accept</string>
+
+    <!-- ==================== PAYMENT / UPI ==================== -->
+    <string name="pay_with">Pay with…</string>
+    <string name="upi_transaction_note">Trevio</string>
+
+    <!-- ==================== SETTLEMENT HISTORY ==================== -->
+    <string name="settlement_paid">%1$s paid %2$s</string>
+    <string name="settlement_ref">Ref: %1$s</string>
+    <string name="settlement_method_suffix">· %1$s</string>
+
+    <!-- ==================== DEBT DESCRIPTION ==================== -->
+    <string name="debt_you_owe_name">You owe %1$s</string>
+    <string name="debt_name_owes_you">%1$s owes you</string>
+    <string name="debt_name_owes_name">%1$s owes %2$s</string>
+
+    <!-- ==================== LOAD MORE ERROR ==================== -->
+    <string name="load_more_error">Failed to load more. Tap to retry.</string>
+
+    <!-- ==================== CLAIM ERROR ==================== -->
+    <string name="claim_failed">Failed to claim profile</string>
+
+    <!-- ==================== ERROR MAPPER (data layer exception → string resource) ==================== -->
+    <string name="error_network">Network error. Please try again.</string>
+    <string name="error_user_not_authenticated">User not authenticated</string>
+    <string name="error_auth_failed">Authentication failed</string>
+    <string name="error_not_member">You are not a member of this group</string>
+    <string name="error_already_member">You are already a member of this group</string>
+    <string name="error_user_already_member">User is already a member of this group</string>
+    <string name="error_both_parties_must_be_members">Both parties must be group members</string>
+    <string name="error_target_not_member">Target user is not a member of this group</string>
+    <string name="error_target_not_active">Target user is not an active member</string>
+    <string name="error_admin_archive">Only group admin can archive the group</string>
+    <string name="error_admin_unarchive">Only group admin can unarchive the group</string>
+    <string name="error_admin_delete">Only group admin can delete the group</string>
+    <string name="error_admin_update_settings">Only group admin can update group settings</string>
+    <string name="error_admin_update_budget">Only group admin can update budget settings</string>
+    <string name="error_admin_transfer">Only group admin can transfer admin role</string>
+    <string name="error_admins_link_only">Only admins can link members</string>
+    <string name="error_admins_remove_only">Only admins can remove members</string>
+    <string name="error_already_admin">You are already the admin</string>
+    <string name="error_admin_cannot_leave">Admin cannot leave. Transfer admin role or delete the group.</string>
+    <string name="error_cannot_remove_admin">Cannot remove another admin</string>
+    <string name="error_use_leave_group">Use leave group to remove yourself</string>
+    <string name="error_expense_edit_permission">Only the expense creator or group admin can edit this expense</string>
+    <string name="error_expense_delete_permission">Only the expense creator or group admin can delete this expense</string>
+    <string name="error_invalid_expense">Invalid expense data</string>
+    <string name="error_group_expense_id_required">Group ID and Expense ID are required</string>
+    <string name="error_group_item_id_required">Group ID and Item ID are required</string>
+    <string name="error_group_location_id_required">Group ID and Location ID are required</string>
+    <string name="error_cannot_settle_self">Cannot settle with yourself</string>
+    <string name="error_settle_self_only">You can only record settlements involving yourself</string>
+    <string name="error_invite_code_required">Invite code is required</string>
+    <string name="error_invalid_invite_code">Invalid invite code</string>
+    <string name="error_cannot_invite_self">You cannot invite yourself</string>
+    <string name="error_invitation_id_required">Invitation ID is required</string>
+    <string name="error_invitation_not_found">Invitation not found</string>
+    <string name="error_invalid_invitation">Invalid invitation</string>
+    <string name="error_invitation_not_for_you">This invitation is not for you</string>
+    <string name="error_invitation_not_pending">Invitation is no longer pending</string>
+    <string name="error_invalid_group_data">Invalid group data</string>
+    <string name="error_invalid_group_id">Invalid group ID</string>
+    <string name="error_group_id_required">Group ID is required</string>
+    <string name="error_group_username_required">Group ID and username are required</string>
+    <string name="error_cannot_delete_with_members">Cannot delete group with other active members. Remove all members first.</string>
+    <string name="error_user_not_found">User not found</string>
+    <string name="error_invalid_user">Invalid user</string>
+    <string name="error_cannot_update_other_profile">Cannot update another user\'s profile</string>
+    <string name="error_username_taken">Username is already taken</string>
+    <string name="error_username_too_short">Username must be at least 3 characters</string>
+    <string name="error_name_required">Name is required</string>
+    <string name="error_not_offline_profile">This member is not an offline profile</string>
+    <string name="error_cannot_block_self">Cannot block yourself</string>
+    <string name="error_cannot_demote_self">Cannot demote yourself</string>
+    <string name="error_ticket_not_found">Ticket not found</string>
+    <string name="error_ticket_reply_denied">Access denied: you can only reply to your own tickets</string>
+    <string name="error_trip_not_found">Trip data not found</string>
+    <string name="error_notification_id_required">Notification ID is required</string>
+    <string name="error_notification_not_found">Notification not found</string>
+    <string name="error_missing_fields">Missing required fields</string>
+    <string name="error_exchange_rates">Failed to get exchange rates</string>
+    <string name="error_group_not_found">Group not found</string>
+    <string name="error_expense_not_found">Expense not found</string>
+    <string name="error_access_denied">Access denied</string>
+
+    <!-- ==================== NAVIGATION ==================== -->
+    <string name="nav_home">Home</string>
+    <string name="nav_groups">Groups</string>
+    <string name="nav_profile">Profile</string>
+    <string name="nav_dashboard">Dashboard</string>
+
+    <!-- ==================== BROADCAST PRIORITY LABELS ==================== -->
+    <string name="priority_critical">Critical</string>
+    <string name="priority_maintenance">Maintenance</string>
+    <string name="priority_info">Info</string>
+
+    <!-- ==================== COMMON LABELS ==================== -->
+    <string name="someone">Someone</string>
+    <string name="you">You</string>
+    <string name="you_lowercase">you</string>
+    <string name="back">Back</string>
+
+    <!-- ==================== BALANCE CHIP ==================== -->
+    <string name="balance_youll_get">you\'ll get %1$s</string>
+    <string name="balance_youll_pay">you\'ll pay %1$s</string>
+    <string name="balance_settled_up">settled up</string>
+    <string name="balance_gets">gets %1$s</string>
+    <string name="balance_owes">owes %1$s</string>
+
+    <!-- ==================== OFFLINE BANNER ==================== -->
+    <string name="offline_banner_message">You\'re offline. Some data may be outdated.</string>
+
+    <!-- ==================== SUPPORT ENUM DISPLAY ==================== -->
+    <string name="support_status_open">Open</string>
+    <string name="support_status_in_progress">In Progress</string>
+    <string name="support_status_waiting_user">Waiting User</string>
+    <string name="support_status_resolved">Resolved</string>
+    <string name="support_status_closed">Closed</string>
+    <string name="support_priority_urgent">Urgent</string>
+    <string name="support_priority_high">High</string>
+    <string name="support_priority_medium">Medium</string>
+    <string name="support_priority_low">Low</string>
+
+    <!-- ==================== RELATIVE TIME ==================== -->
+    <string name="time_just_now">just now</string>
+    <string name="time_minutes_ago">%1$dm ago</string>
+    <string name="time_hours_ago">%1$dh ago</string>
+    <string name="time_days_ago">%1$dd ago</string>
+
+    <!-- ==================== HOME EXTRAS ==================== -->
+    <string name="home_members_total">%1$d members · %2$s total</string>
+
+    <!-- ==================== ANALYTICS EXTRAS ==================== -->
+    <string name="analytics_expenses_count">%1$d expenses</string>
+
+    <!-- ==================== ADMIN SUPPORT LABELS ==================== -->
+    <string name="admin_support_status_colon">Status:</string>
+    <string name="admin_support_priority_colon">Priority:</string>
+    <string name="admin_support_order_label">Order: %1$d</string>
+    <string name="admin_support_article_category_order">%1$s • Order: %2$d</string>
+    <string name="support_category_label">Category: %1$s</string>
+
+    <!-- ==================== HOUSEHOLD CATEGORIES ==================== -->
+    <string name="cat_groceries">Groceries</string>
+    <string name="cat_vegetables">Vegetables</string>
+    <string name="cat_utilities">Utilities</string>
+    <string name="cat_rent">Rent</string>
+    <string name="cat_transport">Transport</string>
+    <string name="cat_medical">Medical</string>
+    <string name="cat_education">Education</string>
+    <string name="cat_entertainment">Entertainment</string>
+    <string name="cat_dining">Dining Out</string>
+    <string name="cat_shopping">Shopping</string>
+    <string name="cat_household">Household</string>
+    <string name="cat_insurance">Insurance</string>
+    <string name="cat_other">Other</string>
+    <string name="cat_salary">Salary</string>
+    <string name="cat_bonus">Bonus</string>
+    <string name="cat_gift">Gift</string>
+    <string name="cat_refund">Refund</string>
+    <string name="cat_investment">Investment</string>
+    <string name="cat_rental_income">Rental Income</string>
+    <string name="cat_pension">Pension</string>
+    <string name="cat_other_income">Other Income</string>
+    <string name="cat_food">Food</string>
+    <string name="cat_turf">Turf</string>
+    <string name="cat_accommodation">Stay</string>
+
+    <!-- ==================== MONTH NAMES ==================== -->
+    <string name="month_jan">Jan</string>
+    <string name="month_feb">Feb</string>
+    <string name="month_mar">Mar</string>
+    <string name="month_apr">Apr</string>
+    <string name="month_may">May</string>
+    <string name="month_jun">Jun</string>
+    <string name="month_jul">Jul</string>
+    <string name="month_aug">Aug</string>
+    <string name="month_sep">Sep</string>
+    <string name="month_oct">Oct</string>
+    <string name="month_nov">Nov</string>
+    <string name="month_dec">Dec</string>
+    <string name="month_january">January</string>
+    <string name="month_february">February</string>
+    <string name="month_march">March</string>
+    <string name="month_april">April</string>
+    <string name="month_may_full">May</string>
+    <string name="month_june">June</string>
+    <string name="month_july">July</string>
+    <string name="month_august">August</string>
+    <string name="month_september">September</string>
+    <string name="month_october">October</string>
+    <string name="month_november">November</string>
+    <string name="month_december">December</string>
+    <string name="month_year">%1$s %2$d</string>
+    <string name="month_year_short">%1$s %2$s</string>
+    <string-array name="month_names">
+        <item>January</item>
+        <item>February</item>
+        <item>March</item>
+        <item>April</item>
+        <item>May</item>
+        <item>June</item>
+        <item>July</item>
+        <item>August</item>
+        <item>September</item>
+        <item>October</item>
+        <item>November</item>
+        <item>December</item>
+    </string-array>
+    <string-array name="month_names_short">
+        <item>Jan</item>
+        <item>Feb</item>
+        <item>Mar</item>
+        <item>Apr</item>
+        <item>May</item>
+        <item>Jun</item>
+        <item>Jul</item>
+        <item>Aug</item>
+        <item>Sep</item>
+        <item>Oct</item>
+        <item>Nov</item>
+        <item>Dec</item>
+    </string-array>
+
+    <!-- ==================== CURRENCY NAMES ==================== -->
+    <string name="currency_inr">Indian Rupee</string>
+    <string name="currency_eur">Euro</string>
+    <string name="currency_gbp">British Pound</string>
+    <string name="currency_jpy">Japanese Yen</string>
+    <string name="currency_aud">Australian Dollar</string>
+    <string name="currency_cad">Canadian Dollar</string>
+    <string name="currency_sgd">Singapore Dollar</string>
+    <string name="currency_sar">Saudi Riyal</string>
+    <string name="currency_pkr">Pakistani Rupee</string>
+    <string name="currency_bdt">Bangladeshi Taka</string>
+    <string name="currency_lkr">Sri Lankan Rupee</string>
+    <string name="currency_npr">Nepalese Rupee</string>
+    <string name="currency_zar">South African Rand</string>
+    <string name="currency_ngn">Nigerian Naira</string>
+    <string name="currency_kes">Kenyan Shilling</string>
+    <string name="currency_chf">Swiss Franc</string>
+    <string name="currency_sek">Swedish Krona</string>
+    <string name="currency_nok">Norwegian Krone</string>
+    <string name="currency_dkk">Danish Krone</string>
+    <string name="currency_pln">Polish Zloty</string>
+    <string name="currency_czk">Czech Koruna</string>
+    <string name="currency_huf">Hungarian Forint</string>
+    <string name="currency_ron">Romanian Leu</string>
+    <string name="currency_bgn">Bulgarian Lev</string>
+    <string name="currency_isk">Icelandic Krona</string>
+    <string name="currency_rub">Russian Ruble</string>
+    <string name="currency_uah">Ukrainian Hryvnia</string>
+    <string name="currency_cny">Chinese Yuan</string>
+    <string name="currency_hkd">Hong Kong Dollar</string>
+    <string name="currency_twd">Taiwan Dollar</string>
+    <string name="currency_krw">South Korean Won</string>
+    <string name="currency_thb">Thai Baht</string>
+    <string name="currency_vnd">Vietnamese Dong</string>
+    <string name="currency_myr">Malaysian Ringgit</string>
+    <string name="currency_idr">Indonesian Rupiah</string>
+    <string name="currency_php">Philippine Peso</string>
+    <string name="currency_try">Turkish Lira</string>
+    <string name="currency_brl">Brazilian Real</string>
+    <string name="currency_ars">Argentine Peso</string>
+    <string name="currency_mxn">Mexican Peso</string>
+    <string name="currency_cop">Colombian Peso</string>
+    <string name="currency_clp">Chilean Peso</string>
+    <string name="currency_pen">Peruvian Sol</string>
+    <string name="currency_nzd">New Zealand Dollar</string>
+    <string name="currency_ils">Israeli Shekel</string>
+    <string name="currency_egp">Egyptian Pound</string>
+    <string name="currency_ghs">Ghanaian Cedi</string>
+    <string name="currency_kzt">Kazakhstani Tenge</string>
+    <string name="currency_mnt">Mongolian Tugrik</string>
+    <string name="currency_gel">Georgian Lari</string>
+    <string name="currency_amd">Armenian Dram</string>
+    <string name="currency_azn">Azerbaijani Manat</string>
+    <string name="currency_usd">US Dollar</string>
+    <string name="currency_aed">UAE Dirham</string>
+
+    <!-- ==================== COUNTRY NAMES ==================== -->
+    <string name="country_in">India</string>
+    <string name="country_us">United States</string>
+    <string name="country_gb">United Kingdom</string>
+    <string name="country_ae">United Arab Emirates</string>
+    <string name="country_sg">Singapore</string>
+    <string name="country_au">Australia</string>
+    <string name="country_ca">Canada</string>
+    <string name="country_jp">Japan</string>
+    <string name="country_de">Germany</string>
+    <string name="country_fr">France</string>
+    <string name="country_sa">Saudi Arabia</string>
+    <string name="country_pk">Pakistan</string>
+    <string name="country_bd">Bangladesh</string>
+    <string name="country_lk">Sri Lanka</string>
+    <string name="country_np">Nepal</string>
+    <string name="country_za">South Africa</string>
+    <string name="country_ng">Nigeria</string>
+    <string name="country_ke">Kenya</string>
+    <string name="country_it">Italy</string>
+    <string name="country_es">Spain</string>
+    <string name="country_nl">Netherlands</string>
+    <string name="country_be">Belgium</string>
+    <string name="country_at">Austria</string>
+    <string name="country_ch">Switzerland</string>
+    <string name="country_se">Sweden</string>
+    <string name="country_no">Norway</string>
+    <string name="country_dk">Denmark</string>
+    <string name="country_fi">Finland</string>
+    <string name="country_ie">Ireland</string>
+    <string name="country_pt">Portugal</string>
+    <string name="country_gr">Greece</string>
+    <string name="country_pl">Poland</string>
+    <string name="country_cz">Czech Republic</string>
+    <string name="country_hu">Hungary</string>
+    <string name="country_ro">Romania</string>
+    <string name="country_bg">Bulgaria</string>
+    <string name="country_hr">Croatia</string>
+    <string name="country_sk">Slovakia</string>
+    <string name="country_si">Slovenia</string>
+    <string name="country_lt">Lithuania</string>
+    <string name="country_lv">Latvia</string>
+    <string name="country_ee">Estonia</string>
+    <string name="country_is">Iceland</string>
+    <string name="country_lu">Luxembourg</string>
+    <string name="country_mt">Malta</string>
+    <string name="country_cy">Cyprus</string>
+    <string name="country_ru">Russia</string>
+    <string name="country_ua">Ukraine</string>
+    <string name="country_by">Belarus</string>
+    <string name="country_md">Moldova</string>
+    <string name="country_rs">Serbia</string>
+    <string name="country_ba">Bosnia and Herzegovina</string>
+    <string name="country_mk">North Macedonia</string>
+    <string name="country_al">Albania</string>
+    <string name="country_me">Montenegro</string>
+    <string name="country_xk">Kosovo</string>
+    <string name="country_cn">China</string>
+    <string name="country_hk">Hong Kong</string>
+    <string name="country_tw">Taiwan</string>
+    <string name="country_kr">South Korea</string>
+    <string name="country_kp">North Korea</string>
+    <string name="country_th">Thailand</string>
+    <string name="country_vn">Vietnam</string>
+    <string name="country_my">Malaysia</string>
+    <string name="country_id">Indonesia</string>
+    <string name="country_ph">Philippines</string>
+    <string name="country_bn">Brunei</string>
+    <string name="country_kh">Cambodia</string>
+    <string name="country_la">Laos</string>
+    <string name="country_mm">Myanmar</string>
+    <string name="country_tl">Timor-Leste</string>
+    <string name="country_mo">Macao</string>
+    <string name="country_af">Afghanistan</string>
+    <string name="country_ir">Iran</string>
+    <string name="country_iq">Iraq</string>
+    <string name="country_sy">Syria</string>
+    <string name="country_lb">Lebanon</string>
+    <string name="country_jo">Jordan</string>
+    <string name="country_il">Israel</string>
+    <string name="country_ps">Palestine</string>
+    <string name="country_ye">Yemen</string>
+    <string name="country_om">Oman</string>
+    <string name="country_qa">Qatar</string>
+    <string name="country_kw">Kuwait</string>
+    <string name="country_bh">Bahrain</string>
+    <string name="country_tr">Turkey</string>
+    <string name="country_eg">Egypt</string>
+    <string name="country_ly">Libya</string>
+    <string name="country_tn">Tunisia</string>
+    <string name="country_dz">Algeria</string>
+    <string name="country_ma">Morocco</string>
+    <string name="country_sd">Sudan</string>
+    <string name="country_ss">South Sudan</string>
+    <string name="country_et">Ethiopia</string>
+    <string name="country_er">Eritrea</string>
+    <string name="country_dj">Djibouti</string>
+    <string name="country_so">Somalia</string>
+    <string name="country_tz">Tanzania</string>
+    <string name="country_ug">Uganda</string>
+    <string name="country_rw">Rwanda</string>
+    <string name="country_bi">Burundi</string>
+    <string name="country_mz">Mozambique</string>
+    <string name="country_zw">Zimbabwe</string>
+    <string name="country_zm">Zambia</string>
+    <string name="country_mw">Malawi</string>
+    <string name="country_bw">Botswana</string>
+    <string name="country_na">Namibia</string>
+    <string name="country_ls">Lesotho</string>
+    <string name="country_sz">Eswatini</string>
+    <string name="country_ao">Angola</string>
+    <string name="country_gh">Ghana</string>
+    <string name="country_ci">Côte d\'Ivoire</string>
+    <string name="country_sn">Senegal</string>
+    <string name="country_ml">Mali</string>
+    <string name="country_bf">Burkina Faso</string>
+    <string name="country_ne">Niger</string>
+    <string name="country_bj">Benin</string>
+    <string name="country_tg">Togo</string>
+    <string name="country_gn">Guinea</string>
+    <string name="country_sl">Sierra Leone</string>
+    <string name="country_lr">Liberia</string>
+    <string name="country_mr">Mauritania</string>
+    <string name="country_gm">Gambia</string>
+    <string name="country_cv">Cape Verde</string>
+    <string name="country_st">São Tomé and Príncipe</string>
+    <string name="country_gw">Guinea-Bissau</string>
+    <string name="country_gq">Equatorial Guinea</string>
+    <string name="country_ga">Gabon</string>
+    <string name="country_cg">Congo</string>
+    <string name="country_cd">DR Congo</string>
+    <string name="country_td">Chad</string>
+    <string name="country_cf">Central African Republic</string>
+    <string name="country_cm">Cameroon</string>
+    <string name="country_km">Comoros</string>
+    <string name="country_mg">Madagascar</string>
+    <string name="country_mu">Mauritius</string>
+    <string name="country_sc">Seychelles</string>
+    <string name="country_br">Brazil</string>
+    <string name="country_ar">Argentina</string>
+    <string name="country_mx">Mexico</string>
+    <string name="country_co">Colombia</string>
+    <string name="country_cl">Chile</string>
+    <string name="country_pe">Peru</string>
+    <string name="country_ve">Venezuela</string>
+    <string name="country_ec">Ecuador</string>
+    <string name="country_bo">Bolivia</string>
+    <string name="country_py">Paraguay</string>
+    <string name="country_uy">Uruguay</string>
+    <string name="country_gy">Guyana</string>
+    <string name="country_sr">Suriname</string>
+    <string name="country_cr">Costa Rica</string>
+    <string name="country_pa">Panama</string>
+    <string name="country_gt">Guatemala</string>
+    <string name="country_hn">Honduras</string>
+    <string name="country_sv">El Salvador</string>
+    <string name="country_ni">Nicaragua</string>
+    <string name="country_cu">Cuba</string>
+    <string name="country_do">Dominican Republic</string>
+    <string name="country_ht">Haiti</string>
+    <string name="country_jm">Jamaica</string>
+    <string name="country_tt">Trinidad and Tobago</string>
+    <string name="country_bb">Barbados</string>
+    <string name="country_bs">Bahamas</string>
+    <string name="country_gd">Grenada</string>
+    <string name="country_lc">Saint Lucia</string>
+    <string name="country_vc">Saint Vincent</string>
+    <string name="country_ag">Antigua and Barbuda</string>
+    <string name="country_dm">Dominica</string>
+    <string name="country_kn">Saint Kitts and Nevis</string>
+    <string name="country_bz">Belize</string>
+    <string name="country_pr">Puerto Rico</string>
+    <string name="country_nz">New Zealand</string>
+    <string name="country_fj">Fiji</string>
+    <string name="country_pg">Papua New Guinea</string>
+    <string name="country_sb">Solomon Islands</string>
+    <string name="country_vu">Vanuatu</string>
+    <string name="country_ws">Samoa</string>
+    <string name="country_to">Tonga</string>
+    <string name="country_ki">Kiribati</string>
+    <string name="country_tv">Tuvalu</string>
+    <string name="country_nr">Nauru</string>
+    <string name="country_pw">Palau</string>
+    <string name="country_mh">Marshall Islands</string>
+    <string name="country_fm">Micronesia</string>
+    <string name="country_ck">Cook Islands</string>
+    <string name="country_nu">Niue</string>
+    <string name="country_kz">Kazakhstan</string>
+    <string name="country_uz">Uzbekistan</string>
+    <string name="country_tm">Turkmenistan</string>
+    <string name="country_kg">Kyrgyzstan</string>
+    <string name="country_tj">Tajikistan</string>
+    <string name="country_mn">Mongolia</string>
+    <string name="country_ge">Georgia</string>
+    <string name="country_am">Armenia</string>
+    <string name="country_az">Azerbaijan</string>
+    <string name="country_bt">Bhutan</string>
+    <string name="country_mv">Maldives</string>
+    <string name="country_va">Vatican City</string>
+    <string name="country_mc">Monaco</string>
+    <string name="country_sm">San Marino</string>
+    <string name="country_ad">Andorra</string>
+    <string name="country_li">Liechtenstein</string>
 </resources>

@@ -1,5 +1,6 @@
 package com.trevio.android.ui.group
 
+import androidx.annotation.StringRes
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.isSystemInDarkTheme
@@ -23,22 +24,37 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.trevio.android.R
 import com.trevio.android.core.UserRefreshNotifier
 import com.trevio.android.core.designsystem.components.EmptyState
 import com.trevio.android.core.designsystem.components.TrevioCard
 import com.trevio.android.core.designsystem.components.TrevioHeader
+import com.trevio.android.core.designsystem.theme.BalanceNegative
+import com.trevio.android.core.designsystem.theme.BalanceNegativeDark
+import com.trevio.android.core.designsystem.theme.BalancePositive
+import com.trevio.android.core.designsystem.theme.BalancePositiveDark
+import com.trevio.android.core.designsystem.theme.TemplateCasual
+import com.trevio.android.core.designsystem.theme.TemplateCasualDark
+import com.trevio.android.core.designsystem.theme.TemplateHousehold
+import com.trevio.android.core.designsystem.theme.TemplateHouseholdDark
+import com.trevio.android.core.designsystem.theme.TemplateTrip
+import com.trevio.android.core.designsystem.theme.TemplateTripDark
+import com.trevio.android.core.designsystem.theme.TemplateTurf
+import com.trevio.android.core.designsystem.theme.TemplateTurfDark
 import com.trevio.android.core.designsystem.theme.TrevioBorder
 import com.trevio.android.core.navigation.TrevioRoute
 import com.trevio.android.domain.model.Group
 import com.trevio.android.domain.model.GroupTemplate
 import com.trevio.android.domain.repository.GroupService
 import com.trevio.android.util.rememberCurrencyFormatter
+import com.trevio.android.util.toStringResId
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -54,7 +70,7 @@ class GroupsListViewModel @Inject constructor(
     data class GroupsListState(
         val groups: List<Group> = emptyList(),
         val isLoading: Boolean = true,
-        val error: String? = null
+        @StringRes val error: Int? = null
     )
 
     private val _state = MutableStateFlow(GroupsListState())
@@ -77,7 +93,7 @@ class GroupsListViewModel @Inject constructor(
                     _state.value = GroupsListState(groups = groups, isLoading = false)
                 }
                 .onFailure { e ->
-                    _state.value = GroupsListState(isLoading = false, error = e.message)
+                    _state.value = GroupsListState(isLoading = false, error = e.toStringResId())
                 }
         }
     }
@@ -89,7 +105,7 @@ class GroupsListViewModel @Inject constructor(
                     _state.value = _state.value.copy(groups = groups, error = null)
                 }
                 .onFailure { e ->
-                    _state.value = _state.value.copy(error = e.message)
+                    _state.value = _state.value.copy(error = e.toStringResId())
                 }
         }
     }
@@ -118,7 +134,7 @@ fun GroupsListScreen(
 
     if (state.isLoading) {
         Column(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
-            TrevioHeader(title = "Groups")
+            TrevioHeader(title = stringResource(R.string.groups_title))
             Box(modifier = Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
                 CircularProgressIndicator()
             }
@@ -128,14 +144,14 @@ fun GroupsListScreen(
 
     state.error?.let { errMsg ->
         Column(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
-            TrevioHeader(title = "Groups")
+            TrevioHeader(title = stringResource(R.string.groups_title))
             Box(modifier = Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     Icon(Icons.Default.Warning, contentDescription = null, modifier = Modifier.size(48.dp), tint = MaterialTheme.colorScheme.error)
                     Spacer(modifier = Modifier.height(12.dp))
-                    Text("Failed to load groups", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                    Text(stringResource(R.string.groups_failed_to_load), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                     Spacer(modifier = Modifier.height(4.dp))
-                    Text(errMsg, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(stringResource(errMsg), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
         }
@@ -143,21 +159,21 @@ fun GroupsListScreen(
     }
 
     Box(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
-        LazyColumn(
-            contentPadding = PaddingValues(bottom = 100.dp),
-            verticalArrangement = Arrangement.spacedBy(0.dp)
-        ) {
-            item {
-                TrevioHeader(title = "Groups")
-            }
+        Column(modifier = Modifier.fillMaxSize()) {
+            TrevioHeader(title = stringResource(R.string.groups_title))
 
+            LazyColumn(
+                modifier = Modifier.weight(1f),
+                contentPadding = PaddingValues(bottom = 100.dp),
+                verticalArrangement = Arrangement.spacedBy(0.dp)
+            ) {
             if (state.groups.isEmpty()) {
                 item {
                     EmptyState(
                         icon = Icons.Default.Group,
-                        title = "No groups yet",
-                        message = "Create your first group to start splitting bills with friends.",
-                        actionText = "Create Group",
+                        title = stringResource(R.string.groups_no_groups_yet),
+                        message = stringResource(R.string.groups_create_message),
+                        actionText = stringResource(R.string.groups_create_group),
                         onAction = { navController.navigate(TrevioRoute.CreateGroup.route) }
                     )
                 }
@@ -171,7 +187,7 @@ fun GroupsListScreen(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text(
-                            text = "${state.groups.size} active",
+                            text = stringResource(R.string.groups_active_count, state.groups.size),
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.SemiBold
                         )
@@ -188,6 +204,7 @@ fun GroupsListScreen(
                     )
                 }
             }
+            }
         }
 
         Column(
@@ -199,15 +216,15 @@ fun GroupsListScreen(
         ) {
             ExtendedFloatingActionButton(
                 onClick = { showJoinSheet = true },
-                icon = { Icon(Icons.Default.GroupAdd, contentDescription = null) },
-                text = { Text("Join Group") },
+                icon = { Icon(Icons.Default.GroupAdd, contentDescription = stringResource(R.string.groups_join_group_desc)) },
+                text = { Text(stringResource(R.string.groups_join_group)) },
                 containerColor = MaterialTheme.colorScheme.secondaryContainer,
                 contentColor = MaterialTheme.colorScheme.onSecondaryContainer
             )
             ExtendedFloatingActionButton(
                 onClick = { navController.navigate(TrevioRoute.CreateGroup.route) },
-                icon = { Icon(Icons.Default.Add, contentDescription = null) },
-                text = { Text("New Group") },
+                icon = { Icon(Icons.Default.Add, contentDescription = stringResource(R.string.groups_new_group_desc)) },
+                text = { Text(stringResource(R.string.groups_new_group)) },
                 containerColor = MaterialTheme.colorScheme.primary,
                 contentColor = MaterialTheme.colorScheme.onPrimary
             )
@@ -241,19 +258,19 @@ private fun GroupsListItem(
     val balance = group.yourBalance
     val isDark = isSystemInDarkTheme()
     val accentColor = when (group.template) {
-        GroupTemplate.TRIP -> if (isDark) Color(0xFF818CF8) else Color(0xFF6366F1)
-        GroupTemplate.TURF -> if (isDark) Color(0xFF4ADE80) else Color(0xFF22C55E)
-        GroupTemplate.CASUAL -> if (isDark) Color(0xFFFBBF24) else Color(0xFFF59E0B)
-        GroupTemplate.HOUSEHOLD -> if (isDark) Color(0xFF2DD4BF) else Color(0xFF0D9488)
+        GroupTemplate.TRIP -> if (isDark) TemplateTripDark else TemplateTrip
+        GroupTemplate.TURF -> if (isDark) TemplateTurfDark else TemplateTurf
+        GroupTemplate.CASUAL -> if (isDark) TemplateCasualDark else TemplateCasual
+        GroupTemplate.HOUSEHOLD -> if (isDark) TemplateHouseholdDark else TemplateHousehold
     }
-    val balanceColor = if (balance > 0) if (isDark) Color(0xFF4ADE80) else Color(0xFF22C55E) else if (balance < 0) if (isDark) Color(0xFFF87171) else Color(0xFFEF4444) else MaterialTheme.colorScheme.onSurfaceVariant
+    val balanceColor = if (balance > 0) if (isDark) BalancePositiveDark else BalancePositive else if (balance < 0) if (isDark) BalanceNegativeDark else BalanceNegative else MaterialTheme.colorScheme.onSurfaceVariant
     val balanceText = when {
         group.template == GroupTemplate.HOUSEHOLD -> {
-            if (group.totalExpenses > 0) "${formatBase(group.totalExpenses)} spent" else "No entries yet"
+            if (group.totalExpenses > 0) stringResource(R.string.group_item_spent, formatBase(group.totalExpenses)) else stringResource(R.string.group_item_no_entries)
         }
-        balance > 0 -> "owes you ${formatBase(balance)}"
-        balance < 0 -> "you owe ${formatBase(-balance)}"
-        else -> "settled up"
+        balance > 0 -> stringResource(R.string.group_item_owes_you, formatBase(balance))
+        balance < 0 -> stringResource(R.string.group_item_you_owe, formatBase(-balance))
+        else -> stringResource(R.string.group_item_settled_up)
     }
 
     TrevioCard(
@@ -296,7 +313,7 @@ private fun GroupsListItem(
                             shape = RoundedCornerShape(4.dp)
                         ) {
                             Text(
-                                "Archived",
+                                stringResource(R.string.group_detail_archived),
                                 style = MaterialTheme.typography.labelSmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 modifier = Modifier.padding(horizontal = 6.dp, vertical = 1.dp)
@@ -305,7 +322,7 @@ private fun GroupsListItem(
                     }
                 }
                 Text(
-                    text = "${group.memberCount} members",
+                    text = stringResource(R.string.group_detail_members_count, group.memberCount),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )

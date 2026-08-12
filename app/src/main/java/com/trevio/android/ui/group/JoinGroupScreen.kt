@@ -1,5 +1,6 @@
 package com.trevio.android.ui.group
 
+import androidx.annotation.StringRes
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
@@ -13,18 +14,21 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.trevio.android.R
 import com.trevio.android.core.designsystem.components.TrevioHeader
 import com.trevio.android.core.navigation.TrevioRoute
 import com.trevio.android.domain.model.Member
 import com.trevio.android.domain.repository.AuthService
 import com.trevio.android.domain.repository.GroupService
 import com.trevio.android.domain.repository.SettlementService
+import com.trevio.android.util.toStringResId
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -40,14 +44,14 @@ class JoinGroupViewModel @Inject constructor(
 
     data class JoinState(
         val isLoading: Boolean = false,
-        val error: String? = null,
+        @StringRes val error: Int? = null,
         val joined: Boolean = false,
         val needsAuth: Boolean = false,
         val needsTnC: Boolean = false,
         val claimableMembers: List<Member> = emptyList(),
         val groupId: String? = null,
         val claiming: Boolean = false,
-        val claimError: String? = null,
+        @StringRes val claimError: Int? = null,
         val claimed: Boolean = false
     )
 
@@ -76,7 +80,7 @@ class JoinGroupViewModel @Inject constructor(
                     val claimable = members.filter { it.isOffline }
                     _state.value = JoinState(joined = true, groupId = groupId, claimableMembers = claimable)
                 }
-                .onFailure { e -> _state.value = JoinState(error = e.message) }
+                .onFailure { e -> _state.value = JoinState(error = e.toStringResId()) }
         }
     }
 
@@ -89,7 +93,7 @@ class JoinGroupViewModel @Inject constructor(
                     _state.value = _state.value.copy(claiming = false, claimed = true)
                 }
                 .onFailure { e ->
-                    _state.value = _state.value.copy(claiming = false, claimError = e.message)
+                    _state.value = _state.value.copy(claiming = false, claimError = e.toStringResId())
                 }
         }
     }
@@ -140,7 +144,7 @@ fun JoinGroupScreen(
 
     Column(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
         TrevioHeader(
-            title = "Join Group",
+            title = stringResource(R.string.join_group_title),
             onBack = { navController.popBackStack() }
         )
         Box(
@@ -152,7 +156,7 @@ fun JoinGroupScreen(
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
                         CircularProgressIndicator()
                         Spacer(modifier = Modifier.height(16.dp))
-                        Text("Joining group...")
+                        Text(stringResource(R.string.join_group_joining))
                     }
                 }
                 state.joined && state.claimableMembers.isNotEmpty() -> {
@@ -168,13 +172,13 @@ fun JoinGroupScreen(
                         )
                         Spacer(modifier = Modifier.height(16.dp))
                         Text(
-                            "Joined successfully!",
+                            stringResource(R.string.join_group_success),
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.Bold
                         )
                         Spacer(modifier = Modifier.height(8.dp))
                         Text(
-                            "Are any of these offline profiles you? Claim one to link your account.",
+                            stringResource(R.string.join_group_claim_message),
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             textAlign = TextAlign.Center
@@ -207,17 +211,17 @@ fun JoinGroupScreen(
                                     Button(
                                         onClick = { viewModel.claimOfflineMember(member.uid) },
                                         enabled = !state.claiming
-                                    ) { Text("Claim") }
+                                    ) { Text(stringResource(R.string.join_group_claim)) }
                                 }
                             }
                         }
                         if (state.claimError != null) {
                             Spacer(modifier = Modifier.height(8.dp))
-                            Text(state.claimError!!, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
+                            Text(stringResource(state.claimError!!), color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
                         }
                         Spacer(modifier = Modifier.height(24.dp))
                         TextButton(onClick = { viewModel.skipClaim() }) {
-                            Text("Skip for now")
+                            Text(stringResource(R.string.join_group_skip_for_now))
                         }
                     }
                 }
@@ -230,9 +234,9 @@ fun JoinGroupScreen(
                             tint = MaterialTheme.colorScheme.primary
                         )
                         Spacer(modifier = Modifier.height(16.dp))
-                        Text("Profile claimed!", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                        Text(stringResource(R.string.join_group_profile_claimed), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                         Spacer(modifier = Modifier.height(8.dp))
-                        Text("All transactions have been linked to your account.", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, textAlign = TextAlign.Center)
+                        Text(stringResource(R.string.join_group_claimed_msg), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, textAlign = TextAlign.Center)
                     }
                 }
                 state.needsAuth -> {
@@ -248,21 +252,21 @@ fun JoinGroupScreen(
                         )
                         Spacer(modifier = Modifier.height(16.dp))
                         Text(
-                            "You've been invited to join a group!",
+                            stringResource(R.string.join_group_invited),
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.SemiBold,
                             textAlign = TextAlign.Center
                         )
                         Spacer(modifier = Modifier.height(8.dp))
                         Text(
-                            "Sign in with Google to accept the invitation and start splitting bills.",
+                            stringResource(R.string.join_group_sign_in_msg),
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             textAlign = TextAlign.Center
                         )
                         Spacer(modifier = Modifier.height(24.dp))
                         Text(
-                            "Redirecting to sign in...",
+                            stringResource(R.string.join_group_redirecting),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.primary
                         )
@@ -274,13 +278,13 @@ fun JoinGroupScreen(
                         modifier = Modifier.padding(32.dp)
                     ) {
                         Text(
-                            "Almost there!",
+                            stringResource(R.string.join_group_almost_there),
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.SemiBold
                         )
                         Spacer(modifier = Modifier.height(8.dp))
                         Text(
-                            "Please accept the Terms & Conditions to join the group.",
+                            stringResource(R.string.join_group_tnc_msg),
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             textAlign = TextAlign.Center
@@ -290,19 +294,19 @@ fun JoinGroupScreen(
                 state.error != null -> {
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
                         Text(
-                            "Failed to join",
+                            stringResource(R.string.join_group_failed),
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.SemiBold,
                             color = MaterialTheme.colorScheme.error
                         )
                         Spacer(modifier = Modifier.height(8.dp))
                         Text(
-                            state.error!!,
+                            stringResource(state.error!!),
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                         Spacer(modifier = Modifier.height(24.dp))
-                        Button(onClick = { navController.popBackStack() }) { Text("Go Back") }
+                        Button(onClick = { navController.popBackStack() }) { Text(stringResource(R.string.join_group_go_back)) }
                     }
                 }
             }

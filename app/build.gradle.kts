@@ -88,6 +88,12 @@ dependencies {
     // DataStore
     implementation(libs.androidx.datastore.preferences)
 
+    // Biometric (app lock)
+    implementation(libs.androidx.biometric)
+
+    // Lifecycle Process (app-level lifecycle observation for re-lock)
+    implementation(libs.androidx.lifecycle.process)
+
     // ViewModel Compose
     implementation(libs.androidx.lifecycle.viewmodel.compose)
 

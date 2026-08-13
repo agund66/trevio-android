@@ -29,16 +29,12 @@ class BroadcastPopupViewModel @Inject constructor(
 
     fun loadUnreadBroadcasts() {
         viewModelScope.launch {
-            try {
-                val uid = authService.getCurrentUserId() ?: return@launch
-                val user = authService.getCurrentUser() ?: return@launch
-                broadcastService.getUnreadBroadcastsForUser(uid, user.blocked)
-                    .onSuccess { unread ->
-                        _state.value = _state.value.copy(unreadBroadcasts = unread, currentIndex = 0)
-                    }
-            } catch (e: Exception) {
-                // Silent fail
-            }
+            val uid = authService.getCurrentUserId() ?: return@launch
+            val user = authService.getCurrentUser() ?: return@launch
+            broadcastService.getUnreadBroadcastsForUser(uid, user.blocked)
+                .onSuccess { unread ->
+                    _state.value = _state.value.copy(unreadBroadcasts = unread, currentIndex = 0)
+                }
         }
     }
 

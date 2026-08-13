@@ -179,11 +179,7 @@ class HouseholdViewModel @Inject constructor(
     }
 
     private fun getCurrentUserId(): String? {
-        return try {
-            com.google.firebase.auth.FirebaseAuth.getInstance().currentUser?.uid
-        } catch (e: Exception) {
-            null
-        }
+        return com.google.firebase.auth.FirebaseAuth.getInstance().currentUser?.uid
     }
 
     /**
@@ -199,63 +195,53 @@ class HouseholdViewModel @Inject constructor(
         if (amount <= 0 || groupId.isBlank()) return
         viewModelScope.launch {
             _state.value = _state.value.copy(isSaving = true, saveSuccess = false, error = null)
-            try {
-                val effectivePaidBy = paidBy ?: _state.value.currentUserId ?: ""
-                if (effectivePaidBy.isBlank()) {
-                    _state.value = _state.value.copy(isSaving = false, error = R.string.error_authentication_required)
-                    return@launch
-                }
-                val effectiveDescription = description.ifBlank {
-                    HouseholdCategories.getCategoryLabel(category)
-                }
-                val currency = _state.value.userCurrency
+            val effectivePaidBy = paidBy ?: _state.value.currentUserId ?: ""
+            if (effectivePaidBy.isBlank()) {
+                _state.value = _state.value.copy(isSaving = false, error = R.string.error_authentication_required)
+                return@launch
+            }
+            val effectiveDescription = description.ifBlank {
+                HouseholdCategories.getCategoryLabel(category)
+            }
+            val currency = _state.value.userCurrency
 
-                val result = expenseService.addExpense(
-                    groupId = groupId,
-                    description = effectiveDescription,
-                    amount = amount,
-                    currency = currency,
-                    paidBy = effectivePaidBy,
-                    splitType = SplitType.EQUAL,
-                    splits = emptyMap(),
-                    memberUids = emptyList(),
-                    category = category,
-                    date = System.currentTimeMillis(),
-                    note = "",
-                    recurring = null,
-                    itemizedData = null,
-                    transactionType = transactionType
-                )
-
-                if (result.isSuccess) {
-                    val labelResId = HouseholdCategories.getCategoryLabelResId(category)
-                    val typeResId = if (transactionType == TransactionType.INCOME) R.string.entry_type_received else R.string.entry_type_logged
-                    val symbol = _state.value.currencySymbol
-                    _state.value = _state.value.copy(
-                        isSaving = false,
-                        saveSuccess = true,
-                        lastSavedMessage = LocalizedString(
-                            R.string.entry_logged_msg,
-                            listOf(
-                                LocalizedString(typeResId),
-                                symbol,
-                                FormatUtils.formatAmount(amount),
-                                LocalizedString(labelResId)
-                            )
-                        )
-                    )
-                    // Reload data to reflect the new entry
-                    loadData()
-                } else {
-                    _state.value = _state.value.copy(
-                        isSaving = false,
-                        error = R.string.error_failed_to_save
-                    )
-                }
-            } catch (e: Exception) {
+            expenseService.addExpense(
+                groupId = groupId,
+                description = effectiveDescription,
+                amount = amount,
+                currency = currency,
+                paidBy = effectivePaidBy,
+                splitType = SplitType.EQUAL,
+                splits = emptyMap(),
+                memberUids = emptyList(),
+                category = category,
+                date = System.currentTimeMillis(),
+                note = "",
+                recurring = null,
+                itemizedData = null,
+                transactionType = transactionType
+            ).onSuccess {
+                val labelResId = HouseholdCategories.getCategoryLabelResId(category)
+                val typeResId = if (transactionType == TransactionType.INCOME) R.string.entry_type_received else R.string.entry_type_logged
+                val symbol = _state.value.currencySymbol
                 _state.value = _state.value.copy(
                     isSaving = false,
-                    error = e.toStringResId()
+                    saveSuccess = true,
+                    lastSavedMessage = LocalizedString(
+                        R.string.entry_logged_msg,
+                        listOf(
+                            LocalizedString(typeResId),
+                            symbol,
+                            FormatUtils.formatAmount(amount),
+                            LocalizedString(labelResId)
+                        )
+                    )
+                )
+                loadData()
+            }.onFailure {
+                _state.value = _state.value.copy(
+                    isSaving = false,
+                    error = R.string.error_failed_to_save
                 )
             }
         }
@@ -277,48 +263,42 @@ class HouseholdViewModel @Inject constructor(
         if (amount <= 0 || groupId.isBlank()) return
         viewModelScope.launch {
             _state.value = _state.value.copy(isSaving = true, saveSuccess = false, error = null)
-            try {
-                if (paidBy.isBlank()) {
-                    _state.value = _state.value.copy(isSaving = false, error = R.string.error_authentication_required)
-                    return@launch
-                }
-                val currency = _state.value.userCurrency
-                val effectiveDescription = description.ifBlank {
-                    HouseholdCategories.getCategoryLabel(category)
-                }
+            if (paidBy.isBlank()) {
+                _state.value = _state.value.copy(isSaving = false, error = R.string.error_authentication_required)
+                return@launch
+            }
+            val currency = _state.value.userCurrency
+            val effectiveDescription = description.ifBlank {
+                HouseholdCategories.getCategoryLabel(category)
+            }
 
-                val result = expenseService.addExpense(
-                    groupId = groupId,
-                    description = effectiveDescription,
-                    amount = amount,
-                    currency = currency,
-                    paidBy = paidBy,
-                    splitType = SplitType.EQUAL,
-                    splits = emptyMap(),
-                    memberUids = emptyList(),
-                    category = category,
-                    date = date,
-                    note = note,
-                    recurring = recurring,
-                    itemizedData = null,
-                    transactionType = transactionType
+            expenseService.addExpense(
+                groupId = groupId,
+                description = effectiveDescription,
+                amount = amount,
+                currency = currency,
+                paidBy = paidBy,
+                splitType = SplitType.EQUAL,
+                splits = emptyMap(),
+                memberUids = emptyList(),
+                category = category,
+                date = date,
+                note = note,
+                recurring = recurring,
+                itemizedData = null,
+                transactionType = transactionType
+            ).onSuccess {
+                _state.value = _state.value.copy(
+                    isSaving = false,
+                    saveSuccess = true,
+                    lastSavedMessage = LocalizedString(R.string.entry_saved_msg)
                 )
-
-                if (result.isSuccess) {
-                    _state.value = _state.value.copy(
-                        isSaving = false,
-                        saveSuccess = true,
-                        lastSavedMessage = LocalizedString(R.string.entry_saved_msg)
-                    )
-                    loadData()
-                } else {
-                    _state.value = _state.value.copy(
-                        isSaving = false,
-                        error = R.string.error_failed_to_save
-                    )
-                }
-            } catch (e: Exception) {
-                _state.value = _state.value.copy(isSaving = false, error = e.toStringResId())
+                loadData()
+            }.onFailure {
+                _state.value = _state.value.copy(
+                    isSaving = false,
+                    error = R.string.error_failed_to_save
+                )
             }
         }
     }
@@ -339,65 +319,59 @@ class HouseholdViewModel @Inject constructor(
         if (amount <= 0 || groupId.isBlank() || expenseId.isBlank()) return
         viewModelScope.launch {
             _state.value = _state.value.copy(isSaving = true, error = null)
-            try {
-                if (paidBy.isBlank()) {
-                    _state.value = _state.value.copy(isSaving = false, error = R.string.error_authentication_required)
-                    return@launch
-                }
-                val userCurrency = _state.value.userCurrency
-                val effectiveDescription = description.ifBlank {
-                    HouseholdCategories.getCategoryLabel(category)
-                }
+            if (paidBy.isBlank()) {
+                _state.value = _state.value.copy(isSaving = false, error = R.string.error_authentication_required)
+                return@launch
+            }
+            val userCurrency = _state.value.userCurrency
+            val effectiveDescription = description.ifBlank {
+                HouseholdCategories.getCategoryLabel(category)
+            }
 
-                // Find the original expense to preserve its currency.
-                // The displayed amount was converted to the user's currency;
-                // convert back to the original currency before saving so
-                // we don't overwrite the stored currency or corrupt the
-                // base amount.
-                val originalExpense = _state.value.expenses.find { it.expenseId == expenseId }
-                val originalCurrency = originalExpense?.originalCurrency?.takeIf { it.isNotBlank() }
-                    ?: originalExpense?.currency?.takeIf { it.isNotBlank() }
-                    ?: userCurrency
-                val originalAmount = originalExpense?.originalAmount?.takeIf { it > 0 }
-                    ?: originalExpense?.amount
-                    ?: amount
+            // Find the original expense to preserve its currency.
+            // The displayed amount was converted to the user's currency;
+            // convert back to the original currency before saving so
+            // we don't overwrite the stored currency or corrupt the
+            // base amount.
+            val originalExpense = _state.value.expenses.find { it.expenseId == expenseId }
+            val originalCurrency = originalExpense?.originalCurrency?.takeIf { it.isNotBlank() }
+                ?: originalExpense?.currency?.takeIf { it.isNotBlank() }
+                ?: userCurrency
+            val originalAmount = originalExpense?.originalAmount?.takeIf { it > 0 }
+                ?: originalExpense?.amount
+                ?: amount
 
-                // Convert the edited display amount back to the original currency
-                val rates = _state.value.exchangeRates
-                val amountToSave = if (userCurrency != originalCurrency && rates.isNotEmpty()) {
-                    CurrencyConverter.convertCurrency(amount, userCurrency, originalCurrency, rates)
-                } else {
-                    amount
-                }
+            // Convert the edited display amount back to the original currency
+            val rates = _state.value.exchangeRates
+            val amountToSave = if (userCurrency != originalCurrency && rates.isNotEmpty()) {
+                CurrencyConverter.convertCurrency(amount, userCurrency, originalCurrency, rates)
+            } else {
+                amount
+            }
 
-                val result = expenseService.updateExpense(
-                    groupId = groupId,
-                    expenseId = expenseId,
-                    description = effectiveDescription,
-                    amount = amountToSave,
-                    currency = originalCurrency,
-                    paidBy = paidBy,
-                    splitType = SplitType.EQUAL,
-                    splits = emptyMap(),
-                    memberUids = emptyList(),
-                    category = category,
-                    date = date,
-                    note = note,
-                    itemizedData = null,
-                    transactionType = transactionType
+            expenseService.updateExpense(
+                groupId = groupId,
+                expenseId = expenseId,
+                description = effectiveDescription,
+                amount = amountToSave,
+                currency = originalCurrency,
+                paidBy = paidBy,
+                splitType = SplitType.EQUAL,
+                splits = emptyMap(),
+                memberUids = emptyList(),
+                category = category,
+                date = date,
+                note = note,
+                itemizedData = null,
+                transactionType = transactionType
+            ).onSuccess {
+                _state.value = _state.value.copy(isSaving = false, lastSavedMessage = LocalizedString(R.string.entry_updated_msg))
+                loadData()
+            }.onFailure {
+                _state.value = _state.value.copy(
+                    isSaving = false,
+                    error = R.string.error_failed_to_update
                 )
-
-                if (result.isSuccess) {
-                    _state.value = _state.value.copy(isSaving = false, lastSavedMessage = LocalizedString(R.string.entry_updated_msg))
-                    loadData()
-                } else {
-                    _state.value = _state.value.copy(
-                        isSaving = false,
-                        error = R.string.error_failed_to_update
-                    )
-                }
-            } catch (e: Exception) {
-                _state.value = _state.value.copy(isSaving = false, error = e.toStringResId())
             }
         }
     }
@@ -409,20 +383,17 @@ class HouseholdViewModel @Inject constructor(
         if (groupId.isBlank() || expenseId.isBlank()) return
         viewModelScope.launch {
             _state.value = _state.value.copy(isSaving = true, error = null)
-            try {
-                val result = expenseService.deleteExpense(groupId, expenseId)
-                if (result.isSuccess) {
+            expenseService.deleteExpense(groupId, expenseId)
+                .onSuccess {
                     _state.value = _state.value.copy(isSaving = false, lastSavedMessage = LocalizedString(R.string.entry_deleted_msg))
                     loadData()
-                } else {
+                }
+                .onFailure {
                     _state.value = _state.value.copy(
                         isSaving = false,
                         error = R.string.error_failed_to_delete
                     )
                 }
-            } catch (e: Exception) {
-                _state.value = _state.value.copy(isSaving = false, error = e.toStringResId())
-            }
         }
     }
 

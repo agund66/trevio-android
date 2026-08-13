@@ -13,6 +13,7 @@ import androidx.compose.material.icons.filled.AdminPanelSettings
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -20,10 +21,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.fragment.app.FragmentActivity
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -31,6 +34,8 @@ import com.trevio.android.R
 import com.trevio.android.core.designsystem.components.MemberAvatar
 import com.trevio.android.core.navigation.TrevioRoute
 import com.trevio.android.core.navigation.TrevioRouteSupport
+import com.trevio.android.core.security.AppLockViewModel
+import com.trevio.android.core.security.BiometricAuthenticator
 import com.trevio.android.domain.model.User
 import com.trevio.android.domain.repository.AuthService
 import com.trevio.android.ui.profile.TermsConditionsDialog
@@ -77,10 +82,17 @@ class MoreViewModel @Inject constructor(
 fun MoreScreen(
     navController: androidx.navigation.NavHostController,
     onSignOut: () -> Unit,
-    viewModel: MoreViewModel = hiltViewModel()
+    viewModel: MoreViewModel = hiltViewModel(),
+    appLockViewModel: AppLockViewModel = hiltViewModel()
 ) {
     val state by viewModel.state.collectAsState()
     var showTermsDialog by remember { mutableStateOf(false) }
+    val appLockEnabled by appLockViewModel.appLockEnabled.collectAsState()
+    val context = LocalContext.current
+    val activity = context as? FragmentActivity
+    val scope = rememberCoroutineScope()
+    var showNoBiometricDialog by remember { mutableStateOf(false) }
+    var isAuthenticating by remember { mutableStateOf(false) }
 
     LaunchedEffect(state.signedOut) {
         if (state.signedOut) onSignOut()
@@ -199,6 +211,45 @@ fun MoreScreen(
                 onClick = { navController.navigate(TrevioRouteSupport.Support.route) }
             )
 
+            // ── Smart Lock toggle ──
+            SmartLockItem(
+                enabled = appLockEnabled,
+                onToggle = { enable ->
+                    if (enable) {
+                        // Check if the device has any authenticator enrolled
+                        if (!BiometricAuthenticator.canAuthenticate(context)) {
+                            showNoBiometricDialog = true
+                        } else if (activity != null && !isAuthenticating) {
+                            // Verify the user can authenticate before enabling.
+                            // Use the composition scope (not viewModelScope)
+                            // so the DataStore write in enableAppLock()
+                            // survives even if the user navigates away
+                            // from MoreScreen immediately after.
+                            isAuthenticating = true
+                            scope.launch {
+                                val result = BiometricAuthenticator.authenticate(
+                                    activity = activity,
+                                    title = context.getString(R.string.app_lock_enable_title),
+                                    subtitle = context.getString(R.string.app_lock_enable_subtitle)
+                                )
+                                isAuthenticating = false
+                                result.onSuccess {
+                                    // Suspend write — completes in the
+                                    // composition scope, not viewModelScope.
+                                    appLockViewModel.enableAppLockSuspend()
+                                }
+                            }
+                        }
+                    } else {
+                        // Also use the composition scope for disable to
+                        // ensure the write completes.
+                        scope.launch {
+                            appLockViewModel.disableAppLockSuspend()
+                        }
+                    }
+                }
+            )
+
             Spacer(modifier = Modifier.height(8.dp))
 
             MoreMenuItem(
@@ -214,6 +265,19 @@ fun MoreScreen(
 
     if (showTermsDialog) {
         TermsConditionsDialog(onDismiss = { showTermsDialog = false })
+    }
+
+    if (showNoBiometricDialog) {
+        AlertDialog(
+            onDismissRequest = { showNoBiometricDialog = false },
+            title = { Text(stringResource(R.string.app_lock_no_biometric_title)) },
+            text = { Text(stringResource(R.string.app_lock_no_biometric_message)) },
+            confirmButton = {
+                TextButton(onClick = { showNoBiometricDialog = false }) {
+                    Text(stringResource(R.string.common_ok))
+                }
+            }
+        )
     }
 }
 
@@ -261,6 +325,67 @@ private fun MoreMenuItem(
                 fontWeight = FontWeight.Medium,
                 color = labelColor,
                 modifier = Modifier.weight(1f)
+            )
+        }
+    }
+}
+
+/**
+ * Smart Lock menu row with an inline [Switch]. Tapping the row or the
+ * switch toggles the app lock. When turning ON, the caller verifies
+ * biometric availability and authenticates the user before enabling.
+ */
+@Composable
+private fun SmartLockItem(
+    enabled: Boolean,
+    onToggle: (Boolean) -> Unit
+) {
+    val tint = MaterialTheme.colorScheme.primary
+
+    Surface(
+        shape = RoundedCornerShape(14.dp),
+        color = MaterialTheme.colorScheme.surface,
+        tonalElevation = 1.dp,
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable { onToggle(!enabled) }
+                .padding(horizontal = 16.dp, vertical = 14.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(36.dp)
+                    .clip(CircleShape)
+                    .background(tint.copy(alpha = 0.1f)),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Lock,
+                    contentDescription = null,
+                    tint = tint,
+                    modifier = Modifier.size(20.dp)
+                )
+            }
+            Spacer(modifier = Modifier.width(14.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = stringResource(R.string.app_lock_title),
+                    style = MaterialTheme.typography.bodyLarge,
+                    fontWeight = FontWeight.Medium,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                Text(
+                    text = stringResource(R.string.app_lock_subtitle),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            Switch(
+                checked = enabled,
+                onCheckedChange = onToggle
             )
         }
     }

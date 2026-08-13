@@ -1443,4 +1443,29 @@
     <string name="country_sm">San Marino</string>
     <string name="country_ad">Andorra</string>
     <string name="country_li">Liechtenstein</string>
+
+    <!-- ==================== APP LOCK (SMART LOCK) ==================== -->
+    <!-- More screen toggle -->
+    <string name="app_lock_title">Smart Lock</string>
+    <string name="app_lock_subtitle">Require biometric or PIN to open Trevio</string>
+    <!-- Enable verification prompt (shown from More screen) -->
+    <string name="app_lock_enable_title">Enable Smart Lock</string>
+    <string name="app_lock_enable_subtitle">Confirm your identity to turn on app lock</string>
+    <!-- Lock screen overlay -->
+    <string name="app_lock_unlock_title">Unlock Trevio</string>
+    <string name="app_lock_unlock_subtitle">Use your fingerprint, face, or device PIN to unlock</string>
+    <string name="app_lock_unlock_button">Unlock</string>
+    <!-- No biometric / device credential enrolled -->
+    <string name="app_lock_no_biometric_title">No screen lock set up</string>
+    <string name="app_lock_no_biometric_message">To use Smart Lock, set up a screen lock (PIN, pattern, or password) and optionally biometric authentication in your device Settings first.</string>
+    <!-- First-login biometric setup screen -->
+    <string name="biometric_setup_title">Enable Smart Lock?</string>
+    <string name="biometric_setup_subtitle">Protect your financial data with an extra layer of security.</string>
+    <string name="biometric_setup_feature_biometric">Unlock with fingerprint or face recognition</string>
+    <string name="biometric_setup_feature_pin">Unlock with device PIN, pattern, or password</string>
+    <string name="biometric_setup_feature_privacy">Keeps your group balances and expenses private</string>
+    <string name="biometric_setup_enable">Enable Smart Lock</string>
+    <string name="biometric_setup_later">Maybe later</string>
+    <string name="biometric_setup_prompt_title">Verify it\'s you</string>
+    <string name="biometric_setup_prompt_subtitle">Confirm your identity to enable Smart Lock</string>
 </resources>

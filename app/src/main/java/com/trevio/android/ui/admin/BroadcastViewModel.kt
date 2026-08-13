@@ -194,39 +194,35 @@ class BroadcastViewModel @Inject constructor(
 
         _state.value = _state.value.copy(isSubmitting = true, formError = null)
         viewModelScope.launch {
-            try {
-                val startMs = s.formStartAt
-                val endMs = s.formEndAt
-                if (endMs != null && endMs < startMs) {
-                    _state.value = _state.value.copy(isSubmitting = false, formError = R.string.broadcast_error_end_after_start)
-                    return@launch
-                }
+            val startMs = s.formStartAt
+            val endMs = s.formEndAt
+            if (endMs != null && endMs < startMs) {
+                _state.value = _state.value.copy(isSubmitting = false, formError = R.string.broadcast_error_end_after_start)
+                return@launch
+            }
 
-                broadcastService.createBroadcast(
-                    title = s.formTitle.trim(),
-                    htmlContent = s.formHtmlContent,
-                    priority = s.formPriority,
-                    targetType = s.formTargetType,
-                    targetUids = if (s.formTargetType == BroadcastTargetType.SPECIFIC) s.formTargetUids.toList() else emptyList(),
-                    startAt = startMs,
-                    endAt = endMs
-                ).onSuccess {
-                    _state.value = _state.value.copy(
-                        isSubmitting = false,
-                        showForm = false,
-                        formTitle = "",
-                        formHtmlContent = "",
-                        formPriority = BroadcastPriority.INFO,
-                        formTargetType = BroadcastTargetType.ALL,
-                        formTargetUids = emptySet(),
-                        formStartAt = null,
-                        formEndAt = null
-                    )
-                    loadBroadcasts()
-                }.onFailure { e ->
-                    _state.value = _state.value.copy(isSubmitting = false, formError = e.toStringResId())
-                }
-            } catch (e: Exception) {
+            broadcastService.createBroadcast(
+                title = s.formTitle.trim(),
+                htmlContent = s.formHtmlContent,
+                priority = s.formPriority,
+                targetType = s.formTargetType,
+                targetUids = if (s.formTargetType == BroadcastTargetType.SPECIFIC) s.formTargetUids.toList() else emptyList(),
+                startAt = startMs,
+                endAt = endMs
+            ).onSuccess {
+                _state.value = _state.value.copy(
+                    isSubmitting = false,
+                    showForm = false,
+                    formTitle = "",
+                    formHtmlContent = "",
+                    formPriority = BroadcastPriority.INFO,
+                    formTargetType = BroadcastTargetType.ALL,
+                    formTargetUids = emptySet(),
+                    formStartAt = null,
+                    formEndAt = null
+                )
+                loadBroadcasts()
+            }.onFailure { e ->
                 _state.value = _state.value.copy(isSubmitting = false, formError = e.toStringResId())
             }
         }

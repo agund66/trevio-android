@@ -9,6 +9,7 @@ import androidx.navigation.navArgument
 import com.trevio.android.ui.auth.AuthScreen
 import com.trevio.android.ui.auth.TermsScreen
 import com.trevio.android.ui.auth.PhoneSetupScreen
+import com.trevio.android.ui.auth.BiometricSetupScreen
 import com.trevio.android.ui.splash.SplashScreen
 
 @Composable
@@ -35,6 +36,10 @@ fun TrevioNavGraph(
 
         composable(TrevioRoute.PhoneSetup.route) {
             PhoneSetupScreen(navController = navController)
+        }
+
+        composable(TrevioRoute.BiometricSetup.route) {
+            BiometricSetupScreen(navController = navController)
         }
 
         composable(TrevioRoute.Main.route) {

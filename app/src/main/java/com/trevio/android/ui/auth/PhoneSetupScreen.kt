@@ -125,7 +125,16 @@ fun PhoneSetupScreen(
     val isValid = phoneNumber.length == country.phoneLength && phoneNumber.all { it.isDigit() }
 
     LaunchedEffect(state.saved, user?.phoneNumber) {
-        if (state.saved || !user?.phoneNumber.isNullOrBlank()) {
+        if (state.saved) {
+            // New user just saved their phone → offer biometric lock setup
+            // (first-login only). The BiometricSetupScreen auto-skips to
+            // Main if no authenticator is available or the prompt was
+            // already shown.
+            navController.navigate(TrevioRoute.BiometricSetup.route) {
+                popUpTo(0) { inclusive = true }
+            }
+        } else if (!user?.phoneNumber.isNullOrBlank()) {
+            // User already had a phone number → go straight to Main
             navController.navigate(TrevioRoute.Main.route) {
                 popUpTo(0) { inclusive = true }
             }

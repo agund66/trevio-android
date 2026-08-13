@@ -5,6 +5,7 @@ sealed class TrevioRoute(val route: String) {
     data object Login : TrevioRoute("login")
     data object Terms : TrevioRoute("terms")
     data object PhoneSetup : TrevioRoute("phone_setup")
+    data object BiometricSetup : TrevioRoute("biometric_setup")
     data object Main : TrevioRoute("main")
     data object Home : TrevioRoute("home")
     data object Groups : TrevioRoute("groups")

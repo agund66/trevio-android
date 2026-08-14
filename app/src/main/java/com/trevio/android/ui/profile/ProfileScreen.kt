@@ -53,7 +53,6 @@ import com.trevio.android.domain.model.User
 import com.trevio.android.domain.repository.AuthService
 import com.trevio.android.domain.repository.UserService
 import com.trevio.android.util.CountryConstants
-import com.trevio.android.util.CurrencyConverter
 import com.trevio.android.util.toStringResId
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -335,14 +334,6 @@ private fun ViewProfileContent(
             label = stringResource(R.string.profile_email),
             value = user.email
         )
-        val currencySymbol = CurrencyConverter.getCurrencySymbol(user.defaultCurrency)
-        ProfileInfoCard(
-            icon = Icons.Default.Payments,
-            iconColor = if (isDark) CategoryFoodDark else CategoryFood,
-            label = stringResource(R.string.profile_currency),
-            value = "$currencySymbol ${user.defaultCurrency}"
-        )
-
         // Always show phone card
         ProfileInfoCard(
             icon = Icons.Default.Phone,

@@ -2,6 +2,7 @@ package com.trevio.android.util
 
 object AppConstants {
     const val BASE_CURRENCY = "INR"
+    const val DEFAULT_TIMEZONE = "Asia/Kolkata"
 
     // Default category
     const val DEFAULT_CATEGORY = "other"

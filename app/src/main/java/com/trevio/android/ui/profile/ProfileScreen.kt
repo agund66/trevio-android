@@ -6,6 +6,8 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.PressInteraction
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -41,18 +43,16 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.trevio.android.R
 import com.trevio.android.core.UserRefreshNotifier
+import com.trevio.android.core.designsystem.components.CountryPickerDialog
 import com.trevio.android.core.designsystem.components.MemberAvatar
 import com.trevio.android.core.designsystem.components.TrevioCard
 import com.trevio.android.core.designsystem.theme.*
 import com.trevio.android.core.designsystem.theme.ThemeMode
 import com.trevio.android.core.designsystem.theme.ThemeViewModel
-import com.trevio.android.core.designsystem.theme.TrevioBorder
-import com.trevio.android.core.navigation.TrevioRoute
 import com.trevio.android.domain.model.User
 import com.trevio.android.domain.repository.AuthService
 import com.trevio.android.domain.repository.UserService
 import com.trevio.android.util.CountryConstants
-import com.trevio.android.util.CountryInfo
 import com.trevio.android.util.CurrencyConverter
 import com.trevio.android.util.toStringResId
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -116,13 +116,16 @@ class ProfileViewModel @Inject constructor(
         _state.value = _state.value.copy(isEditing = false, error = null)
     }
 
-    fun saveProfile(displayName: String, currency: String, upiId: String, phoneNumber: String, countryCode: String) {
+    fun saveProfile(displayName: String, upiId: String, phoneNumber: String, countryCode: String) {
         val currentUser = _state.value.user ?: return
         _state.value = _state.value.copy(isSaving = true, error = null)
         viewModelScope.launch {
+            val derivedCurrency = CountryConstants.getCurrencyForCountry(countryCode)
+            val derivedTimezone = CountryConstants.getTimezoneForCountry(countryCode)
             val updated = currentUser.copy(
                 displayName = displayName,
-                defaultCurrency = currency,
+                defaultCurrency = derivedCurrency,
+                timezone = derivedTimezone,
                 upiId = upiId,
                 phoneNumber = phoneNumber,
                 countryCode = countryCode
@@ -284,7 +287,7 @@ fun ProfileScreen(
                 user = user,
                 isSaving = state.isSaving,
                 error = state.error,
-                onSave = { name, currency, upi, phone, cc -> viewModel.saveProfile(name, currency, upi, phone, cc) }
+                onSave = { name, upi, phone, cc -> viewModel.saveProfile(name, upi, phone, cc) }
             )
         } else {
             ViewProfileContent(
@@ -310,6 +313,7 @@ private fun ViewProfileContent(
     val hasUpiId = user.upiId.isNotEmpty()
     val hasPhone = user.phoneNumber.isNotEmpty()
     val country = COUNTRY_CODES.find { it.code == user.countryCode } ?: COUNTRY_CODES.first()
+    val isIndiaSelected = country.code == "IN"
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -349,15 +353,17 @@ private fun ViewProfileContent(
             onAction = if (!hasPhone) onEdit else null
         )
 
-        // Always show UPI ID card
-        ProfileInfoCard(
-            icon = Icons.Default.Payments,
-            iconColor = if (isDark) CategoryAccommodationDark else CategoryAccommodation,
-            label = stringResource(R.string.profile_upi_id),
-            value = if (hasUpiId) user.upiId else stringResource(R.string.profile_not_set),
-            actionLabel = if (!hasUpiId) stringResource(R.string.profile_add) else null,
-            onAction = if (!hasUpiId) onEdit else null
-        )
+        // UPI ID card — only shown for India (UPI is India-specific)
+        if (isIndiaSelected) {
+            ProfileInfoCard(
+                icon = Icons.Default.Payments,
+                iconColor = if (isDark) CategoryAccommodationDark else CategoryAccommodation,
+                label = stringResource(R.string.profile_upi_id),
+                value = if (hasUpiId) user.upiId else stringResource(R.string.profile_not_set),
+                actionLabel = if (!hasUpiId) stringResource(R.string.profile_add) else null,
+                onAction = if (!hasUpiId) onEdit else null
+            )
+        }
 
         // Payment info card
         TrevioCard(
@@ -381,7 +387,7 @@ private fun ViewProfileContent(
                 }
                 Spacer(modifier = Modifier.height(8.dp))
                 when {
-                    hasUpiId -> {
+                    isIndiaSelected && hasUpiId -> {
                         Text(
                             user.upiId,
                             style = MaterialTheme.typography.bodyMedium,
@@ -592,25 +598,30 @@ private fun EditProfileContent(
     user: User,
     isSaving: Boolean,
     @StringRes error: Int?,
-    onSave: (String, String, String, String, String) -> Unit
+    onSave: (String, String, String, String) -> Unit
 ) {
     var displayName by remember { mutableStateOf(user.displayName) }
-    var currency by remember { mutableStateOf(user.defaultCurrency) }
     var upiId by remember { mutableStateOf(user.upiId) }
     var phoneNumber by remember { mutableStateOf(user.phoneNumber) }
     var countryCode by remember { mutableStateOf(user.countryCode.ifEmpty { CountryConstants.DEFAULT_COUNTRY_CODE }) }
-    var countryMenuExpanded by remember { mutableStateOf(false) }
-
-    val currencies = CurrencyConverter.SUPPORTED_CURRENCIES.map {
-        Triple(it.code, it.symbol, stringResource(it.nameResId))
+    var showCountryPicker by remember { mutableStateOf(false) }
+    val countryPickerInteraction = remember { MutableInteractionSource() }
+    LaunchedEffect(countryPickerInteraction) {
+        countryPickerInteraction.interactions.collect { interaction ->
+            if (interaction is PressInteraction.Press) {
+                showCountryPicker = true
+            }
+        }
     }
-    var currencyMenuExpanded by remember { mutableStateOf(false) }
-    val selectedCurrency = currencies.find { it.first == currency }
 
     val upiError = if (upiId.isNotEmpty() && !isValidUpiId(upiId)) stringResource(R.string.profile_upi_invalid) else null
     val phoneError = if (!isValidPhoneNumber(phoneNumber, countryCode)) stringResource(R.string.profile_phone_invalid) else null
     val nameError = if (displayName.isBlank()) stringResource(R.string.profile_name_required) else null
     val hasErrors = upiError != null || phoneError != null || nameError != null
+
+    val derivedCurrency = CountryConstants.getCurrencyForCountry(countryCode)
+    val derivedTimezone = CountryConstants.getTimezoneForCountry(countryCode)
+    val isIndiaSelected = countryCode == "IN"
 
     Column(
         modifier = Modifier
@@ -626,69 +637,22 @@ private fun EditProfileContent(
             isError = nameError != null,
             supportingText = { if (nameError != null) Text(nameError) }
         )
-        Spacer(modifier = Modifier.height(12.dp))
-
-        Text(stringResource(R.string.profile_currency), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-        Spacer(modifier = Modifier.height(8.dp))
-        Box {
-            OutlinedTextField(
-                value = "${selectedCurrency?.second ?: ""} ${currency} - ${selectedCurrency?.third ?: ""}",
-                onValueChange = {},
-                readOnly = true,
-                trailingIcon = {
-                    Icon(Icons.Default.ArrowDropDown, contentDescription = stringResource(R.string.profile_select_currency))
-                },
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(12.dp)
-            )
-            DropdownMenu(
-                expanded = currencyMenuExpanded,
-                onDismissRequest = { currencyMenuExpanded = false }
-            ) {
-                currencies.forEach { (code, symbol, name) ->
-                    DropdownMenuItem(
-                        text = { Text("$symbol $code - $name") },
-                        onClick = {
-                            currency = code
-                            currencyMenuExpanded = false
-                        }
-                    )
-                }
-            }
-            Box(
-                modifier = Modifier
-                    .matchParentSize()
-                    .clickable { currencyMenuExpanded = true }
-            )
-        }
-
         Spacer(modifier = Modifier.height(16.dp))
+
         Text(stringResource(R.string.profile_phone), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
         Spacer(modifier = Modifier.height(8.dp))
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-            Box(modifier = Modifier.clickable { countryMenuExpanded = true }) {
-                OutlinedTextField(
-                    value = COUNTRY_CODES.find { it.code == countryCode }?.let { "${it.flag} ${it.dialCode}" } ?: "🇮🇳 +91",
-                    onValueChange = {},
-                    readOnly = true,
-                    trailingIcon = {
-                        Icon(Icons.Default.ArrowDropDown, contentDescription = stringResource(R.string.profile_select_country))
-                    },
-                    modifier = Modifier.width(120.dp),
-                    singleLine = true
-                )
-                DropdownMenu(expanded = countryMenuExpanded, onDismissRequest = { countryMenuExpanded = false }) {
-                    COUNTRY_CODES.forEach { country ->
-                        DropdownMenuItem(
-                            text = { Text("${country.flag} ${country.dialCode} (${country.code})") },
-                            onClick = {
-                                countryCode = country.code
-                                countryMenuExpanded = false
-                            }
-                        )
-                    }
-                }
-            }
+            OutlinedTextField(
+                value = COUNTRY_CODES.find { it.code == countryCode }?.let { "${it.flag} ${it.dialCode}" } ?: "🇮🇳 +91",
+                onValueChange = {},
+                readOnly = true,
+                interactionSource = countryPickerInteraction,
+                trailingIcon = {
+                    Icon(Icons.Default.ArrowDropDown, contentDescription = stringResource(R.string.profile_select_country))
+                },
+                modifier = Modifier.width(120.dp),
+                singleLine = true
+            )
             OutlinedTextField(
                 value = phoneNumber,
                 onValueChange = { phoneNumber = it.filter { c -> c.isDigit() }.take((COUNTRY_CODES.find { c -> c.code == countryCode }?.phoneLength ?: 10)) },
@@ -700,16 +664,25 @@ private fun EditProfileContent(
             )
         }
 
-        Spacer(modifier = Modifier.height(12.dp))
-        OutlinedTextField(
-            value = upiId,
-            onValueChange = { upiId = it },
-            label = { Text(stringResource(R.string.profile_upi_id)) },
-            modifier = Modifier.fillMaxWidth(),
-            singleLine = true,
-            isError = upiError != null,
-            supportingText = { if (upiError != null) Text(upiError) else Text(stringResource(R.string.profile_upi_hint)) }
+        Spacer(modifier = Modifier.height(4.dp))
+        Text(
+            text = stringResource(R.string.profile_country_hint, derivedCurrency, derivedTimezone),
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
         )
+
+        Spacer(modifier = Modifier.height(12.dp))
+        if (isIndiaSelected) {
+            OutlinedTextField(
+                value = upiId,
+                onValueChange = { upiId = it },
+                label = { Text(stringResource(R.string.profile_upi_id)) },
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true,
+                isError = upiError != null,
+                supportingText = { if (upiError != null) Text(upiError) else Text(stringResource(R.string.profile_upi_hint)) }
+            )
+        }
 
         if (error != null) {
             Spacer(modifier = Modifier.height(8.dp))
@@ -718,7 +691,7 @@ private fun EditProfileContent(
 
         Spacer(modifier = Modifier.height(24.dp))
         Button(
-            onClick = { onSave(displayName, currency, upiId, phoneNumber, countryCode) },
+            onClick = { onSave(displayName, upiId, phoneNumber, countryCode) },
             enabled = !isSaving && !hasErrors,
             modifier = Modifier.fillMaxWidth().height(52.dp),
             shape = MaterialTheme.shapes.medium
@@ -729,6 +702,17 @@ private fun EditProfileContent(
                 Text(stringResource(R.string.profile_save))
             }
         }
+    }
+
+    if (showCountryPicker) {
+        CountryPickerDialog(
+            selectedCode = countryCode,
+            onSelect = { code ->
+                countryCode = code
+                showCountryPicker = false
+            },
+            onDismiss = { showCountryPicker = false }
+        )
     }
 }
 

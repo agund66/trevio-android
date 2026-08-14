@@ -2,7 +2,8 @@ package com.trevio.android.ui.auth
 
 import androidx.annotation.StringRes
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -11,7 +12,6 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
@@ -22,8 +22,6 @@ import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.Phone
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -50,6 +48,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.navigation.NavHostController
 import com.trevio.android.R
+import com.trevio.android.core.designsystem.components.CountryPickerDialog
 import com.trevio.android.core.navigation.TrevioRoute
 import com.trevio.android.domain.model.User
 import com.trevio.android.domain.repository.AuthService
@@ -101,7 +100,14 @@ class PhoneSetupViewModel @Inject constructor(
         val user = _state.value.user ?: return
         _state.value = _state.value.copy(isSaving = true, error = null)
         viewModelScope.launch {
-            userService.updateUser(user.copy(phoneNumber = phoneNumber, countryCode = countryCode))
+            val currency = CountryConstants.getCurrencyForCountry(countryCode)
+            val timezone = CountryConstants.getTimezoneForCountry(countryCode)
+            userService.updateUser(user.copy(
+                phoneNumber = phoneNumber,
+                countryCode = countryCode,
+                defaultCurrency = currency,
+                timezone = timezone
+            ))
                 .onSuccess { _state.value = _state.value.copy(isSaving = false, saved = true) }
                 .onFailure { _state.value = _state.value.copy(isSaving = false, error = R.string.phone_setup_failed) }
         }
@@ -120,7 +126,15 @@ fun PhoneSetupScreen(
     var countryCode by rememberSaveable(user?.uid) {
         mutableStateOf(user?.countryCode?.ifEmpty { CountryConstants.DEFAULT_COUNTRY_CODE } ?: CountryConstants.DEFAULT_COUNTRY_CODE)
     }
-    var countryMenuExpanded by remember { mutableStateOf(false) }
+    var showCountryPicker by remember { mutableStateOf(false) }
+    val countryPickerInteraction = remember { MutableInteractionSource() }
+    LaunchedEffect(countryPickerInteraction) {
+        countryPickerInteraction.interactions.collect { interaction ->
+            if (interaction is androidx.compose.foundation.interaction.PressInteraction.Press) {
+                showCountryPicker = true
+            }
+        }
+    }
     val country = CountryConstants.getCountryByCode(countryCode)
     val isValid = phoneNumber.length == country.phoneLength && phoneNumber.all { it.isDigit() }
 
@@ -193,13 +207,13 @@ fun PhoneSetupScreen(
                 )
                 Spacer(modifier = Modifier.height(8.dp))
                 Text(
-                    text = stringResource(R.string.phone_setup_subtitle),
+                    text = stringResource(if (countryCode == "IN") R.string.phone_setup_subtitle else R.string.phone_setup_subtitle_generic),
                     style = MaterialTheme.typography.titleSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
                 Spacer(modifier = Modifier.height(8.dp))
                 Text(
-                    text = stringResource(R.string.phone_setup_description),
+                    text = stringResource(if (countryCode == "IN") R.string.phone_setup_description else R.string.phone_setup_description_generic),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -215,42 +229,23 @@ fun PhoneSetupScreen(
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    // Country code selector — the OutlinedTextField itself opens
-                    // the dropdown. The wrapping Box has NO clickable modifier
-                    // (previously it intercepted taps and re-opened the menu
-                    // immediately after selecting an item, making only the first
-                    // item selectable). The DropdownMenu is constrained to a
-                    // max height so the ~200 entries are scrollable.
-                    Box {
-                        OutlinedTextField(
-                            value = "${country.flag} ${country.dialCode}",
-                            onValueChange = {},
-                            readOnly = true,
-                            trailingIcon = {
-                                Icon(Icons.Default.ArrowDropDown, contentDescription = stringResource(R.string.profile_select_country))
-                            },
-                            modifier = Modifier
-                                .width(120.dp)
-                                .clickable { countryMenuExpanded = true },
-                            singleLine = true
-                        )
-                        DropdownMenu(
-                            expanded = countryMenuExpanded,
-                            onDismissRequest = { countryMenuExpanded = false },
-                            modifier = Modifier.heightIn(max = 360.dp)
-                        ) {
-                            CountryConstants.COUNTRY_CODES.forEach { option ->
-                                DropdownMenuItem(
-                                    text = { Text("${option.flag} ${stringResource(option.nameResId)} ${option.dialCode}") },
-                                    onClick = {
-                                        countryCode = option.code
-                                        phoneNumber = phoneNumber.take(option.phoneLength)
-                                        countryMenuExpanded = false
-                                    }
-                                )
-                            }
-                        }
-                    }
+                    // Country code selector — opens a full-screen searchable
+                    // dialog instead of a DropdownMenu (which was impractical
+                    // to scroll through ~200 entries). Uses interactionSource
+                    // to detect taps because .clickable on an OutlinedTextField
+                    // is unreliable (the text field's own touch handling
+                    // intercepts taps before the clickable modifier fires).
+                    OutlinedTextField(
+                        value = "${country.flag} ${country.dialCode}",
+                        onValueChange = {},
+                        readOnly = true,
+                        interactionSource = countryPickerInteraction,
+                        trailingIcon = {
+                            Icon(Icons.Default.ArrowDropDown, contentDescription = stringResource(R.string.profile_select_country))
+                        },
+                        modifier = Modifier.width(120.dp),
+                        singleLine = true
+                    )
                     OutlinedTextField(
                         value = phoneNumber,
                         onValueChange = { phoneNumber = it.filter(Char::isDigit).take(country.phoneLength) },
@@ -297,5 +292,17 @@ fun PhoneSetupScreen(
                 }
             }
         }
+    }
+
+    if (showCountryPicker) {
+        CountryPickerDialog(
+            selectedCode = countryCode,
+            onSelect = { code ->
+                countryCode = code
+                phoneNumber = phoneNumber.take(CountryConstants.getCountryByCode(code).phoneLength)
+                showCountryPicker = false
+            },
+            onDismiss = { showCountryPicker = false }
+        )
     }
 }

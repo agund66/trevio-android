@@ -35,7 +35,8 @@ data class User(
     val blocked: Boolean = false,
     val upiId: String = "",
     val phoneNumber: String = "",
-    val countryCode: String = ""
+    val countryCode: String = "",
+    val timezone: String = "Asia/Kolkata"
 )
 
 data class Group(

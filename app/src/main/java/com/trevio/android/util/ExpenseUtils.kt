@@ -153,8 +153,11 @@ object SplitBuilder {
 object PaymentUtils {
 
     fun getUpiVpa(debt: SimplifiedDebt): String {
+        // UPI is India-specific — don't build VPA for other countries
+        // even if the user has a UPI ID set (e.g. they changed country after setting one).
+        if (debt.toCountryCode.isNotEmpty() && debt.toCountryCode != "IN") return ""
         if (debt.toUpiId.isNotEmpty()) return debt.toUpiId
-        if (debt.toPhoneNumber.isNotEmpty() && (debt.toCountryCode.isEmpty() || debt.toCountryCode == "IN")) {
+        if (debt.toPhoneNumber.isNotEmpty()) {
             return "${debt.toPhoneNumber}@paytm"
         }
         return ""

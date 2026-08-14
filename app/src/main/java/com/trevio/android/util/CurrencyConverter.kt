@@ -5,6 +5,7 @@ import com.trevio.android.R
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import java.util.TimeZone
 import kotlin.math.round
 
 object CurrencyConverter {
@@ -70,11 +71,15 @@ object CurrencyConverter {
         return currencyLocales[currency] ?: Locale("en", "US")
     }
 
-    fun formatDate(timestamp: Long, currency: String, includeTime: Boolean = false): String {
+    fun formatDate(timestamp: Long, currency: String, includeTime: Boolean = false, timezone: String? = null): String {
         if (timestamp <= 0L) return ""
         val locale = getLocaleForCurrency(currency)
         val pattern = if (includeTime) "dd MMM yyyy, HH:mm" else "dd MMM yyyy"
-        return SimpleDateFormat(pattern, locale).format(Date(timestamp))
+        val formatter = SimpleDateFormat(pattern, locale)
+        if (!timezone.isNullOrEmpty()) {
+            formatter.timeZone = TimeZone.getTimeZone(timezone)
+        }
+        return formatter.format(Date(timestamp))
     }
 
     fun convertFromBase(

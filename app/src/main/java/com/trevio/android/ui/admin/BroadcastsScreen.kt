@@ -4,6 +4,8 @@ import android.webkit.WebView
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.PressInteraction
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -394,6 +396,21 @@ private fun BroadcastCreateScreen(
             var pendingStartDateMillis by remember { mutableStateOf<Long?>(null) }
             var pendingEndDateMillis by remember { mutableStateOf<Long?>(null) }
 
+            // Use interactionSource for date picker fields — .clickable on a
+            // disabled OutlinedTextField is unreliable.
+            val startPickerInteraction = remember { MutableInteractionSource() }
+            val endPickerInteraction = remember { MutableInteractionSource() }
+            LaunchedEffect(startPickerInteraction) {
+                startPickerInteraction.interactions.collect { i ->
+                    if (i is PressInteraction.Press) showStartPicker = true
+                }
+            }
+            LaunchedEffect(endPickerInteraction) {
+                endPickerInteraction.interactions.collect { i ->
+                    if (i is PressInteraction.Press) showEndPicker = true
+                }
+            }
+
             Text(stringResource(R.string.broadcasts_schedule), style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Medium)
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -403,10 +420,9 @@ private fun BroadcastCreateScreen(
                     value = state.formStartAt?.let { formatDate(it, true) } ?: "",
                     onValueChange = {},
                     label = { Text(stringResource(R.string.broadcasts_start_date_time)) },
-                    modifier = Modifier
-                        .weight(1f)
-                        .clickable { showStartPicker = true },
+                    modifier = Modifier.weight(1f),
                     enabled = false,
+                    interactionSource = startPickerInteraction,
                     singleLine = true,
                     shape = RoundedCornerShape(12.dp),
                     colors = OutlinedTextFieldDefaults.colors(
@@ -419,10 +435,9 @@ private fun BroadcastCreateScreen(
                     value = state.formEndAt?.let { formatDate(it, true) } ?: "",
                     onValueChange = {},
                     label = { Text(stringResource(R.string.broadcasts_end_optional)) },
-                    modifier = Modifier
-                        .weight(1f)
-                        .clickable { showEndPicker = true },
+                    modifier = Modifier.weight(1f),
                     enabled = false,
+                    interactionSource = endPickerInteraction,
                     singleLine = true,
                     shape = RoundedCornerShape(12.dp),
                     colors = OutlinedTextFieldDefaults.colors(

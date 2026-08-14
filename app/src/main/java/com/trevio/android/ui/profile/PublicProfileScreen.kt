@@ -202,8 +202,8 @@ fun PublicProfileScreen(
                 value = user.email
             )
 
-            // Payment info
-            if (user.upiId.isNotEmpty()) {
+            // Payment info — UPI only shown for India users
+            if (user.upiId.isNotEmpty() && user.countryCode == "IN") {
                 ProfileInfoCard(
                     icon = Icons.Default.Wallet,
                     iconColor = if (isDark) CategoryAccommodationDark else CategoryAccommodation,

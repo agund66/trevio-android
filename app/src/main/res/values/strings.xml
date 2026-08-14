@@ -6,7 +6,7 @@
     <!-- ==================== HOME SCREEN ==================== -->
     <string name="home_welcome_back">Welcome</string>
     <string name="home_no_groups_yet">No groups yet</string>
-    <string name="home_no_groups_message">Create your first group to start splitting bills with friends. Perfect for trips, turf sessions, or casual splits!</string>
+    <string name="home_no_groups_message">Create a group to split bills with friends, or start a household to track your daily expenses. Perfect for trips, turf sessions, or family budgeting!</string>
     <string name="home_create_group">Create Group</string>
     <string name="home_failed_to_load">Failed to load groups</string>
     <string name="home_your_groups">Your Groups</string>
@@ -29,7 +29,7 @@
     <string name="groups_title">Groups</string>
     <string name="groups_failed_to_load">Failed to load groups</string>
     <string name="groups_no_groups_yet">No groups yet</string>
-    <string name="groups_create_message">Create your first group to start splitting bills with friends.</string>
+    <string name="groups_create_message">Create a group to split bills with friends, or a household to track daily expenses.</string>
     <string name="groups_create_group">Create Group</string>
     <string name="groups_join_group">Join Group</string>
     <string name="groups_join_group_desc">Join group</string>
@@ -86,7 +86,7 @@
     <string name="group_detail_retry">Retry</string>
     <string name="group_detail_failed_load">Failed to load group</string>
     <string name="group_detail_share_subject">Join \"%1$s\" on Trevio</string>
-    <string name="group_detail_share_text">You\'ve been invited to join \"%1$s\" on Trevio. Tap to join and start splitting bills!\n\nhttps://trevio.app/join/%2$s</string>
+    <string name="group_detail_share_text">You\'ve been invited to join \"%1$s\" on Trevio. Tap to join and start splitting bills &amp; tracking expenses together!\n\nhttps://trevio.app/join/%2$s</string>
     <string name="group_detail_share_chooser">Share Invite</string>
     <string name="group_detail_transfer_admin">Transfer Admin</string>
     <string name="group_detail_transfer_to">Transfer to</string>
@@ -199,7 +199,7 @@
     <string name="create_group_template_household">Household</string>
     <string name="create_group_template_trip">Trip</string>
     <string name="create_group_template_turf">Turf</string>
-    <string name="create_group_template_casual_desc">For splitting bills with friends</string>
+    <string name="create_group_template_casual_desc">For splitting bills &amp; tracking expenses with friends</string>
     <string name="create_group_template_household_desc">Track household expenses</string>
     <string name="create_group_template_trip_desc">Plan and split trip costs</string>
     <string name="create_group_template_turf_desc">For turf bookings and sessions</string>
@@ -238,7 +238,7 @@
     <string name="join_group_profile_claimed">Profile claimed!</string>
     <string name="join_group_claimed_msg">All transactions have been linked to your account.</string>
     <string name="join_group_invited">You\'ve been invited to join a group!</string>
-    <string name="join_group_sign_in_msg">Sign in with Google to accept the invitation and start splitting bills.</string>
+    <string name="join_group_sign_in_msg">Sign in with Google to accept the invitation and start splitting bills &amp; tracking expenses.</string>
     <string name="join_group_redirecting">Redirecting to sign in…</string>
     <string name="join_group_almost_there">Almost there!</string>
     <string name="join_group_tnc_msg">Please accept the Terms &amp; Conditions to join the group.</string>
@@ -272,7 +272,7 @@
     <string name="qr_code_instruction">Ask a friend to scan this code or use the code to join</string>
     <string name="qr_code_share">Share</string>
     <string name="qr_code_share_subject">Join \"%1$s\" on Trevio</string>
-    <string name="qr_code_share_text">You\'ve been invited to join \"%1$s\" on Trevio. Tap to join and start splitting bills!\n\nhttps://trevio.app/join/%2$s</string>
+    <string name="qr_code_share_text">You\'ve been invited to join \"%1$s\" on Trevio. Tap to join and start splitting bills &amp; tracking expenses together!\n\nhttps://trevio.app/join/%2$s</string>
     <string name="qr_code_content_desc">QR Code for %1$s</string>
     <string name="qr_code_share_qr">Share QR</string>
     <string name="qr_code_share_qr_chooser">Share QR Code</string>
@@ -437,7 +437,9 @@
     <string name="profile_phone_invalid">Invalid phone number</string>
     <string name="phone_setup_title">Add Mobile Number</string>
     <string name="phone_setup_subtitle">Required for UPI payments</string>
+    <string name="phone_setup_subtitle_generic">Required to complete your profile</string>
     <string name="phone_setup_description">Your mobile number lets friends pay you via UPI directly from their payment app. It is also used as a fallback when you do not have a UPI ID.</string>
+    <string name="phone_setup_description_generic">Your mobile number helps friends identify you and contact you for settlements.</string>
     <string name="phone_setup_placeholder">%1$d-digit number</string>
     <string name="phone_setup_continue">Continue</string>
     <string name="phone_setup_failed">Failed to save phone number</string>
@@ -724,10 +726,10 @@
     <string name="terms_error">Failed to accept</string>
 
     <!-- ==================== AUTH SCREEN ==================== -->
-    <string name="auth_tagline">Split bills. Simplify life.</string>
-    <string name="auth_feature_track">Track expenses with groups</string>
+    <string name="auth_tagline">Split bills &amp; track daily expenses.</string>
+    <string name="auth_feature_track">Track daily expenses &amp; manage group spending</string>
     <string name="auth_feature_split">Split bills with friends instantly</string>
-    <string name="auth_feature_settle">Settle up easily</string>
+    <string name="auth_feature_settle">Settle up easily with friends</string>
     <string name="auth_sign_in">Sign in with Google</string>
     <string name="auth_signing_in">Signing in…</string>
     <string name="auth_error">Sign-in failed</string>
@@ -778,6 +780,8 @@
     <string name="profile_upi_hint">Used for receiving payments. Phone number used as fallback.</string>
     <string name="profile_select_currency">Select currency</string>
     <string name="profile_select_country">Select country</string>
+    <string name="search_country">Search country…</string>
+    <string name="profile_country_hint">Currency: %1$s · Timezone: %2$s</string>
 
     <!-- ==================== EDIT ENTRY EXTRAS ==================== -->
     <string name="edit_entry_view_only">You can only view this entry. Only the creator or an admin can edit or delete it.</string>

@@ -287,7 +287,7 @@ private fun DebtCard(
                     Text(formatBase(debt.amount), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
                 }
             }
-            if (debt.toUpiId.isNotEmpty()) {
+            if (debt.toUpiId.isNotEmpty() && (debt.toCountryCode.isEmpty() || debt.toCountryCode == "IN")) {
                 Spacer(modifier = Modifier.height(4.dp))
                 Text(stringResource(R.string.settle_up_pay_to, debt.toUpiId), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             } else if (debt.toPhoneNumber.isNotEmpty() && (debt.toCountryCode.isEmpty() || debt.toCountryCode == "IN")) {

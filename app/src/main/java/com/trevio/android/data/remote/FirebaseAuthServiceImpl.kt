@@ -43,6 +43,7 @@ class FirebaseAuthServiceImpl @Inject constructor(
                     "acceptedTnC" to false,
                     "role" to "user",
                     "blocked" to false,
+                    "timezone" to AppConstants.DEFAULT_TIMEZONE,
                     "createdAt" to System.currentTimeMillis(),
                     "updatedAt" to System.currentTimeMillis()
                 )
@@ -89,6 +90,7 @@ class FirebaseAuthServiceImpl @Inject constructor(
                     "acceptedTnC" to false,
                     "role" to "user",
                     "blocked" to false,
+                    "timezone" to AppConstants.DEFAULT_TIMEZONE,
                     "createdAt" to System.currentTimeMillis(),
                     "updatedAt" to System.currentTimeMillis()
                 )
@@ -131,7 +133,8 @@ class FirebaseAuthServiceImpl @Inject constructor(
                     blocked = data["blocked"] as? Boolean ?: false,
                     upiId = data["upiId"] as? String ?: "",
                     phoneNumber = data["phoneNumber"] as? String ?: "",
-                    countryCode = data["countryCode"] as? String ?: ""
+                    countryCode = data["countryCode"] as? String ?: "",
+                    timezone = data["timezone"] as? String ?: AppConstants.DEFAULT_TIMEZONE
                 )
             } else null
         } catch (e: Exception) {

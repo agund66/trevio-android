@@ -23,6 +23,7 @@ class CurrencyViewModel @Inject constructor(
 
     data class CurrencyState(
         val userCurrency: String = AppConstants.BASE_CURRENCY,
+        val userTimezone: String = AppConstants.DEFAULT_TIMEZONE,
         val rates: Map<String, Double> = emptyMap(),
         val isLoading: Boolean = true
     )
@@ -36,10 +37,12 @@ class CurrencyViewModel @Inject constructor(
         viewModelScope.launch {
             val user = authService.getCurrentUser()
             val userCurrency = user?.defaultCurrency ?: AppConstants.BASE_CURRENCY
+            val userTimezone = user?.timezone ?: AppConstants.DEFAULT_TIMEZONE
             exchangeRateService.getRates()
                 .onSuccess { exchangeRates ->
                     _state.value = CurrencyState(
                         userCurrency = userCurrency,
+                        userTimezone = userTimezone,
                         rates = exchangeRates.rates,
                         isLoading = false
                     )
@@ -47,6 +50,7 @@ class CurrencyViewModel @Inject constructor(
                 .onFailure {
                     _state.value = CurrencyState(
                         userCurrency = userCurrency,
+                        userTimezone = userTimezone,
                         isLoading = false
                     )
                 }
@@ -65,7 +69,7 @@ class CurrencyViewModel @Inject constructor(
     }
 
     fun formatDate(timestamp: Long, includeTime: Boolean = false): String {
-        return CurrencyConverter.formatDate(timestamp, _state.value.userCurrency, includeTime)
+        return CurrencyConverter.formatDate(timestamp, _state.value.userCurrency, includeTime, _state.value.userTimezone)
     }
 }
 
@@ -76,6 +80,7 @@ fun rememberCurrencyFormatter(): CurrencyFormatter {
     return remember(state) {
         CurrencyFormatter(
             userCurrency = state.userCurrency,
+            userTimezone = state.userTimezone,
             rates = state.rates,
             isLoading = state.isLoading,
             formatBase = { amountInBase -> viewModel.formatBase(amountInBase) },
@@ -87,6 +92,7 @@ fun rememberCurrencyFormatter(): CurrencyFormatter {
 
 data class CurrencyFormatter(
     val userCurrency: String,
+    val userTimezone: String,
     val rates: Map<String, Double>,
     val isLoading: Boolean,
     val formatBase: (Double) -> String,

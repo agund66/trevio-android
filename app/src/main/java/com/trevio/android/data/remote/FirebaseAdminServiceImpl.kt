@@ -58,7 +58,8 @@ class FirebaseAdminServiceImpl @Inject constructor(
                     blocked = data["blocked"] as? Boolean ?: false,
                     upiId = data["upiId"] as? String ?: "",
                     phoneNumber = data["phoneNumber"] as? String ?: "",
-                    countryCode = data["countryCode"] as? String ?: ""
+                    countryCode = data["countryCode"] as? String ?: "",
+                    timezone = data["timezone"] as? String ?: AppConstants.DEFAULT_TIMEZONE
                 )
             }
             Result.success(PaginatedResult(

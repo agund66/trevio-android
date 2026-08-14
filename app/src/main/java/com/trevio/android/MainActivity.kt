@@ -39,6 +39,11 @@ import dagger.hilt.android.AndroidEntryPoint
 class MainActivity : FragmentActivity() {
 
     private var pendingInviteCode = mutableStateOf<String?>(null)
+    // Pair of (route, nonce) — the nonce increments on each notification so
+    // the same route can re-trigger navigation (e.g. two notifications for
+    // the same group on different days).
+    private var pendingNavRoute = mutableStateOf<Pair<String, Int>?>(null)
+    private var navRouteNonce = 0
 
     // Held as a field so the splash-screen keep condition can read
     // isReady synchronously before setContent runs.
@@ -64,6 +69,9 @@ class MainActivity : FragmentActivity() {
         )
 
         pendingInviteCode.value = extractInviteCode(intent)
+        intent?.getStringExtra("nav_route")?.let { route ->
+            pendingNavRoute.value = route to ++navRouteNonce
+        }
 
         setContent {
             val themeViewModel: ThemeViewModel = hiltViewModel()
@@ -91,9 +99,11 @@ class MainActivity : FragmentActivity() {
                         // The lock screen is drawn on top as an overlay.
                         val navController = rememberNavController()
                         val inviteCode by pendingInviteCode
+                        val navRoutePair by pendingNavRoute
                         TrevioNavGraph(
                             navController = navController,
-                            pendingInviteCode = inviteCode
+                            pendingInviteCode = inviteCode,
+                            pendingNavRoute = navRoutePair
                         )
 
                         if (isLocked && appLockEnabled) {
@@ -111,6 +121,9 @@ class MainActivity : FragmentActivity() {
         val code = extractInviteCode(intent)
         if (code != null) {
             pendingInviteCode.value = code
+        }
+        intent.getStringExtra("nav_route")?.let { route ->
+            pendingNavRoute.value = route to ++navRouteNonce
         }
     }
 

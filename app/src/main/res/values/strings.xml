@@ -575,6 +575,7 @@
     <string name="admin_users">Users</string>
     <string name="admin_broadcasts">Broadcasts</string>
     <string name="admin_support">Support</string>
+    <string name="admin_reminders">Reminders</string>
     <string name="admin_block">Block</string>
     <string name="admin_unblock">Unblock</string>
     <string name="admin_promote">Promote</string>
@@ -744,6 +745,18 @@
     <string name="notification_channel_general_desc">General app notifications — group invites, expense updates, and settlements</string>
     <string name="notification_channel_announcements">Announcements</string>
     <string name="notification_channel_announcements_desc">Important announcements from the Trevio team</string>
+    <string name="notification_channel_reminder">Daily Reminders</string>
+    <string name="notification_channel_reminder_desc">Daily reminders to log your spending and earnings</string>
+
+    <!-- Fallback reminder messages (used if reminder_messages.json fails to load) -->
+    <string name="reminder_fallback_nothing">Take a moment to log today\'s spending. Your future self will thank you.</string>
+    <string name="reminder_fallback_partial">Good start! Complete today\'s expense log before you sleep.</string>
+    <string name="reminder_fallback_full">Today\'s log is complete. Beautifully done.</string>
+    <string name="reminder_title">Trevio Reminder</string>
+    <string name="reminder_streak_format">🔥 %1$d-day streak</string>
+    <string name="reminder_streak_milestone">🎉 %1$s</string>
+    <string name="reminder_streak_start">🌟 Start your streak today</string>
+    <string name="reminder_streak_recovery">🌱 New streak starts today</string>
     <string name="common_cancel">Cancel</string>
     <string name="common_save">Save</string>
     <string name="common_delete">Delete</string>

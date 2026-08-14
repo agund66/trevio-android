@@ -96,7 +96,8 @@ val baseBottomNavItems = listOf(
 @Composable
 fun MainShell(
     navController: NavHostController,
-    pendingInviteCode: String?
+    pendingInviteCode: String?,
+    pendingNavRoute: Pair<String, Int>? = null
 ) {
     val innerNavController = rememberNavController()
     val navBackStackEntry by innerNavController.currentBackStackEntryAsState()
@@ -112,6 +113,16 @@ fun MainShell(
     LaunchedEffect(pendingInviteCode) {
         if (pendingInviteCode != null) {
             innerNavController.navigate(TrevioRoute.JoinGroup.createRoute(pendingInviteCode))
+        }
+    }
+
+    // Navigate to a deep-linked route from a notification (e.g. "group/{groupId}").
+    // The nonce in the Pair ensures the same route can re-trigger on subsequent
+    // notifications (LaunchedEffect re-fires when the key object changes).
+    LaunchedEffect(pendingNavRoute) {
+        val route = pendingNavRoute?.first ?: return@LaunchedEffect
+        if (currentRoute != route) {
+            innerNavController.navigate(route)
         }
     }
 

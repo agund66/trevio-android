@@ -434,3 +434,41 @@ data class HouseholdGamification(
     val totalMembers: Int = 0,
     val insightMessageText: LocalizedString? = null
 )
+
+// ─── Daily Reminder Config ───────────────────────────────────────────
+
+/**
+ * Admin-controlled configuration for daily local reminders.
+ * Stored at Firestore path `config/dailyReminder`.
+ *
+ * @param enabled           Global kill switch — when false, no reminders fire
+ *                          for any user.
+ * @param featuredMessage   Optional admin-authored message that overrides the
+ *                          client-side message library for a specific period
+ *                          (e.g. Diwali, end-of-month push).
+ * @param defaultLocalTime  Default evening time in "HH:mm" format (e.g. "20:00").
+ *                          Applied in the user's local timezone when no
+ *                          override exists for that zone.
+ * @param timezoneOverrides Map of IANA timezone ID → "HH:mm" time. Allows the
+ *                          admin to set different evening times per region
+ *                          (e.g. "America/New_York" → "19:00").
+ * @param updatedAt         Last update timestamp (server-set).
+ */
+data class ReminderConfig(
+    val enabled: Boolean = true,
+    val featuredMessage: FeaturedMessage? = null,
+    val defaultLocalTime: String = "20:00",
+    val timezoneOverrides: Map<String, String> = emptyMap(),
+    val updatedAt: Long = 0
+)
+
+/**
+ * An admin-authored message that temporarily overrides the client-side
+ * message library for all users.
+ */
+data class FeaturedMessage(
+    val title: String? = null,
+    val body: String,
+    val startAt: Long,
+    val endAt: Long
+)

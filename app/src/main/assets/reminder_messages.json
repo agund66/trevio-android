@@ -1,0 +1,352 @@
+{
+  "version": 1,
+  "nothingLogged": {
+    "household": {
+      "playful": [
+        "Your fridge knows what you spent. Trevio doesn't. Fix that.",
+        "Today's spending is playing hide and seek. Be the seeker.",
+        "Did money leave your wallet today? Trevio wants to know.",
+        "Your expenses are ghosting you. Time to summon them.",
+        "The milkman came. The sabziwala came. Did Trevio get the memo?",
+        "Groceries won't log themselves. Trust me, I checked.",
+        "Your wallet called. It wants its receipts back.",
+        "Today's spending is like a mystery novel. Write the ending.",
+        "Even your cat tracks its treats. Time to log yours.",
+        "The kitchen budget is whispering. Are you listening?",
+        "Rent, groceries, and that impulse Amazon order. Log them all.",
+        "Your expenses are like uninvited guests. Document them anyway.",
+        "The ATM gave, the wallet took. Who's keeping score? You are.",
+        "Spending without logging is like cooking without tasting.",
+        "Your bank statement is judging you. Trevio just wants to help."
+      ],
+      "warm": [
+        "Take two minutes tonight. Future you will thank present you.",
+        "Logging today's spending is a small act of self-care.",
+        "Your evening routine is incomplete without a quick log.",
+        "A minute now saves an hour at month-end. Log your day.",
+        "You had a busy day. Your expenses deserve to be remembered.",
+        "Small habits build big clarity. Start with today's log.",
+        "Your future self is watching. Make them proud tonight.",
+        "Clarity begins with one logged expense. Tonight's the night.",
+        "You deserve to know where your money went today.",
+        "Logging is caring. Care for your finances tonight.",
+        "Tonight is a good night to be kind to your future self.",
+        "Your money story today is worth recording. Log it.",
+        "Two minutes of logging today saves hours of stress tomorrow.",
+        "Be the friend your finances need. Log your spending.",
+        "Your wallet worked hard today. Give it the attention it deserves."
+      ],
+      "witty": [
+        "Ignoring your expenses doesn't make them cheaper. Sadly.",
+        "Procrastination is free. Logging your spending is priceless.",
+        "Your expenses are like toddlers — they need attention now.",
+        "Unlogged expenses are like unread emails. They pile up.",
+        "Money has a terrible memory. That's why Trevio exists.",
+        "Your spending today called. It wants to be acknowledged.",
+        "Logging expenses: the only workout your wallet enjoys.",
+        "If spending was a sport, you'd want stats. Trevio is your stats.",
+        "Untracked spending is like a leaky tap. Fix it tonight.",
+        "Your expenses called in sick today. They're not really sick.",
+        "Budgeting without logging is like dieting without tracking calories.",
+        "Your money is doing things today. Don't you want to know what?",
+        "Logging expenses is like flossing — you know you should, just do it.",
+        "Your wallet's diary is empty. That's not a mystery, that's neglect.",
+        "Today's unlogged expenses are tomorrow's budget surprises."
+      ],
+      "budgetAware": [
+        "You're {pctUsed}% into your monthly budget. Log today to stay on track.",
+        "Budget check: you've used {pctUsed}% this month. Don't fall behind on logging.",
+        "At {pctUsed}% of your budget, every logged expense counts.",
+        "Your budget is watching. {pctUsed}% used. Log today's spending.",
+        "Staying aware is staying in control. You're at {pctUsed}%. Log today.",
+        "{pctUsed}% of your budget is gone. Where did today's go? Log it.",
+        "Budget tracker needs today's data. You're at {pctUsed}%.",
+        "You've spent {pctUsed}% of your budget. Today's expenses complete the picture.",
+        "Every unlogged day is a blind spot. You're at {pctUsed}%. Fix that.",
+        "Your budget at {pctUsed}% needs today's entries to be accurate."
+      ]
+    },
+    "other": {
+      "playful": [
+        "Today's spending is a mystery. Trevio is your detective.",
+        "Your wallet is crying silently. Log today to comfort it.",
+        "Money came, money went. Trevio wants the details.",
+        "Your expenses are hiding under the bed. Coax them out.",
+        "The group budget is watching. Log today's spending.",
+        "Unlogged expenses are like unread messages. Open them.",
+        "Your spending today deserves a spotlight. Hit the log button.",
+        "Did you spend money today? Of course you did. Log it.",
+        "Trevio is not a mind reader. Log your expenses, please.",
+        "Your expenses are like puzzle pieces. Complete the picture tonight.",
+        "The day's spending is a story waiting to be written. Be the author.",
+        "Your wallet has a story to tell. Give it a voice — log today.",
+        "Money flows like water. Trevio is your dam. Log today.",
+        "Unlogged spending is like a song half-sung. Finish it.",
+        "Your expenses today are like shooting stars. Catch them before they fade."
+      ],
+      "warm": [
+        "A quick log tonight means a clearer picture tomorrow.",
+        "Your spending matters. Take a moment to record it.",
+        "Logging is how you honor your financial journey. Log today.",
+        "Every entry is a step toward financial clarity. Take one tonight.",
+        "You work hard for your money. Track where it goes tonight.",
+        "Tonight's log is tomorrow's peace of mind.",
+        "Your financial story today is worth a two-minute entry.",
+        "Be kind to your future self. Log today's spending.",
+        "Clarity is a habit. Tonight is a great time to practice.",
+        "Your money journey deserves to be documented. Start with today."
+      ],
+      "witty": [
+        "Unlogged expenses are like unreturned phone calls. They haunt you.",
+        "Your spending today is like a plot twist. Write it down.",
+        "Money has commitment issues. Logging makes it official.",
+        "Your expenses are like cats — they pretend they don't need attention.",
+        "Budgeting without logging is like baking without measuring. Good luck.",
+        "Your wallet's diary has a blank page for today. Fill it.",
+        "Untracked spending is like a diet cheat day that never ends.",
+        "Your expenses called. They said 'notice me, please.'",
+        "Logging expenses is like journaling, but with receipts.",
+        "Today's spending is a cliffhanger. Log it to see the ending."
+      ],
+      "budgetAware": [
+        "You're at {pctUsed}% of your group budget. Log today to stay accurate.",
+        "Budget alert: {pctUsed}% used. Today's log keeps the picture clear.",
+        "At {pctUsed}% budget usage, every logged expense matters.",
+        "Your group budget is at {pctUsed}%. Don't leave today blank.",
+        "Staying on top of your budget means logging every day. You're at {pctUsed}%."
+      ]
+    }
+  },
+  "partiallyLogged": {
+    "household": {
+      "playful": [
+        "Nice start! But did the milkman come today?",
+        "Halfway there. The other half is hiding in your receipts.",
+        "You logged some expenses. Some. Not all. We noticed.",
+        "Good progress! But the kitchen budget is still incomplete.",
+        "Partial logging is like half a pizza. Where's the rest?",
+        "You're on the board! Now finish the game.",
+        "Some expenses made it to Trevio. Others are still in the wild.",
+        "Great start! But your wallet says there's more to the story.",
+        "You're like a detective who found some clues. Keep digging.",
+        "Partial log detected. The remaining expenses are feeling left out."
+      ],
+      "warm": [
+        "Good job logging some expenses today. Finish strong tonight.",
+        "You're building the habit. One more push to complete today's log.",
+        "Partial logging is still progress. Complete the picture tonight.",
+        "You started great. A few more entries and today is done.",
+        "Every logged expense counts. Add the rest when you can.",
+        "You're almost there. Tonight's the night to finish logging.",
+        "Halfway logged is halfway to clarity. Finish the journey tonight.",
+        "Good momentum! Complete today's log before you sleep.",
+        "You care enough to start. Care enough to finish. Log the rest.",
+        "Partial logs are like partial sunrises. Beautiful, but incomplete."
+      ],
+      "witty": [
+        "You logged some expenses. 'Some' is doing a lot of heavy lifting.",
+        "Partial logging is like a half-written love letter. Finish it.",
+        "Your expenses are like a band — some showed up, some didn't.",
+        "Half your spending is documented. The other half is living rent-free.",
+        "You're like a student who did half the homework. Close, but no.",
+        "Some expenses made the cut. Others are still auditioning.",
+        "Partial log: like a selfie with half your face. Show the rest.",
+        "You started logging. That's the trailer. Now show the full movie.",
+        "Half-logged days are like half-charged phones. Functional, but anxious.",
+        "Your expenses are like a choir. Only half showed up to sing."
+      ],
+      "budgetAware": [
+        "You're at {pctUsed}% of your budget. Complete today's log for accuracy.",
+        "Partial log at {pctUsed}% budget. Fill in the gaps tonight.",
+        "At {pctUsed}% budget used, a complete log helps you plan better.",
+        "Your budget is at {pctUsed}%. Complete today's entries to see the full picture.",
+        "{pctUsed}% budget used, partially logged. Finish tonight for clarity."
+      ]
+    },
+    "other": {
+      "playful": [
+        "Good start! But there's more to today's story.",
+        "Half logged, half forgotten. Which half wins tonight?",
+        "You're like a chef who plated half the dish. Finish it.",
+        "Some expenses are logged. Others are playing hard to get.",
+        "Partial credit! But Trevio doesn't grade on a curve.",
+        "You found some clues. Now solve the whole case.",
+        "Half the receipts are in. The other half are plotting their escape.",
+        "Nice partial log! The remaining expenses are feeling shy.",
+        "You're like a photographer who took half the shots. Keep going.",
+        "Some spending is tracked. The rest is still in stealth mode."
+      ],
+      "warm": [
+        "You're making progress. Complete today's log when you can.",
+        "Partial logging is a step forward. Take one more tonight.",
+        "Good effort so far. Finish the day strong.",
+        "You started, and that matters. Complete today's log tonight.",
+        "Every entry helps. Add the rest before the day ends.",
+        "You're on the right track. Finish logging tonight.",
+        "Partial logs show you care. Complete logs show you're committed.",
+        "Good start. A few more entries and today is complete.",
+        "You're building momentum. Finish today's log tonight.",
+        "Progress is progress. Complete the picture before you rest."
+      ],
+      "witty": [
+        "Partial log: like a joke without a punchline. Finish it.",
+        "You logged some expenses. The rest are giving you the silent treatment.",
+        "Half your spending is tracked. The other half is off the grid.",
+        "Partial logging is like a GPS that only knows half the route.",
+        "You're like a singer who hit half the notes. Close, but not quite.",
+        "Some expenses are logged. Others are still in beta.",
+        "Your log is like a half-painted wall. One more coat, please.",
+        "Partial log detected. The remaining expenses filed a complaint.",
+        "You started strong. The finish line is right there.",
+        "Half-logged is like a half-tied shoelace. Tripping hazard."
+      ],
+      "budgetAware": [
+        "Partial log at {pctUsed}% budget. Complete it for accuracy.",
+        "You're at {pctUsed}% budget. Finish today's log to stay on track.",
+        "At {pctUsed}% budget, complete logging helps you plan ahead.",
+        "{pctUsed}% budget used, partially logged. Finish tonight.",
+        "Your budget is at {pctUsed}%. Complete today's entries for clarity."
+      ]
+    }
+  },
+  "fullyLogged": {
+    "household": {
+      "playful": [
+        "Today's books: closed. Beautifully done.",
+        "You, a cup of chai, and complete expense logs. Perfect evening.",
+        "All logged. The kitchen budget is doing a happy dance.",
+        "Fully logged! Your wallet is practically throwing a party.",
+        "Complete log achieved. You're the MVP of the household today.",
+        "Every expense accounted for. You're like a financial superhero.",
+        "Today's spending: fully documented. Take a bow.",
+        "All entries in. The budget gods are pleased.",
+        "Complete! Your expenses are organized and your evening is free.",
+        "Fully logged. Even the milkman's visit is recorded for posterity."
+      ],
+      "warm": [
+        "Beautifully done. Today's log is complete.",
+        "You showed up for your finances today. That's something to celebrate.",
+        "Complete logging is a form of self-respect. You did it tonight.",
+        "Every expense logged. Your future self is smiling.",
+        "Tonight, your finances are clear. That's a gift to yourself.",
+        "Fully logged. You're building a habit that pays dividends.",
+        "Complete log, complete peace. Well done tonight.",
+        "You honored your money today by tracking it. Beautiful.",
+        "All entries in. Your financial clarity is growing.",
+        "Fully logged. This is what financial mindfulness looks like."
+      ],
+      "witty": [
+        "Fully logged. Your expenses are organized, categorized, and slightly intimidated.",
+        "Complete log! Your wallet is blushing from all the attention.",
+        "All expenses logged. The budget is satisfied. You can relax now.",
+        "Fully documented. Your money has never felt so seen.",
+        "Complete! The kitchen budget is practically writing you a thank-you note.",
+        "Every expense logged. Your inner accountant is doing a victory lap.",
+        "Fully logged. Your expenses are in formation, ready for inspection.",
+        "All entries in. The budget is so organized it's almost smug.",
+        "Complete log achieved. Your money is officially on a schedule.",
+        "Fully logged. Even your impulse purchases feel respected."
+      ],
+      "budgetAware": [
+        "Fully logged at {pctUsed}% budget. You're in control.",
+        "Complete log! You're at {pctUsed}% of your budget. Well managed.",
+        "All entries in at {pctUsed}% budget. You're staying on track.",
+        "Fully logged. {pctUsed}% budget used — clear and controlled.",
+        "Complete log at {pctUsed}%. Your budget is in great shape tonight."
+      ]
+    },
+    "other": {
+      "playful": [
+        "Today's books: closed. Beautifully done.",
+        "Fully logged! Your wallet is throwing a small celebration.",
+        "Complete log achieved. You're today's financial champion.",
+        "All expenses accounted for. Take a victory lap.",
+        "Fully logged. Your money has never felt so organized.",
+        "Complete! The group budget is doing a happy dance.",
+        "Every expense logged. You're like a financial superhero.",
+        "All entries in. Your spending is fully documented and slightly impressed.",
+        "Fully logged. Tonight's log is a masterpiece.",
+        "Complete log! Your finances are in formation."
+      ],
+      "warm": [
+        "Beautifully done. Today's log is complete.",
+        "You showed up for your finances today. Well done.",
+        "Complete logging is self-care. You did it tonight.",
+        "Every expense logged. Your future self is grateful.",
+        "Tonight, your finances are clear. Enjoy the peace.",
+        "Fully logged. You're building something valuable.",
+        "Complete log, complete clarity. Well done.",
+        "You honored your money today by tracking it all.",
+        "All entries in. Your financial awareness is growing.",
+        "Fully logged. This is what financial mindfulness looks like."
+      ],
+      "witty": [
+        "Fully logged. Your expenses are organized and slightly intimidated.",
+        "Complete log! Your wallet is blushing from all the attention.",
+        "All expenses logged. The budget is satisfied. Relax now.",
+        "Fully documented. Your money has never felt so seen.",
+        "Complete! The group budget is writing you a thank-you note.",
+        "Every expense logged. Your inner accountant is doing a victory lap.",
+        "Fully logged. Your expenses are in formation, ready for inspection.",
+        "All entries in. The budget is so organized it's almost smug.",
+        "Complete log achieved. Your money is officially on a schedule.",
+        "Fully logged. Even your impulse purchases feel respected."
+      ],
+      "budgetAware": [
+        "Fully logged at {pctUsed}% budget. You're in control.",
+        "Complete log! You're at {pctUsed}% of your budget. Well managed.",
+        "All entries in at {pctUsed}% budget. Staying on track.",
+        "Fully logged. {pctUsed}% budget used — clear and controlled.",
+        "Complete log at {pctUsed}%. Your budget is in great shape."
+      ]
+    }
+  },
+  "milestones": [
+    "One whole week of logging! This is how habits are born.",
+    "Day 7 milestone! The chain is forming. Don't break it.",
+    "Two weeks straight! You're not just logging, you're building discipline.",
+    "14 days of complete logs. Your finances thank you.",
+    "Three weeks! You're in the habit zone now.",
+    "21 days of logging. This is who you are now — someone who tracks.",
+    "A full month of logging! This is legendary territory.",
+    "30 days. You've built a habit that most people only dream of.",
+    "45 days strong! You're in the top 1% of financial trackers.",
+    "50 days! Halfway to 100. The momentum is unstoppable.",
+    "Two months of logging! Your future self is building a statue of you.",
+    "60 days. This isn't a habit anymore. It's a lifestyle.",
+    "75 days! You're in the elite club of consistent trackers.",
+    "100 days of logging! You are officially a financial legend.",
+    "100 days! This is the kind of consistency that changes lives.",
+    "150 days! You're beyond habits now. This is identity.",
+    "Half a year of logging! 180 days of financial clarity.",
+    "200 days! You're in a league of your own.",
+    "250 days of logging. You're not just tracking money, you're mastering it.",
+    "300 days! Almost a full year. Extraordinary.",
+    "365 days. One full year of logging. You are unstoppable.",
+    "A year of logging! This is what financial mastery looks like."
+  ],
+  "recovery": [
+    "Streak broke yesterday. New streak starts today. No biggie.",
+    "The chain broke, but the habit didn't. Start fresh tonight.",
+    "One missed day doesn't erase your progress. Log today and move on.",
+    "Every streak has a restart. This is yours. Log today.",
+    "The gap was yesterday. Today is a new beginning. Log it.",
+    "Broke the streak? No judgment here. Start a new one tonight.",
+    "Yesterday is gone. Today is a blank page. Write on it.",
+    "Streaks break. Habits don't have to. Log today's spending.",
+    "A broken streak is a lesson, not a failure. Start again tonight.",
+    "The best time to restart was yesterday. The second best is now."
+  ],
+  "seasonal": [
+    "Weekend spending hits different. Log it before Monday morning.",
+    "It's the weekend! Your wallet is working overtime. Track it.",
+    "Weekend expenses are sneaky. Catch them before Monday.",
+    "Friday night spending deserves to be remembered. Log it.",
+    "Weekend mode: activated. Logging mode: also activated, right?",
+    "Saturday spending is the most fun kind. Document it.",
+    "Sunday is for rest and... logging this weekend's spending.",
+    "Weekend recap time. How much did those coffees add up to?",
+    "The weekend was great. Your expense log should reflect that.",
+    "Monday is coming. Log the weekend's spending before it arrives."
+  ]
+}

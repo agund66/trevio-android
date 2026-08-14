@@ -16,7 +16,8 @@ import com.trevio.android.ui.splash.SplashScreen
 fun TrevioNavGraph(
     navController: NavHostController,
     startDestination: String = TrevioRoute.Splash.route,
-    pendingInviteCode: String? = null
+    pendingInviteCode: String? = null,
+    pendingNavRoute: Pair<String, Int>? = null
 ) {
     NavHost(
         navController = navController,
@@ -45,7 +46,8 @@ fun TrevioNavGraph(
         composable(TrevioRoute.Main.route) {
             MainShell(
                 navController = navController,
-                pendingInviteCode = pendingInviteCode
+                pendingInviteCode = pendingInviteCode,
+                pendingNavRoute = pendingNavRoute
             )
         }
     }

@@ -8,6 +8,7 @@ import com.trevio.android.domain.model.Activity
 import com.trevio.android.domain.model.AppNotification
 import com.trevio.android.domain.model.BillItem
 import com.trevio.android.domain.model.Expense
+import com.trevio.android.domain.model.FeaturedMessage
 import com.trevio.android.domain.model.Group
 import com.trevio.android.domain.model.GroupTemplate
 import com.trevio.android.domain.model.ItemizedSplitData
@@ -15,6 +16,7 @@ import com.trevio.android.domain.model.Member
 import com.trevio.android.domain.model.PaginatedResult
 import com.trevio.android.domain.model.RecurringConfig
 import com.trevio.android.domain.model.RecurringFrequency
+import com.trevio.android.domain.model.ReminderConfig
 import com.trevio.android.domain.model.SplitEntry
 import com.trevio.android.domain.model.SplitType
 import com.trevio.android.domain.model.TransactionType
@@ -400,6 +402,49 @@ class FirestoreObservers @Inject constructor(
                     items = activities,
                     hasMore = snapshot.size() == pageSize,
                     lastId = if (snapshot.size() > 0) snapshot.documents.last().id else null
+                ))
+            }
+        awaitClose { registration.remove() }
+    }
+
+    // ─── Daily Reminder Config ──────────────────────────────────────
+
+    /**
+     * Emits the daily reminder configuration from `config/dailyReminder` in
+     * real-time.  Returns `null` if the document does not exist yet (admin
+     * has not configured reminders).  The caller should treat `null` as
+     * "reminders disabled" and cancel any scheduled work.
+     */
+    fun observeReminderConfig(): Flow<ReminderConfig?> = callbackFlow {
+        val registration = firestore.collection("config").document("dailyReminder")
+            .addSnapshotListener { snapshot, error ->
+                if (error != null) {
+                    Logger.w("FirestoreObservers", "observeReminderConfig error: ${error.message}", error)
+                    close(error)
+                    return@addSnapshotListener
+                }
+                if (snapshot == null || !snapshot.exists()) {
+                    trySend(null)
+                    return@addSnapshotListener
+                }
+
+                val data = snapshot.data ?: emptyMap()
+                @Suppress("UNCHECKED_CAST")
+                val overrides = data["timezoneOverrides"] as? Map<String, String> ?: emptyMap()
+                val featured = (data["featuredMessage"] as? Map<String, Any>)?.let { fm ->
+                    FeaturedMessage(
+                        title = fm["title"] as? String,
+                        body = fm["body"] as? String ?: return@let null,
+                        startAt = (fm["startAt"] as? Number)?.toLong() ?: 0,
+                        endAt = (fm["endAt"] as? Number)?.toLong() ?: 0
+                    )
+                }
+                trySend(ReminderConfig(
+                    enabled = data["enabled"] as? Boolean ?: true,
+                    featuredMessage = featured,
+                    defaultLocalTime = data["defaultLocalTime"] as? String ?: "20:00",
+                    timezoneOverrides = overrides,
+                    updatedAt = (data["updatedAt"] as? Number)?.toLong() ?: 0
                 ))
             }
         awaitClose { registration.remove() }

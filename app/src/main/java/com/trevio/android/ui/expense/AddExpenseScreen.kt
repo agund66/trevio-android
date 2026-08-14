@@ -69,6 +69,7 @@ class ExpenseViewModel @Inject constructor(
     private val settlementService: SettlementService,
     private val groupService: GroupService,
     private val authService: AuthService,
+    private val streakTracker: com.trevio.android.core.notification.StreakTracker,
     savedStateHandle: SavedStateHandle
 ) : ViewModel() {
 
@@ -240,6 +241,15 @@ class ExpenseViewModel @Inject constructor(
                 itemizedData = itemizedData,
                 transactionType = transactionType
             ).onSuccess {
+                // Update the logging streak for gamification. Best-effort —
+                // a DataStore failure must not block the save success flow.
+                try {
+                    val user = authService.getCurrentUser()
+                    val timezone = user?.timezone ?: com.trevio.android.util.AppConstants.DEFAULT_TIMEZONE
+                    streakTracker.onExpenseLogged(timezone)
+                } catch (e: Exception) {
+                    com.trevio.android.util.Logger.w("ExpenseViewModel", "Streak update failed", e)
+                }
                 _state.value = _state.value.copy(isLoading = false, saved = true)
             }.onFailure { e ->
                 _state.value = _state.value.copy(isLoading = false, error = e.toStringResId())

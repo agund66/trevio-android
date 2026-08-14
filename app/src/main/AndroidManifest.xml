@@ -66,5 +66,21 @@
                 android:name="android.support.FILE_PROVIDER_PATHS"
                 android:resource="@xml/file_paths" />
         </provider>
+
+        <!-- Remove the default WorkManager initializer so TrevioApp's
+             Configuration.Provider implementation (with HiltWorkerFactory)
+             takes effect. WorkManager 2.6+ uses androidx.startup, so we
+             remove the WorkManagerInitializer meta-data entry from the
+             InitializationProvider instead of the old ContentProvider. -->
+        <provider
+            android:name="androidx.startup.InitializationProvider"
+            android:authorities="${applicationId}.androidx-startup"
+            android:exported="false"
+            tools:node="merge">
+            <meta-data
+                android:name="androidx.work.WorkManagerInitializer"
+                android:value="androidx.startup"
+                tools:node="remove" />
+        </provider>
     </application>
 </manifest>

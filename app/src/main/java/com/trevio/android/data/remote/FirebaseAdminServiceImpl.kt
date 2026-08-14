@@ -1,9 +1,13 @@
 package com.trevio.android.data.remote
 
 import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.Query
+import com.google.firebase.firestore.SetOptions
+import com.trevio.android.domain.model.FeaturedMessage
 import com.trevio.android.domain.model.PaginatedResult
+import com.trevio.android.domain.model.ReminderConfig
 import com.trevio.android.domain.model.User
 import com.trevio.android.domain.repository.AdminService
 import com.trevio.android.util.AppConstants
@@ -126,6 +130,62 @@ class FirebaseAdminServiceImpl @Inject constructor(
             requireSuperadmin().onFailure { return Result.failure(it) }
             firestore.collection("users").document(uid)
                 .update(mapOf("role" to "user", "updatedAt" to System.currentTimeMillis())).await()
+            Result.success(Unit)
+        } catch (e: Exception) {
+            Result.failure(Exception(friendlyNetworkMessage(e) ?: e.message, e))
+        }
+    }
+
+    override suspend fun getReminderConfig(): Result<ReminderConfig?> {
+        return try {
+            requireSuperadmin().onFailure { return Result.failure(it) }
+            val doc = firestore.collection("config").document("dailyReminder").get().await()
+            if (!doc.exists()) return Result.success(null)
+            val data = doc.data ?: emptyMap()
+            @Suppress("UNCHECKED_CAST")
+            val overrides = data["timezoneOverrides"] as? Map<String, String> ?: emptyMap()
+            val featured = (data["featuredMessage"] as? Map<String, Any>)?.let { fm ->
+                FeaturedMessage(
+                    title = fm["title"] as? String,
+                    body = fm["body"] as? String ?: return@let null,
+                    startAt = (fm["startAt"] as? Number)?.toLong() ?: 0,
+                    endAt = (fm["endAt"] as? Number)?.toLong() ?: 0
+                )
+            }
+            Result.success(ReminderConfig(
+                enabled = data["enabled"] as? Boolean ?: true,
+                featuredMessage = featured,
+                defaultLocalTime = data["defaultLocalTime"] as? String ?: "20:00",
+                timezoneOverrides = overrides,
+                updatedAt = (data["updatedAt"] as? Number)?.toLong() ?: 0
+            ))
+        } catch (e: Exception) {
+            Result.failure(Exception(friendlyNetworkMessage(e) ?: e.message, e))
+        }
+    }
+
+    override suspend fun saveReminderConfig(config: ReminderConfig): Result<Unit> {
+        return try {
+            requireSuperadmin().onFailure { return Result.failure(it) }
+            val data = mutableMapOf<String, Any>(
+                "enabled" to config.enabled,
+                "defaultLocalTime" to config.defaultLocalTime,
+                "timezoneOverrides" to config.timezoneOverrides,
+                "updatedAt" to System.currentTimeMillis()
+            )
+            val featured = config.featuredMessage
+            if (featured != null) {
+                data["featuredMessage"] = mapOf(
+                    "title" to (featured.title ?: ""),
+                    "body" to featured.body,
+                    "startAt" to featured.startAt,
+                    "endAt" to featured.endAt
+                )
+            } else {
+                data["featuredMessage"] = FieldValue.delete()
+            }
+            firestore.collection("config").document("dailyReminder")
+                .set(data, SetOptions.merge()).await()
             Result.success(Unit)
         } catch (e: Exception) {
             Result.failure(Exception(friendlyNetworkMessage(e) ?: e.message, e))

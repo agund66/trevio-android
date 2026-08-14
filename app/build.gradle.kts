@@ -44,6 +44,10 @@ android {
         compose = true
         buildConfig = true
     }
+
+    testOptions {
+        unitTests.isReturnDefaultValues = true
+    }
 }
 
 dependencies {
@@ -94,6 +98,11 @@ dependencies {
     // Lifecycle Process (app-level lifecycle observation for re-lock)
     implementation(libs.androidx.lifecycle.process)
 
+    // WorkManager (daily reminder scheduling)
+    implementation(libs.androidx.work.runtime)
+    implementation(libs.androidx.hilt.work)
+    ksp(libs.androidx.hilt.compiler)
+
     // ViewModel Compose
     implementation(libs.androidx.lifecycle.viewmodel.compose)
 
@@ -115,4 +124,6 @@ dependencies {
     testImplementation("junit:junit:4.13.2")
     testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.9.0")
     testImplementation("com.google.truth:truth:1.4.4")
+    testImplementation("org.mockito:mockito-core:5.12.0")
+    testImplementation("org.json:json:20240303")
 }

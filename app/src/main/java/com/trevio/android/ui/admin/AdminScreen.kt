@@ -161,7 +161,8 @@ fun AdminScreen(
     val tabs = listOf(
         stringResource(R.string.admin_users) to Icons.Default.People,
         stringResource(R.string.admin_broadcasts) to Icons.Default.Campaign,
-        stringResource(R.string.admin_support) to Icons.Default.Support
+        stringResource(R.string.admin_support) to Icons.Default.Support,
+        stringResource(R.string.admin_reminders) to Icons.Default.Notifications
     )
 
     if (state.isCheckingAdmin) {
@@ -234,6 +235,8 @@ fun AdminScreen(
             BroadcastsScreen()
         } else if (state.selectedTab == 2) {
             AdminSupportScreen()
+        } else if (state.selectedTab == 3) {
+            RemindersScreen()
         } else if (state.isLoading) {
             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 CircularProgressIndicator()

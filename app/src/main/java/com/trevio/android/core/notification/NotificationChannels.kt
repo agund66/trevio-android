@@ -7,4 +7,5 @@ package com.trevio.android.core.notification
 object NotificationChannels {
     const val GENERAL = "general"
     const val BROADCAST = "broadcast"
+    const val REMINDER = "reminder"
 }

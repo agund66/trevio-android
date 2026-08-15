@@ -8,6 +8,7 @@ interface AuthService {
     suspend fun signInWithGoogleWeb(activity: Activity): Result<String>
     suspend fun getCurrentUserId(): String?
     suspend fun signOut()
+    fun clearUserCache()
     suspend fun getCurrentUser(): User?
     suspend fun createUserDocument(user: User): Result<Unit>
     suspend fun isUserAuthenticated(): Boolean

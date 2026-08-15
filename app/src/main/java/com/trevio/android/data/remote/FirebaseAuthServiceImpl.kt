@@ -19,6 +19,11 @@ class FirebaseAuthServiceImpl @Inject constructor(
     private val firestore: FirebaseFirestore
 ) : AuthService {
 
+    @Volatile
+    private var cachedUser: User? = null
+    @Volatile
+    private var cachedUserTime: Long = 0
+
     override suspend fun signInWithGoogle(idToken: String): Result<String> {
         return try {
             val credential = GoogleAuthProvider.getCredential(idToken, null)
@@ -110,16 +115,26 @@ class FirebaseAuthServiceImpl @Inject constructor(
     }
 
     override suspend fun signOut() {
+        clearUserCache()
         auth.signOut()
     }
 
+    override fun clearUserCache() {
+        cachedUser = null
+        cachedUserTime = 0
+    }
+
     override suspend fun getCurrentUser(): User? {
+        val cached = cachedUser
+        if (cached != null && System.currentTimeMillis() - cachedUserTime < 30_000) {
+            return cached
+        }
         val firebaseUser = auth.currentUser ?: return null
         return try {
             val doc = firestore.collection("users").document(firebaseUser.uid).get().await()
             if (doc.exists()) {
                 val data = doc.data ?: return null
-                User(
+                val user = User(
                     uid = firebaseUser.uid,
                     email = data["email"] as? String ?: "",
                     displayName = data["displayName"] as? String ?: "",
@@ -136,6 +151,9 @@ class FirebaseAuthServiceImpl @Inject constructor(
                     countryCode = data["countryCode"] as? String ?: "",
                     timezone = data["timezone"] as? String ?: AppConstants.DEFAULT_TIMEZONE
                 )
+                cachedUser = user
+                cachedUserTime = System.currentTimeMillis()
+                user
             } else null
         } catch (e: Exception) {
             null

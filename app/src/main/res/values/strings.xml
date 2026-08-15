@@ -419,7 +419,6 @@
     <string name="profile_display_name">Display Name</string>
     <string name="profile_username">Username</string>
     <string name="profile_email">Email</string>
-    <string name="profile_currency">Currency</string>
     <string name="profile_upi_id">UPI ID</string>
     <string name="profile_phone">Phone Number</string>
     <string name="profile_country">Country</string>

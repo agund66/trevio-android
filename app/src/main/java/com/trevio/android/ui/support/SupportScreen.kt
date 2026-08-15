@@ -734,7 +734,7 @@ fun MyTicketsScreen(navController: NavController) {
                     contentPadding = PaddingValues(16.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    items(state.tickets) { ticket ->
+                    items(state.tickets, key = { it.ticketId }) { ticket ->
                         TicketListItem(ticket = ticket) {
                             navController.navigate(TrevioRouteSupport.TicketDetail.createRoute(ticket.ticketId))
                         }
@@ -1014,7 +1014,7 @@ fun TicketDetailScreen(
                 contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                items(state.messages) { msg ->
+                items(state.messages, key = { it.messageId }) { msg ->
                     MessageBubble(message = msg)
                 }
             }

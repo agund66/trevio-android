@@ -20,9 +20,7 @@ import androidx.lifecycle.viewModelScope
 import com.trevio.android.core.navigation.TrevioRoute
 import com.trevio.android.domain.repository.AuthService
 import com.trevio.android.domain.repository.UserService
-import com.trevio.android.util.AppConstants
 import dagger.hilt.android.lifecycle.HiltViewModel
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
@@ -52,7 +50,6 @@ class SplashViewModel @Inject constructor(
 
     private fun checkAuthState() {
         viewModelScope.launch {
-            delay(AppConstants.SPLASH_DELAY_MS)
             if (!authService.isUserAuthenticated()) {
                 _state.value = SplashState.NotAuthenticated
                 return@launch

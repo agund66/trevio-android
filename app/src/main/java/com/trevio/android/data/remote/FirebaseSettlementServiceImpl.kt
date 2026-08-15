@@ -3,6 +3,7 @@ package com.trevio.android.data.remote
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.Query
+import com.google.firebase.firestore.WriteBatch
 import com.trevio.android.domain.model.Member
 import com.trevio.android.domain.model.PaginatedResult
 import com.trevio.android.domain.model.Settlement
@@ -138,10 +139,12 @@ class FirebaseSettlementServiceImpl @Inject constructor(
                 if (toUid != uid) notifyUids.add(toUid)
                 if (fromUid != uid && toUid !in notifyUids) notifyUids.add(fromUid)
 
+                val notifBatch = firestore.batch()
                 for (notifyUid in notifyUids) {
                     val isReceiver = notifyUid == toUid
-                    firestore.collection("users").document(notifyUid).collection("notifications").document()
-                        .set(mapOf(
+                    notifBatch.set(
+                        firestore.collection("users").document(notifyUid).collection("notifications").document(),
+                        mapOf(
                             "type" to "settlement",
                             "title" to if (isReceiver) "Payment Received" else "Payment Recorded",
                             "body" to if (isReceiver)
@@ -156,8 +159,10 @@ class FirebaseSettlementServiceImpl @Inject constructor(
                             ),
                             "read" to false,
                             "createdAt" to now
-                        )).await()
+                        )
+                    )
                 }
+                notifBatch.commit().await()
             } catch (notifError: Exception) {
                 Logger.w("FirebaseSettlementService", "Failed to send settlement notification", notifError)
             }

@@ -406,7 +406,7 @@ private fun AdminTicketsList(
                 contentPadding = PaddingValues(16.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                items(filteredTickets) { ticket ->
+                items(filteredTickets, key = { it.ticketId }) { ticket ->
                     AdminTicketItem(ticket = ticket) { onSelectTicket(it) }
                 }
                 if (state.ticketsHasMore && searchQuery.isBlank() && categoryFilter == null) {
@@ -653,7 +653,7 @@ private fun AdminTicketDetail(
                 contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                items(messages) { msg ->
+                items(messages, key = { it.messageId }) { msg ->
                     AdminMessageBubble(message = msg)
                 }
             }
@@ -762,7 +762,7 @@ private fun AdminArticlesList(
                 contentPadding = PaddingValues(16.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                items(state.articles) { article ->
+                items(state.articles, key = { it.articleId }) { article ->
                     AdminArticleItem(
                         article = article,
                         onToggleActive = { onToggleActive(it) },

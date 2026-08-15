@@ -6,6 +6,10 @@ import android.app.NotificationManager
 import android.content.Context
 import android.os.Build
 import androidx.work.Configuration
+import coil.Coil
+import coil.ImageLoader
+import coil.disk.DiskCache
+import coil.memory.MemoryCache
 import com.trevio.android.core.notification.NotificationChannels
 import com.trevio.android.core.notification.ReminderManager
 import com.trevio.android.util.Logger
@@ -32,6 +36,20 @@ class TrevioApp : Application(), Configuration.Provider {
 
     override fun onCreate() {
         super.onCreate()
+
+        val imageLoader = ImageLoader.Builder(this)
+            .memoryCache {
+                MemoryCache.Builder(this).maxSizePercent(0.25).build()
+            }
+            .diskCache {
+                DiskCache.Builder()
+                    .directory(cacheDir.resolve("image_cache"))
+                    .maxSizeBytes(50L * 1024 * 1024)
+                    .build()
+            }
+            .crossfade(300)
+            .build()
+        Coil.setImageLoader(imageLoader)
 
         // Start observing connectivity so the UI can react to offline state.
         networkMonitor.startMonitoring()

@@ -9,6 +9,8 @@ import com.trevio.android.domain.repository.UserService
 import com.trevio.android.util.AppConstants
 import com.trevio.android.util.Calculations
 import com.trevio.android.util.friendlyNetworkMessage
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.tasks.await
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -81,16 +83,20 @@ class FirebaseUserServiceImpl @Inject constructor(
     override suspend fun syncUserProfileToGroups(): Result<Unit> {
         return try {
             val uid = auth.currentUser?.uid ?: return Result.failure(Exception("User not authenticated"))
-            val userDoc = firestore.collection("users").document(uid).get().await()
+
+            val (userDoc, memberSnapshot) = coroutineScope {
+                val userDocAsync = async { firestore.collection("users").document(uid).get().await() }
+                val memberSnapshotAsync = async {
+                    firestore.collectionGroup("members")
+                        .whereEqualTo("uid", uid)
+                        .whereEqualTo("status", "active")
+                        .get().await()
+                }
+                userDocAsync.await() to memberSnapshotAsync.await()
+            }
             val displayName = userDoc.getString("displayName") ?: ""
             val username = userDoc.getString("username") ?: ""
             val photoURL = userDoc.getString("photoURL") ?: ""
-
-            // Find all groups where this user is an active, non-offline member
-            val memberSnapshot = firestore.collectionGroup("members")
-                .whereEqualTo("uid", uid)
-                .whereEqualTo("status", "active")
-                .get().await()
 
             val toUpdate = memberSnapshot.documents.filter { it.getBoolean("isOffline") != true }
             val batchSize = 400
@@ -167,12 +173,16 @@ class FirebaseUserServiceImpl @Inject constructor(
     private suspend fun findUniqueUsername(base: String): String {
         var username = base
         var suffix = 0
-        while (true) {
+        val maxAttempts = 20
+        var attempts = 0
+        while (attempts < maxAttempts) {
             val doc = firestore.collection("usernames").document(username).get().await()
             if (!doc.exists()) return username
             suffix++
             username = "$base$suffix"
+            attempts++
         }
+        return username
     }
 
     override suspend fun checkUsernameAvailability(username: String): Result<Pair<Boolean, String>> {
@@ -269,14 +279,18 @@ class FirebaseUserServiceImpl @Inject constructor(
             val currentUser = auth.currentUser ?: return Result.failure(Exception("User not authenticated"))
 
             // 1. Get user doc to find username
-            val userDoc = firestore.collection("users").document(uid).get().await()
-            val username = userDoc.getString("username")
-
             // 2. Find all group memberships and set status to "left"
-            val membersSnapshot = firestore.collectionGroup("members")
-                .whereEqualTo("uid", uid)
-                .whereEqualTo("status", "active")
-                .get().await()
+            val (userDoc, membersSnapshot) = coroutineScope {
+                val userDocAsync = async { firestore.collection("users").document(uid).get().await() }
+                val membersSnapshotAsync = async {
+                    firestore.collectionGroup("members")
+                        .whereEqualTo("uid", uid)
+                        .whereEqualTo("status", "active")
+                        .get().await()
+                }
+                userDocAsync.await() to membersSnapshotAsync.await()
+            }
+            val username = userDoc.getString("username")
 
             val memberDocs = membersSnapshot.documents
             val batchSize = 200

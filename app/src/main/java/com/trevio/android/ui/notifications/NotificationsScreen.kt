@@ -216,7 +216,9 @@ fun NotificationsScreen(
 ) {
     val state by viewModel.state.collectAsState()
     val currencyFormatter = rememberCurrencyFormatter()
-    val unreadCount = state.notifications.count { !it.read }
+    val unreadCount by remember {
+        derivedStateOf { state.notifications.count { !it.read } }
+    }
     val context = androidx.compose.ui.platform.LocalContext.current
 
     // Lazily request POST_NOTIFICATIONS when the user opens the Notifications screen
@@ -316,10 +318,10 @@ fun NotificationsScreen(
                 modifier = Modifier.weight(1f),
                 contentPadding = PaddingValues(bottom = 100.dp)
             ) {
-                items(state.broadcasts) { broadcast ->
+                items(state.broadcasts, key = { it.id }) { broadcast ->
                     BroadcastNotificationCard(broadcast)
                 }
-                items(state.notifications) { notification ->
+                items(state.notifications, key = { it.notificationId }) { notification ->
                     NotificationCard(
                         notification = notification,
                         navController = navController,

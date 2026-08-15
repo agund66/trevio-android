@@ -113,7 +113,7 @@ fun BroadcastsScreen(
                 contentPadding = PaddingValues(16.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                items(state.broadcasts) { broadcast ->
+                items(state.broadcasts, key = { it.id }) { broadcast ->
                     BroadcastRow(
                         broadcast = broadcast,
                         readCount = state.readCounts[broadcast.id] ?: 0,

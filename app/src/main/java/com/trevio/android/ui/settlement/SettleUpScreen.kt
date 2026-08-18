@@ -2,6 +2,7 @@ package com.trevio.android.ui.settlement
 
 import android.content.Intent
 import android.net.Uri
+import android.widget.Toast
 import androidx.annotation.StringRes
 import androidx.compose.foundation.background
 import androidx.compose.foundation.isSystemInDarkTheme
@@ -43,6 +44,7 @@ import com.trevio.android.domain.model.SimplifiedDebt
 import com.trevio.android.domain.repository.AuthService
 import com.trevio.android.domain.repository.SettlementService
 import com.trevio.android.util.AppConstants
+import com.trevio.android.util.CurrencyConverter
 import com.trevio.android.util.rememberCurrencyFormatter
 import com.trevio.android.util.toStringResId
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -99,7 +101,7 @@ class SettlementViewModel @Inject constructor(
                 fromUid = debt.fromUid,
                 toUid = debt.toUid,
                 amount = debt.amount,
-                currency = AppConstants.BASE_CURRENCY,
+                currency = debt.currency,
                 method = method,
                 upiRefId = null
             ).onSuccess {
@@ -229,7 +231,7 @@ fun SettleUpScreen(
                 DebtCard(
                     debt = debt,
                     currentUserId = currentUserId,
-                    formatBase = currencyFormatter.formatBase,
+                    formatGroupCurrency = { amount, currency -> currencyFormatter.formatAmount(amount, currency) },
                     onSettle = {
                         viewModel.settleDebt(debt)
                         navController.previousBackStackEntry?.savedStateHandle?.set("needsRefresh", true)
@@ -237,9 +239,19 @@ fun SettleUpScreen(
                     onPayViaUpi = {
                         val vpa = getUpiVpa(debt)
                         if (vpa.isNotEmpty()) {
-                            val upiUri = "upi://pay?pa=${Uri.encode(vpa)}&pn=${Uri.encode(debt.toName)}&am=${debt.amount}&cu=${AppConstants.BASE_CURRENCY}&tn=${Uri.encode("Trevio")}"
-                            val intent = Intent(Intent.ACTION_VIEW, Uri.parse(upiUri))
-                            context.startActivity(Intent.createChooser(intent, context.getString(R.string.pay_with)))
+                            val amountInInr = if (debt.currency == AppConstants.BASE_CURRENCY) {
+                                debt.amount
+                            } else if (currencyFormatter.rates.isNotEmpty()) {
+                                CurrencyConverter.convertCurrency(debt.amount, debt.currency, AppConstants.BASE_CURRENCY, currencyFormatter.rates)
+                            } else {
+                                Toast.makeText(context, context.getString(R.string.group_detail_rates_loading), Toast.LENGTH_SHORT).show()
+                                null
+                            }
+                            if (amountInInr != null) {
+                                val upiUri = "upi://pay?pa=${Uri.encode(vpa)}&pn=${Uri.encode(debt.toName)}&am=$amountInInr&cu=${AppConstants.BASE_CURRENCY}&tn=${Uri.encode("Trevio")}"
+                                val intent = Intent(Intent.ACTION_VIEW, Uri.parse(upiUri))
+                                context.startActivity(Intent.createChooser(intent, context.getString(R.string.pay_with)))
+                            }
                         }
                     }
                 )
@@ -252,7 +264,7 @@ fun SettleUpScreen(
 private fun DebtCard(
     debt: SimplifiedDebt,
     currentUserId: String?,
-    formatBase: (Double) -> String,
+    formatGroupCurrency: (Double, String) -> String,
     onSettle: () -> Unit,
     onPayViaUpi: () -> Unit
 ) {
@@ -284,7 +296,7 @@ private fun DebtCard(
                         stringResource(R.string.debt_name_owes_name, fromName, toName)
                     }
                     Text(debtText, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    Text(formatBase(debt.amount), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                    Text(formatGroupCurrency(debt.amount, debt.currency), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
                 }
             }
             if (debt.toUpiId.isNotEmpty() && (debt.toCountryCode.isEmpty() || debt.toCountryCode == "IN")) {

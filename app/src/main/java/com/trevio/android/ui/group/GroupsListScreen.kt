@@ -220,7 +220,7 @@ fun GroupsListScreen(
                         onClick = {
                             navController.navigate(TrevioRoute.GroupDetail.createRoute(group.groupId))
                         },
-                        formatBase = currencyFormatter.formatBase
+                        formatAmount = currencyFormatter.formatAmount
                     )
                 }
             }
@@ -273,7 +273,7 @@ fun GroupsListScreen(
 private fun GroupsListItem(
     group: Group,
     onClick: () -> Unit,
-    formatBase: (Double) -> String
+    formatAmount: (Double, String) -> String
 ) {
     val balance = group.yourBalance
     val isDark = isSystemInDarkTheme()
@@ -286,10 +286,10 @@ private fun GroupsListItem(
     val balanceColor = if (balance > 0) if (isDark) BalancePositiveDark else BalancePositive else if (balance < 0) if (isDark) BalanceNegativeDark else BalanceNegative else MaterialTheme.colorScheme.onSurfaceVariant
     val balanceText = when {
         group.template == GroupTemplate.HOUSEHOLD -> {
-            if (group.totalExpenses > 0) stringResource(R.string.group_item_spent, formatBase(group.totalExpenses)) else stringResource(R.string.group_item_no_entries)
+            if (group.totalExpenses > 0) stringResource(R.string.group_item_spent, formatAmount(group.totalExpenses, group.currency)) else stringResource(R.string.group_item_no_entries)
         }
-        balance > 0 -> stringResource(R.string.group_item_owes_you, formatBase(balance))
-        balance < 0 -> stringResource(R.string.group_item_you_owe, formatBase(-balance))
+        balance > 0 -> stringResource(R.string.group_item_owes_you, formatAmount(balance, group.currency))
+        balance < 0 -> stringResource(R.string.group_item_you_owe, formatAmount(-balance, group.currency))
         else -> stringResource(R.string.group_item_settled_up)
     }
 

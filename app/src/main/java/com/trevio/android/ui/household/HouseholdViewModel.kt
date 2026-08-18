@@ -133,7 +133,7 @@ class HouseholdViewModel @Inject constructor(
                     }
 
                     val budgetInUserCurrency = groupInfo?.monthlyBudget?.let { budget ->
-                        CurrencyConverter.convertFromBase(budget, userCurrency, rates)
+                        CurrencyConverter.convertCurrency(budget, groupInfo.currency, userCurrency, rates)
                     }
 
                     val dailySummary = computeDailySummary(convertedExpenses, _state.value.selectedDate)

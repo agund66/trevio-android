@@ -33,6 +33,7 @@ import com.trevio.android.domain.model.TripItineraryItem
 import com.trevio.android.domain.model.TripLocation
 import com.trevio.android.domain.repository.SettlementService
 import com.trevio.android.domain.repository.TripService
+import com.trevio.android.util.AppConstants
 import com.trevio.android.util.rememberCurrencyFormatter
 import com.trevio.android.util.toStringResId
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -161,6 +162,7 @@ class TripViewModel @Inject constructor(
 @Composable
 fun TripTab(
     groupId: String,
+    groupCurrency: String = AppConstants.BASE_CURRENCY,
     viewModel: TripViewModel = hiltViewModel()
 ) {
     val state by viewModel.state.collectAsState()
@@ -260,7 +262,7 @@ fun TripTab(
                         }
                         Column {
                             Text(stringResource(R.string.trip_est_cost_label), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f))
-                            Text(currencyFormatter.formatBase(totalEst), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onPrimaryContainer)
+                            Text(currencyFormatter.formatAmount(totalEst, groupCurrency), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onPrimaryContainer)
                         }
                     }
                 }
@@ -333,6 +335,7 @@ fun TripTab(
                 ItineraryItemCard(
                     item = item,
                     currencyFormatter = currencyFormatter,
+                    groupCurrency = groupCurrency,
                     onToggleComplete = { viewModel.toggleComplete(item) },
                     onRemove = { viewModel.removeItineraryItem(item.itemId) }
                 )
@@ -412,6 +415,7 @@ fun TripTab(
 private fun ItineraryItemCard(
     item: TripItineraryItem,
     currencyFormatter: com.trevio.android.util.CurrencyFormatter,
+    groupCurrency: String,
     onToggleComplete: () -> Unit,
     onRemove: () -> Unit
 ) {
@@ -453,7 +457,7 @@ private fun ItineraryItemCard(
                     }
                     if (item.estimatedCost > 0) {
                         Text(
-                            currencyFormatter.formatBase(item.estimatedCost),
+                            currencyFormatter.formatAmount(item.estimatedCost, groupCurrency),
                             style = MaterialTheme.typography.labelMedium,
                             fontWeight = FontWeight.SemiBold,
                             color = MaterialTheme.colorScheme.primary

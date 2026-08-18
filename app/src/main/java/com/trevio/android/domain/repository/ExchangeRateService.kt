@@ -5,4 +5,5 @@ import com.trevio.android.domain.model.ExchangeRates
 interface ExchangeRateService {
     suspend fun getRates(): Result<ExchangeRates>
     suspend fun getRateToBase(currency: String): Result<Double>
+    suspend fun getRate(sourceCurrency: String, targetCurrency: String): Result<Double>
 }

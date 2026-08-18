@@ -62,6 +62,7 @@ import com.trevio.android.ui.notifications.NotificationsScreen
 import com.trevio.android.ui.profile.ProfileScreen
 import com.trevio.android.ui.profile.PublicProfileScreen
 import com.trevio.android.ui.settlement.SettleUpScreen
+import com.trevio.android.ui.wrapped.WrappedScreen
 import com.trevio.android.ui.support.CreateTicketScreen
 import com.trevio.android.ui.support.MyTicketsScreen
 import com.trevio.android.ui.support.SupportScreen
@@ -238,6 +239,9 @@ private fun NavGraphBuilder.detailGraph(navController: NavHostController, onSign
     }
     composable(TrevioRoute.Admin.route) {
         AdminScreen(navController = navController)
+    }
+    composable(TrevioRoute.Wrapped.route) {
+        WrappedScreen(navController = navController)
     }
     composable(TrevioRoute.CreateGroup.route) {
         CreateGroupScreen(navController = navController)

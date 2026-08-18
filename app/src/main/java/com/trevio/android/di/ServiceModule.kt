@@ -7,11 +7,14 @@ import com.trevio.android.data.remote.FirebaseBroadcastServiceImpl
 import com.trevio.android.data.remote.FirebaseExchangeRateServiceImpl
 import com.trevio.android.data.remote.FirebaseExpenseServiceImpl
 import com.trevio.android.data.remote.FirebaseGroupServiceImpl
+import com.trevio.android.data.remote.FirebaseKarmaServiceImpl
+import com.trevio.android.data.remote.FirebaseNudgeServiceImpl
 import com.trevio.android.data.remote.FirebaseNotificationServiceImpl
 import com.trevio.android.data.remote.FirebaseSettlementServiceImpl
 import com.trevio.android.data.remote.FirebaseSupportServiceImpl
 import com.trevio.android.data.remote.FirebaseTripServiceImpl
 import com.trevio.android.data.remote.FirebaseUserServiceImpl
+import com.trevio.android.data.remote.FirebaseWrappedServiceImpl
 import com.trevio.android.domain.repository.AdminService
 import com.trevio.android.domain.repository.AnalyticsService
 import com.trevio.android.domain.repository.AuthService
@@ -19,11 +22,14 @@ import com.trevio.android.domain.repository.BroadcastService
 import com.trevio.android.domain.repository.ExchangeRateService
 import com.trevio.android.domain.repository.ExpenseService
 import com.trevio.android.domain.repository.GroupService
+import com.trevio.android.domain.repository.KarmaService
+import com.trevio.android.domain.repository.NudgeService
 import com.trevio.android.domain.repository.NotificationService
 import com.trevio.android.domain.repository.SettlementService
 import com.trevio.android.domain.repository.SupportService
 import com.trevio.android.domain.repository.TripService
 import com.trevio.android.domain.repository.UserService
+import com.trevio.android.domain.repository.WrappedService
 import dagger.Binds
 import dagger.Module
 import dagger.hilt.InstallIn
@@ -76,9 +82,21 @@ abstract class ServiceModule {
 
     @Binds
     @Singleton
+    abstract fun bindKarmaService(impl: FirebaseKarmaServiceImpl): KarmaService
+
+    @Binds
+    @Singleton
+    abstract fun bindNudgeService(impl: FirebaseNudgeServiceImpl): NudgeService
+
+    @Binds
+    @Singleton
     abstract fun bindTripService(impl: FirebaseTripServiceImpl): TripService
 
     @Binds
     @Singleton
     abstract fun bindSupportService(impl: FirebaseSupportServiceImpl): SupportService
+
+    @Binds
+    @Singleton
+    abstract fun bindWrappedService(impl: FirebaseWrappedServiceImpl): WrappedService
 }

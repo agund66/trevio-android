@@ -65,7 +65,8 @@ class AdminSupportViewModel @Inject constructor(
         val isSending: Boolean = false,
         @StringRes val error: Int? = null,
         val subTab: Int = 0,
-        val statusFilter: SupportStatus? = null
+        val statusFilter: SupportStatus? = null,
+        val categoryFilter: SupportCategory? = null
     )
 
     private val _state = MutableStateFlow(State())
@@ -82,13 +83,18 @@ class AdminSupportViewModel @Inject constructor(
 
     fun setStatusFilter(status: SupportStatus?) {
         _state.value = _state.value.copy(statusFilter = status)
-        loadTickets(status)
+        loadTickets(status = status, category = _state.value.categoryFilter)
     }
 
-    fun loadTickets(status: SupportStatus? = null) {
+    fun setCategoryFilter(category: SupportCategory?) {
+        _state.value = _state.value.copy(categoryFilter = category)
+        loadTickets(status = _state.value.statusFilter, category = category)
+    }
+
+    fun loadTickets(status: SupportStatus? = _state.value.statusFilter, category: SupportCategory? = _state.value.categoryFilter) {
         _state.value = _state.value.copy(isLoading = true)
         viewModelScope.launch {
-            supportService.getAllTickets(status = status, pageSize = AppConstants.DEFAULT_PAGE_SIZE, lastTicketId = null)
+            supportService.getAllTickets(status = status, category = category, pageSize = AppConstants.DEFAULT_PAGE_SIZE, lastTicketId = null)
                 .onSuccess { result ->
                     _state.value = _state.value.copy(isLoading = false, tickets = result.items, ticketsHasMore = result.hasMore)
                 }
@@ -103,7 +109,7 @@ class AdminSupportViewModel @Inject constructor(
         _state.value = _state.value.copy(ticketsLoadingMore = true)
         val lastId = _state.value.tickets.lastOrNull()?.ticketId
         viewModelScope.launch {
-            supportService.getAllTickets(status = _state.value.statusFilter, pageSize = AppConstants.DEFAULT_PAGE_SIZE, lastTicketId = lastId)
+            supportService.getAllTickets(status = _state.value.statusFilter, category = _state.value.categoryFilter, pageSize = AppConstants.DEFAULT_PAGE_SIZE, lastTicketId = lastId)
                 .onSuccess { result ->
                     _state.value = _state.value.copy(
                         tickets = _state.value.tickets + result.items,
@@ -280,6 +286,7 @@ fun AdminSupportScreen(
             AdminTicketsList(
                 state = state,
                 onFilterChange = { viewModel.setStatusFilter(it) },
+                onCategoryFilterChange = { viewModel.setCategoryFilter(it) },
                 onSelectTicket = { viewModel.selectTicket(it) },
                 onLoadMore = { viewModel.loadMoreTickets() }
             )
@@ -303,25 +310,24 @@ fun AdminSupportScreen(
 private fun AdminTicketsList(
     state: AdminSupportViewModel.State,
     onFilterChange: (SupportStatus?) -> Unit,
+    onCategoryFilterChange: (SupportCategory?) -> Unit,
     onSelectTicket: (SupportTicket) -> Unit,
     onLoadMore: () -> Unit = {}
 ) {
     var searchQuery by remember { mutableStateOf("") }
-    var categoryFilter by remember { mutableStateOf<SupportCategory?>(null) }
 
     // Stats
     val total = state.tickets.size
     val open = state.tickets.count { it.status == SupportStatus.OPEN || it.status == SupportStatus.IN_PROGRESS }
     val unread = state.tickets.count { it.unreadByAdmin }
 
-    // Client-side filter by search + category
-    val filteredTickets = remember(state.tickets, searchQuery, categoryFilter) {
+    // Client-side filter by search query only (status and category are filtered server-side)
+    val filteredTickets = remember(state.tickets, searchQuery) {
         state.tickets.filter { t ->
-            (categoryFilter == null || t.category == categoryFilter) &&
-            (searchQuery.isBlank() ||
+            searchQuery.isBlank() ||
                 t.subject.contains(searchQuery, ignoreCase = true) ||
                 t.userEmail.contains(searchQuery, ignoreCase = true) ||
-                t.userDisplayName.contains(searchQuery, ignoreCase = true))
+                t.userDisplayName.contains(searchQuery, ignoreCase = true)
         }
     }
 
@@ -377,14 +383,14 @@ private fun AdminTicketsList(
             verticalArrangement = Arrangement.spacedBy(4.dp)
         ) {
             FilterChip(
-                selected = categoryFilter == null,
-                onClick = { categoryFilter = null },
+                selected = state.categoryFilter == null,
+                onClick = { onCategoryFilterChange(null) },
                 label = { Text(stringResource(R.string.admin_support_all_categories)) }
             )
             SupportCategory.values().forEach { cat ->
                 FilterChip(
-                    selected = categoryFilter == cat,
-                    onClick = { categoryFilter = if (categoryFilter == cat) null else cat },
+                    selected = state.categoryFilter == cat,
+                    onClick = { onCategoryFilterChange(if (state.categoryFilter == cat) null else cat) },
                     label = { Text(stringResource(cat.toStringResId())) }
                 )
             }
@@ -409,7 +415,7 @@ private fun AdminTicketsList(
                 items(filteredTickets, key = { it.ticketId }) { ticket ->
                     AdminTicketItem(ticket = ticket) { onSelectTicket(it) }
                 }
-                if (state.ticketsHasMore && searchQuery.isBlank() && categoryFilter == null) {
+                if (state.ticketsHasMore && searchQuery.isBlank()) {
                     item {
                         LaunchedEffect(state.tickets.lastOrNull()?.ticketId) {
                             onLoadMore()

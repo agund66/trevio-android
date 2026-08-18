@@ -46,9 +46,6 @@ class FirebaseSettlementServiceImpl @Inject constructor(
                 return Result.failure(Exception("Missing required fields"))
             }
             if (fromUid == toUid) return Result.failure(Exception("Cannot settle with yourself"))
-            if (uid != fromUid && uid != toUid) {
-                return Result.failure(Exception("You can only record settlements involving yourself"))
-            }
 
             val groupRef = firestore.collection("groups").document(groupId)
             val groupDoc = groupRef.get().await()
@@ -57,14 +54,27 @@ class FirebaseSettlementServiceImpl @Inject constructor(
             val memberDoc = groupRef.collection("members").document(uid).get().await()
             if (!memberDoc.exists()) return Result.failure(Exception("You are not a member of this group"))
 
+            // Allow settlement if the user is a party to it OR is a group admin
+            val isAdmin = memberDoc.data?.get("role") == "admin"
+            if (uid != fromUid && uid != toUid && !isAdmin) {
+                return Result.failure(Exception("You can only record settlements involving yourself or be a group admin"))
+            }
+
             val fromMember = groupRef.collection("members").document(fromUid).get().await()
             val toMember = groupRef.collection("members").document(toUid).get().await()
             if (!fromMember.exists() || !toMember.exists()) {
                 return Result.failure(Exception("Both parties must be group members"))
             }
 
-            val rateToBase = exchangeRateService.getRateToBase(currency).getOrDefault(1.0)
-            val amountInBase = kotlin.math.round(amount * rateToBase * 100) / 100
+            val groupCurrency = groupDoc.getString("currency") ?: AppConstants.BASE_CURRENCY
+            val exchangeRateToGroupCurrency = if (currency == groupCurrency) {
+                1.0
+            } else {
+                exchangeRateService.getRate(currency, groupCurrency).getOrElse {
+                    return Result.failure(Exception("Failed to get exchange rate for currency: $currency"))
+                }
+            }
+            val amountInGroupCurrency = kotlin.math.round(amount * exchangeRateToGroupCurrency * 100) / 100
 
             val now = System.currentTimeMillis()
             val settlementRef = groupRef.collection("settlements").document()
@@ -100,10 +110,12 @@ class FirebaseSettlementServiceImpl @Inject constructor(
                 "toUid" to toUid,
                 "fromName" to fromUserName,
                 "toName" to toUserName,
-                "amount" to amountInBase,
-                "currency" to AppConstants.BASE_CURRENCY,
+                "amount" to amountInGroupCurrency,
+                "currency" to groupCurrency,
                 "originalAmount" to amount,
                 "originalCurrency" to currency,
+                "exchangeRateToGroupCurrency" to exchangeRateToGroupCurrency,
+                "amountInGroupCurrency" to amountInGroupCurrency,
                 "method" to method.toStorageString(),
                 "date" to now,
                 "createdBy" to uid,
@@ -123,7 +135,8 @@ class FirebaseSettlementServiceImpl @Inject constructor(
                     "settlementId" to settlementRef.id,
                     "fromUid" to fromUid,
                     "toUid" to toUid,
-                    "amount" to amountInBase
+                    "amount" to amountInGroupCurrency,
+                    "currency" to groupCurrency
                 ),
                 "createdAt" to now
             ))
@@ -183,6 +196,7 @@ class FirebaseSettlementServiceImpl @Inject constructor(
             // Read pre-computed simplifiedDebts from group doc (stored by recalculateBalances).
             // Fall back to client-side computation for older docs without this field.
             val groupDoc = groupRef.get().await()
+            val groupCurrency = groupDoc.getString("currency") ?: AppConstants.BASE_CURRENCY
             @Suppress("UNCHECKED_CAST")
             val storedDebts = groupDoc.get("simplifiedDebts") as? List<Map<String, Any>>
             val debts = if (storedDebts != null) {
@@ -244,7 +258,8 @@ class FirebaseSettlementServiceImpl @Inject constructor(
                     fromUpiId = fromUpiId,
                     toPhoneNumber = toPhoneNumber,
                     toCountryCode = toCountryCode,
-                    amount = debt.amount
+                    amount = debt.amount,
+                    currency = groupCurrency
                 )
             }
             Result.success(enrichedDebts)
@@ -275,7 +290,8 @@ class FirebaseSettlementServiceImpl @Inject constructor(
                     balance = (data["balance"] as? Number)?.toDouble() ?: 0.0,
                     role = data["role"] as? String ?: "member",
                     status = data["status"] as? String ?: "active",
-                    isOffline = data["isOffline"] as? Boolean ?: false
+                    isOffline = data["isOffline"] as? Boolean ?: false,
+                    currency = data["currency"] as? String ?: "INR"
                 )
             }
             Result.success(members)
@@ -306,6 +322,7 @@ class FirebaseSettlementServiceImpl @Inject constructor(
             }
 
             val snapshot = query.get().await()
+            val groupCurrency = groupRef.get().await().getString("currency") ?: AppConstants.BASE_CURRENCY
 
             // Collect UIDs for fallback name resolution (older docs may not have fromName/toName)
             val allUids = snapshot.documents.flatMap { doc ->
@@ -341,8 +358,13 @@ class FirebaseSettlementServiceImpl @Inject constructor(
                     toUid = toUid,
                     fromName = fromName,
                     toName = toName,
-                    amount = (data["amount"] as? Number)?.toDouble() ?: 0.0,
-                    currency = data["currency"] as? String ?: AppConstants.BASE_CURRENCY,
+                    amount = (data["amountInGroupCurrency"] as? Number)?.toDouble()
+                        ?: (data["amount"] as? Number)?.toDouble() ?: 0.0,
+                    currency = data["currency"] as? String ?: groupCurrency,
+                    originalAmount = (data["originalAmount"] as? Number)?.toDouble() ?: (data["amount"] as? Number)?.toDouble() ?: 0.0,
+                    originalCurrency = data["originalCurrency"] as? String ?: data["currency"] as? String ?: groupCurrency,
+                    exchangeRateToGroupCurrency = (data["exchangeRateToGroupCurrency"] as? Number)?.toDouble() ?: 1.0,
+                    amountInGroupCurrency = (data["amountInGroupCurrency"] as? Number)?.toDouble() ?: (data["amount"] as? Number)?.toDouble() ?: 0.0,
                     method = SettlementMethod.valueOf((data["method"] as? String ?: "cash").uppercase()),
                     upiRefId = data["upiRefId"] as? String ?: "",
                     date = (data["date"] as? Number)?.toLong() ?: 0,
@@ -380,8 +402,9 @@ class FirebaseSettlementServiceImpl @Inject constructor(
                         shareValue = (v["shareValue"] as? Number)?.toDouble() ?: 0.0
                     )
                 },
-                amount = (data["amount"] as? Number)?.toDouble() ?: 0.0,
-                exchangeRateToBase = (data["exchangeRateToBase"] as? Number)?.toDouble() ?: 1.0
+                amountInGroupCurrency = (data["amountInGroupCurrency"] as? Number)?.toDouble()
+                    ?: (data["amount"] as? Number)?.toDouble() ?: 0.0,
+                exchangeRateToGroupCurrency = (data["exchangeRateToGroupCurrency"] as? Number)?.toDouble() ?: 1.0
             )
         }
 
@@ -419,8 +442,9 @@ class FirebaseSettlementServiceImpl @Inject constructor(
                         shareValue = (v["shareValue"] as? Number)?.toDouble() ?: 0.0
                     )
                 },
-                amount = (data["amount"] as? Number)?.toDouble() ?: 0.0,
-                exchangeRateToBase = (data["exchangeRateToBase"] as? Number)?.toDouble() ?: 1.0
+                amountInGroupCurrency = (data["amountInGroupCurrency"] as? Number)?.toDouble()
+                    ?: (data["amount"] as? Number)?.toDouble() ?: 0.0,
+                exchangeRateToGroupCurrency = (data["exchangeRateToGroupCurrency"] as? Number)?.toDouble() ?: 1.0
             )
         }
 

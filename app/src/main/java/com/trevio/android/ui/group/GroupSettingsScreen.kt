@@ -87,14 +87,12 @@ class GroupSettingsViewModel @Inject constructor(
             val uid = authService.getCurrentUserId()
             val user = authService.getCurrentUser()
             val userCurrency = user?.defaultCurrency ?: com.trevio.android.util.AppConstants.BASE_CURRENCY
-            val currencySymbol = CurrencyConverter.getCurrencySymbol(userCurrency)
-            val rates = exchangeRateService.getRates().getOrNull()?.rates ?: emptyMap()
             val info = groupService.getGroupInfo(groupId).getOrNull()
             val members = settlementService.getGroupBalances(groupId).getOrDefault(emptyList())
-            // Convert budget from INR base to user's currency for display
-            val budgetInUserCurrency = info?.monthlyBudget?.let { budget ->
-                CurrencyConverter.convertFromBase(budget, userCurrency, rates)
-            }
+            val groupCurrency = info?.currency ?: userCurrency
+            val currencySymbol = CurrencyConverter.getCurrencySymbol(groupCurrency)
+            val rates = emptyMap<String, Double>()
+            val budgetInGroupCurrency = info?.monthlyBudget
             _state.value = _state.value.copy(
                 isLoading = false,
                 groupInfo = info,
@@ -102,7 +100,7 @@ class GroupSettingsViewModel @Inject constructor(
                 currentUserId = uid,
                 name = info?.name ?: "",
                 description = info?.description ?: "",
-                monthlyBudget = budgetInUserCurrency?.let { formatBudgetDisplay(it) } ?: "",
+                monthlyBudget = budgetInGroupCurrency?.let { formatBudgetDisplay(it) } ?: "",
                 userCurrency = userCurrency,
                 currencySymbol = currencySymbol,
                 rates = rates
@@ -115,19 +113,19 @@ class GroupSettingsViewModel @Inject constructor(
             val uid = authService.getCurrentUserId()
             val info = groupService.getGroupInfo(groupId).getOrNull()
             val members = settlementService.getGroupBalances(groupId).getOrDefault(emptyList())
-            val userCurrency = _state.value.userCurrency
+            val groupCurrency = info?.currency ?: _state.value.userCurrency
+            val currencySymbol = CurrencyConverter.getCurrencySymbol(groupCurrency)
             val rates = _state.value.rates
-            // Convert budget from INR base to user's currency for display
-            val budgetInUserCurrency = info?.monthlyBudget?.let { budget ->
-                CurrencyConverter.convertFromBase(budget, userCurrency, rates)
-            }
+            val budgetInGroupCurrency = info?.monthlyBudget
             _state.value = _state.value.copy(
                 groupInfo = info,
                 members = members,
                 currentUserId = uid,
                 name = info?.name ?: "",
                 description = info?.description ?: "",
-                monthlyBudget = budgetInUserCurrency?.let { formatBudgetDisplay(it) } ?: ""
+                monthlyBudget = budgetInGroupCurrency?.let { formatBudgetDisplay(it) } ?: "",
+                currencySymbol = currencySymbol,
+                rates = rates
             )
         }
     }
@@ -163,13 +161,13 @@ class GroupSettingsViewModel @Inject constructor(
             return
         }
         val isHousehold = s.groupInfo?.template == com.trevio.android.domain.model.GroupTemplate.HOUSEHOLD
-        val budgetInUserCurrency = if (isHousehold) s.monthlyBudget.toDoubleOrNull() else null
-        if (isHousehold && s.monthlyBudget.isNotBlank() && (budgetInUserCurrency == null || budgetInUserCurrency < 0)) {
+        val budgetValue = if (isHousehold) s.monthlyBudget.toDoubleOrNull() else null
+        if (isHousehold && s.monthlyBudget.isNotBlank() && (budgetValue == null || budgetValue < 0)) {
             _state.value = s.copy(error = R.string.group_settings_budget_error)
             return
         }
-        val budgetInBase = if (isHousehold && budgetInUserCurrency != null && budgetInUserCurrency > 0) {
-            CurrencyConverter.convertToBase(budgetInUserCurrency, s.userCurrency, s.rates)
+        val budgetInGroupCurrency = if (isHousehold && budgetValue != null && budgetValue > 0) {
+            budgetValue
         } else null
 
         _state.value = s.copy(isSaving = true, error = null, success = null)
@@ -182,7 +180,7 @@ class GroupSettingsViewModel @Inject constructor(
             }
             // Step 2: update budget for household groups
             if (isHousehold) {
-                val budgetResult = groupService.updateGroupBudget(groupId, budgetInBase, null)
+                val budgetResult = groupService.updateGroupBudget(groupId, budgetInGroupCurrency, null)
                 if (budgetResult.isFailure) {
                     _state.value = s.copy(isSaving = false, error = budgetResult.exceptionOrNull()?.toStringResId())
                     return@launch
@@ -208,6 +206,21 @@ class GroupSettingsViewModel @Inject constructor(
             groupService.transferAdminRole(groupId, targetUid)
                 .onSuccess {
                     _state.value = s.copy(isSaving = false, success = R.string.group_settings_admin_transferred, transferTargetUid = null)
+                    refreshData()
+                }
+                .onFailure { e ->
+                    _state.value = s.copy(isSaving = false, error = e.toStringResId())
+                }
+        }
+    }
+
+    fun updateMemberRole(memberUid: String, role: String) {
+        val s = _state.value
+        _state.value = s.copy(isSaving = true, error = null, success = null)
+        viewModelScope.launch {
+            groupService.updateMemberRole(groupId, memberUid, role)
+                .onSuccess {
+                    _state.value = s.copy(isSaving = false, success = R.string.group_settings_role_updated)
                     refreshData()
                 }
                 .onFailure { e ->
@@ -283,11 +296,8 @@ fun GroupSettingsScreen(
     }
 
     val activeMembers = state.members.filter { it.status == MemberStatus.ACTIVE && it.uid != state.currentUserId }
+    val onlineActiveMembers = activeMembers.filter { !it.isOffline }
     val isHousehold = state.groupInfo?.template == com.trevio.android.domain.model.GroupTemplate.HOUSEHOLD
-    // Only show transfer admin section when there are other active members
-    // to transfer the role to. With a single member (the admin), the section
-    // is meaningless.
-    val showTransferAdmin = activeMembers.isNotEmpty()
 
     LaunchedEffect(state.savedAndNavigateBack) {
         if (state.savedAndNavigateBack) {
@@ -364,39 +374,83 @@ fun GroupSettingsScreen(
                 }
             }
 
-            // Transfer Admin Section — only when there are other active members
-            if (showTransferAdmin) {
+            // Manage Admins Section — allows admin to promote/demote members
+            if (viewModel.isAdmin && onlineActiveMembers.isNotEmpty()) {
+                var roleUpdateTarget by remember { mutableStateOf<Pair<String, String>?>(null) }
                 Surface(shape = RoundedCornerShape(16.dp), tonalElevation = 1.dp, modifier = Modifier.fillMaxWidth()) {
                     Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                        Text(stringResource(R.string.group_settings_transfer_admin_role), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-                        Text(stringResource(R.string.group_settings_transfer_desc), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        activeMembers.forEach { m ->
+                        Text(stringResource(R.string.group_settings_manage_admins), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                        Text(stringResource(R.string.group_settings_manage_admins_desc), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        onlineActiveMembers.forEach { m ->
+                            val isMemberAdmin = m.role == MemberRole.ADMIN
                             Surface(
-                                onClick = { viewModel.setTransferTarget(m.uid) },
                                 shape = RoundedCornerShape(12.dp),
-                                color = if (state.transferTargetUid == m.uid) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
+                                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
                                 modifier = Modifier.fillMaxWidth()
                             ) {
-                                Row(modifier = Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth().padding(12.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
                                     MemberAvatar(name = m.displayName, photoURL = m.photoURL, size = 32)
                                     Spacer(modifier = Modifier.width(8.dp))
-                                    Text(m.displayName, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
-                                    if (state.transferTargetUid == m.uid) Icon(Icons.Default.Check, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text(m.displayName, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium, maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
+                                        if (isMemberAdmin) {
+                                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                                Icon(Icons.Default.Star, contentDescription = null, modifier = Modifier.size(12.dp), tint = MaterialTheme.colorScheme.tertiary)
+                                                Spacer(modifier = Modifier.width(2.dp))
+                                                Text(stringResource(R.string.group_settings_admin_badge), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.tertiary)
+                                            }
+                                        }
+                                    }
+                                    OutlinedButton(
+                                        onClick = { roleUpdateTarget = Pair(m.uid, if (isMemberAdmin) "member" else "admin") },
+                                        enabled = !state.isSaving,
+                                        shape = RoundedCornerShape(8.dp),
+                                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
+                                    ) {
+                                        Icon(Icons.Default.Star, contentDescription = null, modifier = Modifier.size(14.dp))
+                                        Spacer(modifier = Modifier.width(4.dp))
+                                        Text(
+                                            if (isMemberAdmin) stringResource(R.string.group_settings_remove_admin) else stringResource(R.string.group_settings_make_admin),
+                                            style = MaterialTheme.typography.labelMedium
+                                        )
+                                    }
                                 }
                             }
                         }
-                        if (state.transferTargetUid != null) {
-                            OutlinedButton(
-                                onClick = { viewModel.transferAdmin() },
-                                enabled = !state.isSaving,
-                                modifier = Modifier.fillMaxWidth()
-                            ) {
-                                Icon(Icons.Default.AdminPanelSettings, contentDescription = null, modifier = Modifier.size(18.dp))
-                                Spacer(modifier = Modifier.width(8.dp))
-                                if (state.isSaving) Text(stringResource(R.string.group_settings_transferring)) else Text(stringResource(R.string.group_settings_transfer_admin_role))
+                    }
+                }
+                // Role update confirmation dialog
+                roleUpdateTarget?.let { (targetUid, newRole) ->
+                    val targetMember = onlineActiveMembers.find { it.uid == targetUid }
+                    val targetName = targetMember?.displayName ?: ""
+                    AlertDialog(
+                        onDismissRequest = { roleUpdateTarget = null },
+                        title = { Text(if (newRole == "admin") stringResource(R.string.group_settings_make_admin) else stringResource(R.string.group_settings_remove_admin)) },
+                        text = {
+                            Text(
+                                if (newRole == "admin")
+                                    stringResource(R.string.group_settings_make_admin_confirm, targetName)
+                                else
+                                    stringResource(R.string.group_settings_remove_admin_confirm, targetName)
+                            )
+                        },
+                        confirmButton = {
+                            TextButton(
+                                onClick = {
+                                    viewModel.updateMemberRole(targetUid, newRole)
+                                    roleUpdateTarget = null
+                                }
+                            ) { Text(stringResource(R.string.common_confirm)) }
+                        },
+                        dismissButton = {
+                            TextButton(onClick = { roleUpdateTarget = null }) {
+                                Text(stringResource(R.string.group_detail_cancel))
                             }
                         }
-                    }
+                    )
                 }
             }
 

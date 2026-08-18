@@ -14,6 +14,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Mail
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Phone
+import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.Wallet
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -32,6 +33,7 @@ import com.trevio.android.R
 import com.trevio.android.core.designsystem.components.TrevioCard
 import com.trevio.android.core.designsystem.theme.*
 import com.trevio.android.domain.model.User
+import com.trevio.android.domain.repository.KarmaService
 import com.trevio.android.domain.repository.UserService
 import com.trevio.android.util.toStringResId
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -42,11 +44,13 @@ import javax.inject.Inject
 
 @HiltViewModel
 class PublicProfileViewModel @Inject constructor(
-    private val userService: UserService
+    private val userService: UserService,
+    private val karmaService: KarmaService
 ) : ViewModel() {
 
     data class State(
         val user: User? = null,
+        val karmaBreakdown: com.trevio.android.domain.model.KarmaBreakdown? = null,
         val isLoading: Boolean = true,
         @StringRes val error: Int? = null
     )
@@ -59,7 +63,13 @@ class PublicProfileViewModel @Inject constructor(
         viewModelScope.launch {
             userService.getUser(uid)
                 .onSuccess { user ->
-                    _state.value = State(user = user, isLoading = false)
+                    // If user has karma public, fetch their breakdown
+                    var karmaBreakdown: com.trevio.android.domain.model.KarmaBreakdown? = null
+                    if (user.karmaPublic) {
+                        karmaService.getPublicKarma(uid)
+                            .onSuccess { karmaBreakdown = it }
+                    }
+                    _state.value = State(user = user, karmaBreakdown = karmaBreakdown, isLoading = false)
                 }
                 .onFailure { e ->
                     _state.value = State(isLoading = false, error = e.toStringResId())
@@ -180,6 +190,38 @@ fun PublicProfileScreen(
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
+            // Karma badge (only if user has made it public and breakdown is available)
+            state.karmaBreakdown?.let { breakdown ->
+                Spacer(modifier = Modifier.height(12.dp))
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.Center,
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(50))
+                        .background(tierColor(breakdown.tier).copy(alpha = 0.15f))
+                        .padding(horizontal = 16.dp, vertical = 6.dp)
+                ) {
+                    Icon(
+                        Icons.Default.Star,
+                        contentDescription = null,
+                        tint = tierColor(breakdown.tier),
+                        modifier = Modifier.size(16.dp)
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(
+                        "${stringResource(R.string.karma_public_badge)}: ${breakdown.score}",
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = FontWeight.SemiBold,
+                        color = tierColor(breakdown.tier)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        stringResource(tierLabelResId(breakdown.tier)),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
         }
 
         Column(
@@ -221,4 +263,18 @@ fun PublicProfileScreen(
             }
         }
     }
+}
+
+private fun tierColor(tier: String): Color = when (tier) {
+    "platinum" -> Color(0xFFE5E4E2)
+    "gold" -> Color(0xFFFFD700)
+    "silver" -> Color(0xFFC0C0C0)
+    else -> Color(0xFFCD7F32)
+}
+
+private fun tierLabelResId(tier: String): Int = when (tier) {
+    "platinum" -> R.string.karma_tier_platinum
+    "gold" -> R.string.karma_tier_gold
+    "silver" -> R.string.karma_tier_silver
+    else -> R.string.karma_tier_bronze
 }

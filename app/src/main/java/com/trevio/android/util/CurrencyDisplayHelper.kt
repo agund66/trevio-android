@@ -57,10 +57,15 @@ class CurrencyViewModel @Inject constructor(
         }
     }
 
-    fun formatBase(amountInBase: Double): String {
+    fun formatAmount(amount: Double, sourceCurrency: String): String {
         val currentState = _state.value
-        if (currentState.rates.isEmpty()) return CurrencyConverter.formatCurrency(amountInBase, AppConstants.BASE_CURRENCY)
-        val converted = CurrencyConverter.convertFromBase(amountInBase, currentState.userCurrency, currentState.rates)
+        if (sourceCurrency == currentState.userCurrency) {
+            return CurrencyConverter.formatCurrency(amount, sourceCurrency)
+        }
+        if (currentState.rates.isEmpty()) {
+            return CurrencyConverter.formatCurrency(amount, sourceCurrency)
+        }
+        val converted = CurrencyConverter.convertCurrency(amount, sourceCurrency, currentState.userCurrency, currentState.rates)
         return CurrencyConverter.formatCurrency(converted, currentState.userCurrency)
     }
 
@@ -83,7 +88,7 @@ fun rememberCurrencyFormatter(): CurrencyFormatter {
             userTimezone = state.userTimezone,
             rates = state.rates,
             isLoading = state.isLoading,
-            formatBase = { amountInBase -> viewModel.formatBase(amountInBase) },
+            formatAmount = { amount, currency -> viewModel.formatAmount(amount, currency) },
             formatOriginal = { amount, currency -> viewModel.formatOriginal(amount, currency) },
             formatDate = { timestamp, includeTime -> viewModel.formatDate(timestamp, includeTime) }
         )
@@ -95,7 +100,7 @@ data class CurrencyFormatter(
     val userTimezone: String,
     val rates: Map<String, Double>,
     val isLoading: Boolean,
-    val formatBase: (Double) -> String,
+    val formatAmount: (Double, String) -> String,
     val formatOriginal: (Double, String) -> String,
     val formatDate: (Long, Boolean) -> String
 )

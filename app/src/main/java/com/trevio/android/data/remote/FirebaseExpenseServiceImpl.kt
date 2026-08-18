@@ -74,6 +74,9 @@ class FirebaseExpenseServiceImpl @Inject constructor(
 
             val memberDoc = groupRef.collection("members").document(uid).get().await()
             if (!memberDoc.exists()) return Result.failure(Exception("You are not a member of this group"))
+            val groupCurrency = groupDoc.getString("currency") ?: AppConstants.BASE_CURRENCY
+            val payerMemberDoc = groupRef.collection("members").document(paidBy).get().await()
+            val effectiveCurrency = if (payerMemberDoc.getBoolean("isOffline") == true) groupCurrency else currency
 
             // Check if this is a household group (no splitting, no balance recalc)
             val templateStr = groupDoc.getString("template") ?: "casual"
@@ -84,7 +87,14 @@ class FirebaseExpenseServiceImpl @Inject constructor(
             } else {
                 Calculations.calculateSplits(amount, splitType, memberUids, splits, itemizedData)
             }
-            val exchangeRateToBase = exchangeRateService.getRateToBase(currency).getOrDefault(1.0)
+            val exchangeRateToGroupCurrency = if (effectiveCurrency == groupCurrency) {
+                1.0
+            } else {
+                exchangeRateService.getRate(effectiveCurrency, groupCurrency).getOrElse {
+                    return Result.failure(Exception("Failed to get exchange rate for currency: $effectiveCurrency"))
+                }
+            }
+            val amountInGroupCurrency = kotlin.math.round(amount * exchangeRateToGroupCurrency * 100) / 100
             val now = System.currentTimeMillis()
             val expenseDate = if (date > 0) date else now
             val expenseRef = groupRef.collection("expenses").document()
@@ -115,7 +125,7 @@ class FirebaseExpenseServiceImpl @Inject constructor(
             val expenseData = mutableMapOf<String, Any>(
                 "description" to description,
                 "amount" to amount,
-                "currency" to currency,
+                "currency" to effectiveCurrency,
                 "paidBy" to paidBy,
                 "paidByName" to paidByName,
                 "splitType" to splitType.toStorageString(),
@@ -126,7 +136,8 @@ class FirebaseExpenseServiceImpl @Inject constructor(
                 "date" to expenseDate,
                 "createdBy" to uid,
                 "createdAt" to now,
-                "exchangeRateToBase" to exchangeRateToBase,
+                "exchangeRateToGroupCurrency" to exchangeRateToGroupCurrency,
+                "amountInGroupCurrency" to amountInGroupCurrency,
                 "transactionType" to transactionType.toStorageString()
             )
             if (note.isNotBlank()) expenseData["note"] = note
@@ -155,8 +166,6 @@ class FirebaseExpenseServiceImpl @Inject constructor(
                 )
             }
 
-            val amountInBase = amount * exchangeRateToBase
-
             val batch = firestore.batch()
             batch.set(expenseRef, expenseData)
             val activityType = if (transactionType == TransactionType.INCOME) "income_added" else "expense_added"
@@ -177,7 +186,7 @@ class FirebaseExpenseServiceImpl @Inject constructor(
             // Only update totalExpenses for EXPENSE type (not INCOME)
             if (transactionType == TransactionType.EXPENSE) {
                 batch.update(groupRef, mapOf(
-                    "totalExpenses" to FieldValue.increment(amountInBase),
+                    "totalExpenses" to FieldValue.increment(amountInGroupCurrency),
                     "updatedAt" to now
                 ))
             } else {
@@ -297,11 +306,17 @@ class FirebaseExpenseServiceImpl @Inject constructor(
             val isHousehold = templateStr.equals("household", ignoreCase = true)
 
             val now = System.currentTimeMillis()
+            val groupCurrency = groupDoc.getString("currency") ?: AppConstants.BASE_CURRENCY
+            val oldCurrency = oldExpense["currency"] as? String ?: groupCurrency
+            val requestedCurrency = if (currency.isNotBlank()) currency else oldCurrency
+            val payerUid = if (paidBy.isNotBlank()) paidBy else (oldExpense["paidBy"] as? String ?: "")
+            val payerMemberDoc = groupRef.collection("members").document(payerUid).get().await()
+            val newCurrency = if (payerMemberDoc.getBoolean("isOffline") == true) groupCurrency else requestedCurrency
             val updateData = mutableMapOf<String, Any>("updatedAt" to now)
 
             if (description.isNotBlank()) updateData["description"] = description
             if (amount > 0) updateData["amount"] = amount
-            if (currency.isNotBlank()) updateData["currency"] = currency
+            updateData["currency"] = newCurrency
             if (paidBy.isNotBlank()) {
                 updateData["paidBy"] = paidBy
                 // Update denormalized paidByName when paidBy changes
@@ -312,16 +327,18 @@ class FirebaseExpenseServiceImpl @Inject constructor(
             updateData["note"] = note
             updateData["transactionType"] = transactionType.toStorageString()
 
-            val oldCurrency = oldExpense["currency"] as? String ?: AppConstants.BASE_CURRENCY
-            val newCurrency = if (currency.isNotBlank()) currency else oldCurrency
-            if (newCurrency != oldCurrency) {
-                val rateResult = exchangeRateService.getRateToBase(newCurrency)
-                val newRate = rateResult.getOrNull()
-                    ?: return Result.failure(Exception("Failed to get exchange rate for currency: $newCurrency"))
-                updateData["exchangeRateToBase"] = newRate
+            val exchangeRateToGroupCurrency = if (newCurrency == groupCurrency) {
+                1.0
+            } else {
+                exchangeRateService.getRate(newCurrency, groupCurrency).getOrElse {
+                    return Result.failure(Exception("Failed to get exchange rate for currency: $newCurrency"))
+                }
             }
+            updateData["exchangeRateToGroupCurrency"] = exchangeRateToGroupCurrency
 
             val effectiveAmount = if (amount > 0) amount else (oldExpense["amount"] as? Number)?.toDouble() ?: 0.0
+            val newAmountInGroupCurrency = kotlin.math.round(effectiveAmount * exchangeRateToGroupCurrency * 100) / 100
+            updateData["amountInGroupCurrency"] = newAmountInGroupCurrency
 
             if (memberUids.isNotEmpty() && !isHousehold) {
                 updateData["splitType"] = splitType.toStorageString()
@@ -349,12 +366,8 @@ class FirebaseExpenseServiceImpl @Inject constructor(
                 }
             }
 
-            val oldAmount = (oldExpense["amount"] as? Number)?.toDouble() ?: 0.0
-            val oldRate = (oldExpense["exchangeRateToBase"] as? Number)?.toDouble() ?: 1.0
-            val newRate = (updateData["exchangeRateToBase"] as? Number)?.toDouble() ?: oldRate
-            val oldAmountInBase = oldAmount * oldRate
-            val newAmountInBase = effectiveAmount * newRate
-            val amountDiffInBase = newAmountInBase - oldAmountInBase
+            val oldAmountInGroupCurrency = (oldExpense["amountInGroupCurrency"] as? Number)?.toDouble() ?: 0.0
+            val amountDiffInGroupCurrency = newAmountInGroupCurrency - oldAmountInGroupCurrency
 
             // Check old transaction type to determine if totalExpenses should be adjusted
             val oldTransactionType = (oldExpense["transactionType"] as? String) ?: "expense"
@@ -371,21 +384,21 @@ class FirebaseExpenseServiceImpl @Inject constructor(
                 oldTransactionType == "expense" && newTransactionType == "income" -> {
                     // Changed from expense to income: decrement by old amount
                     batch.update(groupRef, mapOf(
-                        "totalExpenses" to FieldValue.increment(-oldAmountInBase),
+                        "totalExpenses" to FieldValue.increment(-oldAmountInGroupCurrency),
                         "updatedAt" to now
                     ))
                 }
                 oldTransactionType == "income" && newTransactionType == "expense" -> {
                     // Changed from income to expense: increment by new amount
                     batch.update(groupRef, mapOf(
-                        "totalExpenses" to FieldValue.increment(newAmountInBase),
+                        "totalExpenses" to FieldValue.increment(newAmountInGroupCurrency),
                         "updatedAt" to now
                     ))
                 }
-                oldTransactionType == "expense" && newTransactionType == "expense" && amountDiffInBase != 0.0 -> {
+                oldTransactionType == "expense" && newTransactionType == "expense" && amountDiffInGroupCurrency != 0.0 -> {
                     // Both expenses, amount changed: adjust by difference
                     batch.update(groupRef, mapOf(
-                        "totalExpenses" to FieldValue.increment(amountDiffInBase),
+                        "totalExpenses" to FieldValue.increment(amountDiffInGroupCurrency),
                         "updatedAt" to now
                     ))
                 }
@@ -441,8 +454,7 @@ class FirebaseExpenseServiceImpl @Inject constructor(
 
             val now = System.currentTimeMillis()
             val expenseAmount = (expenseData["amount"] as? Number)?.toDouble() ?: 0.0
-            val expenseRate = (expenseData["exchangeRateToBase"] as? Number)?.toDouble() ?: 1.0
-            val amountInBase = expenseAmount * expenseRate
+            val amountInGroupCurrency = (expenseData["amountInGroupCurrency"] as? Number)?.toDouble() ?: 0.0
             val transactionTypeStr = (expenseData["transactionType"] as? String) ?: "expense"
 
             val userDoc = firestore.collection("users").document(uid).get().await()
@@ -454,7 +466,7 @@ class FirebaseExpenseServiceImpl @Inject constructor(
             // Only decrement totalExpenses if it was an expense (not income)
             if (transactionTypeStr == "expense") {
                 batch.update(groupRef, mapOf(
-                    "totalExpenses" to FieldValue.increment(-amountInBase),
+                    "totalExpenses" to FieldValue.increment(-amountInGroupCurrency),
                     "updatedAt" to now
                 ))
             } else {
@@ -524,7 +536,8 @@ class FirebaseExpenseServiceImpl @Inject constructor(
                     },
                     category = data["category"] as? String ?: "other",
                     createdBy = data["createdBy"] as? String ?: "",
-                    exchangeRateToBase = (data["exchangeRateToBase"] as? Number)?.toDouble() ?: 1.0,
+                    exchangeRateToGroupCurrency = (data["exchangeRateToGroupCurrency"] as? Number)?.toDouble() ?: 1.0,
+                    amountInGroupCurrency = (data["amountInGroupCurrency"] as? Number)?.toDouble() ?: ((data["amount"] as? Number)?.toDouble() ?: 0.0),
                     date = DateUtils.toMillis(data["date"]) ?: 0,
                     note = data["note"] as? String ?: "",
                     recurring = (data["recurring"] as? Map<*, *>)?.let { r ->
@@ -591,8 +604,8 @@ class FirebaseExpenseServiceImpl @Inject constructor(
                         shareValue = (v["shareValue"] as? Number)?.toDouble() ?: 0.0
                     )
                 },
-                amount = (data["amount"] as? Number)?.toDouble() ?: 0.0,
-                exchangeRateToBase = (data["exchangeRateToBase"] as? Number)?.toDouble() ?: 1.0
+                amountInGroupCurrency = (data["amountInGroupCurrency"] as? Number)?.toDouble() ?: 0.0,
+                exchangeRateToGroupCurrency = (data["exchangeRateToGroupCurrency"] as? Number)?.toDouble() ?: 1.0
             )
         }
 

@@ -269,45 +269,32 @@ class FirebaseSupportServiceImpl @Inject constructor(
         return try {
             requireSuperadmin().onFailure { return Result.failure(it) }
 
-            var query = firestore.collection("supportTickets")
-                .orderBy("updatedAt", Query.Direction.DESCENDING)
-                .limit(pageSize.toLong()) as Query
+            var query: Query = firestore.collection("supportTickets")
 
             if (status != null) {
-                query = firestore.collection("supportTickets")
-                    .whereEqualTo("status", status.name.lowercase())
-                    .orderBy("updatedAt", Query.Direction.DESCENDING)
-                    .limit(pageSize.toLong())
+                query = query.whereEqualTo("status", status.name.lowercase())
             }
+            if (category != null) {
+                query = query.whereEqualTo("category", category.name.lowercase())
+            }
+            if (priority != null) {
+                query = query.whereEqualTo("priority", priority.name.lowercase())
+            }
+
+            query = query.orderBy("updatedAt", Query.Direction.DESCENDING)
 
             if (lastTicketId != null) {
                 val lastDoc = firestore.collection("supportTickets").document(lastTicketId).get().await()
                 if (lastDoc.exists()) {
-                    if (status != null) {
-                        query = firestore.collection("supportTickets")
-                            .whereEqualTo("status", status.name.lowercase())
-                            .orderBy("updatedAt", Query.Direction.DESCENDING)
-                            .startAfter(lastDoc)
-                            .limit(pageSize.toLong())
-                    } else {
-                        query = firestore.collection("supportTickets")
-                            .orderBy("updatedAt", Query.Direction.DESCENDING)
-                            .startAfter(lastDoc)
-                            .limit(pageSize.toLong())
-                    }
+                    query = query.startAfter(lastDoc)
                 }
             }
 
-            val snapshot = query.get().await()
-            var tickets = snapshot.documents.mapNotNull { doc ->
-                doc.data?.let { mapTicket(doc.id, it) }
-            }
+            query = query.limit(pageSize.toLong())
 
-            if (category != null) {
-                tickets = tickets.filter { it.category == category }
-            }
-            if (priority != null) {
-                tickets = tickets.filter { it.priority == priority }
+            val snapshot = query.get().await()
+            val tickets = snapshot.documents.mapNotNull { doc ->
+                doc.data?.let { mapTicket(doc.id, it) }
             }
 
             Result.success(PaginatedResult(

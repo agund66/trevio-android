@@ -57,7 +57,9 @@ class FirebaseAnalyticsService @Inject constructor(
                     category = data["category"] as? String ?: "other",
                     date = (data["date"] as? Number)?.toLong() ?: 0,
                     createdBy = data["createdBy"] as? String ?: "",
-                    note = data["note"] as? String ?: ""
+                    note = data["note"] as? String ?: "",
+                    exchangeRateToGroupCurrency = (data["exchangeRateToGroupCurrency"] as? Number)?.toDouble() ?: 1.0,
+                    amountInGroupCurrency = (data["amountInGroupCurrency"] as? Number)?.toDouble() ?: ((data["amount"] as? Number)?.toDouble() ?: 0.0)
                 )
             }
 
@@ -73,7 +75,8 @@ class FirebaseAnalyticsService @Inject constructor(
                     photoURL = data["photoURL"] as? String ?: "",
                     balance = (data["balance"] as? Number)?.toDouble() ?: 0.0,
                     role = data["role"] as? String ?: "member",
-                    status = data["status"] as? String ?: "active"
+                    status = data["status"] as? String ?: "active",
+                    currency = data["currency"] as? String ?: AppConstants.BASE_CURRENCY
                 )
             }
 

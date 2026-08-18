@@ -15,8 +15,8 @@
     <string name="home_new_group">New Group</string>
     <string name="home_view_all_groups">View All Groups</string>
     <string name="home_total_balance">Total Balance</string>
-    <string name="home_youre_owed">you\'re owed</string>
-    <string name="home_you_owe">you owe</string>
+    <string name="home_youre_owed">you\'ll get</string>
+    <string name="home_you_owe">you\'ll pay</string>
     <string name="home_youll_get">You\'ll get</string>
     <string name="home_youll_pay">You\'ll pay</string>
     <string name="home_total_spent">Total Spent</string>
@@ -65,8 +65,8 @@
     <string name="group_detail_search_expenses">Search expenses…</string>
     <string name="group_detail_all_settled">All settled up!</string>
     <string name="group_detail_no_balances">No outstanding balances</string>
-    <string name="group_detail_you_owe">You owe</string>
-    <string name="group_detail_owes_you">owes you</string>
+    <string name="group_detail_you_owe">You will pay</string>
+    <string name="group_detail_owes_you">will pay you</string>
     <string name="group_detail_settle_up">Settle Up</string>
     <string name="group_detail_pay_via_upi">Pay via UPI</string>
     <string name="group_detail_mark_cash">Mark as Paid (Cash)</string>
@@ -105,17 +105,33 @@
     <string name="group_detail_remove_confirm">Remove %1$s?</string>
     <string name="group_detail_remove_msg">If they have any entries, they\'ll be converted to an offline member to preserve transaction history.</string>
     <string name="group_detail_your_balance">Your balance</string>
-    <string name="group_detail_you_owe_count">You owe %1$d %2$s %3$s</string>
-    <string name="group_detail_owes_you_count">%1$d %2$s you %3$s</string>
+    <string name="group_detail_you_owe_count">You will pay %1$d %2$s %3$s</string>
+    <string name="group_detail_owes_you_count">%1$d %2$s will pay you %3$s</string>
+    <string name="group_detail_you_will_pay_names">You will pay %1$s %2$s</string>
+    <string name="group_detail_names_will_pay_you">%1$s will pay you %2$s</string>
     <string name="group_detail_person">person</string>
     <string name="group_detail_people">people</string>
-    <string name="group_detail_person_owes">person owes</string>
-    <string name="group_detail_people_owe">people owe</string>
+    <string name="group_detail_person_owes">person will pay</string>
+    <string name="group_detail_people_owe">people will pay</string>
     <string name="group_detail_all_settled_group">All settled up in this group</string>
     <string name="group_detail_suggested_settlements">Suggested Settlements</string>
-    <string name="group_detail_you_owe_name">You owe %1$s</string>
-    <string name="group_detail_name_owes_you">%1$s owes you</string>
-    <string name="group_detail_name_owes_name">%1$s owes %2$s</string>
+    <string name="group_detail_outstanding_balances">Outstanding Balances</string>
+    <string name="group_detail_you_will_pay">You will pay</string>
+    <string name="group_detail_you_will_get">You will get</string>
+    <string name="group_detail_you_will_pay_name">You will pay %1$s</string>
+    <string name="group_detail_name_will_pay_you">%1$s will pay you</string>
+    <string name="group_detail_settle_between_members">Settle between members (%1$d)</string>
+    <string name="group_detail_paid_by_you">Paid by You</string>
+    <string name="group_detail_paid_by_name">Paid by %1$s</string>
+    <string name="group_detail_received_from_name">Received from %1$s</string>
+    <string name="group_detail_will_pay">will pay</string>
+    <string name="group_detail_all_members">All Members</string>
+    <string name="group_detail_from_names">from %1$s</string>
+    <string name="group_detail_to_names">to %1$s</string>
+    <string name="group_detail_settled_count">%1$d members all settled up</string>
+    <string name="group_detail_you_owe_name">You will pay %1$s</string>
+    <string name="group_detail_name_owes_you">%1$s will pay you</string>
+    <string name="group_detail_name_owes_name">%1$s will pay %2$s</string>
     <string name="group_detail_pay_to">Pay to: %1$s</string>
     <string name="group_detail_mark_settled">Mark Settled</string>
     <string name="group_detail_member_balances">Member Balances</string>
@@ -151,6 +167,13 @@
     <string name="group_settings_saved">Settings saved</string>
     <string name="group_settings_budget_error">Budget must be a positive number</string>
     <string name="group_settings_transfer_admin">Transfer Admin</string>
+    <string name="group_settings_manage_admins">Manage Admins</string>
+    <string name="group_settings_manage_admins_desc">Promote members to admin or demote existing admins. Multiple admins can manage the group.</string>
+    <string name="group_settings_remove_admin">Remove Admin</string>
+    <string name="group_settings_make_admin_confirm">Promote %1$s to admin? They will be able to edit group settings, add/remove members, and settle on behalf of others.</string>
+    <string name="group_settings_remove_admin_confirm">Remove admin role from %1$s? They will become a regular member.</string>
+    <string name="group_settings_role_updated">Member role updated successfully</string>
+    <string name="group_settings_admin_badge">Admin</string>
     <string name="group_settings_transfer_to">Transfer to</string>
     <string name="group_settings_no_admin">No admin selected</string>
     <string name="group_settings_transfer_success">Admin transferred successfully</string>
@@ -377,8 +400,8 @@
     <string name="settle_up_retry">Retry</string>
     <string name="settle_up_all_settled">You\'re all settled up!</string>
     <string name="settle_up_no_debts">No outstanding balances in this group</string>
-    <string name="settle_up_you_owe">You owe</string>
-    <string name="settle_up_owes_you">owes you</string>
+    <string name="settle_up_you_owe">You will pay</string>
+    <string name="settle_up_owes_you">will pay you</string>
     <string name="settle_up_settle">Settle</string>
     <string name="settle_up_pay_upi">Pay via UPI</string>
     <string name="settle_up_mark_cash">Mark as Paid (Cash)</string>
@@ -927,8 +950,8 @@
     <!-- ==================== GROUP LIST ITEM ==================== -->
     <string name="group_item_no_entries">No entries yet</string>
     <string name="group_item_spent">%1$s spent</string>
-    <string name="group_item_owes_you">owes you %1$s</string>
-    <string name="group_item_you_owe">you owe %1$s</string>
+    <string name="group_item_owes_you">will pay you %1$s</string>
+    <string name="group_item_you_owe">you\'ll pay %1$s</string>
     <string name="group_item_settled_up">settled up</string>
 
     <!-- ==================== NOTIFICATIONS EXTRAS ==================== -->
@@ -983,9 +1006,9 @@
     <string name="settlement_method_suffix">· %1$s</string>
 
     <!-- ==================== DEBT DESCRIPTION ==================== -->
-    <string name="debt_you_owe_name">You owe %1$s</string>
-    <string name="debt_name_owes_you">%1$s owes you</string>
-    <string name="debt_name_owes_name">%1$s owes %2$s</string>
+    <string name="debt_you_owe_name">You will pay %1$s</string>
+    <string name="debt_name_owes_you">%1$s will pay you</string>
+    <string name="debt_name_owes_name">%1$s will pay %2$s</string>
 
     <!-- ==================== LOAD MORE ERROR ==================== -->
     <string name="load_more_error">Failed to load more. Tap to retry.</string>
@@ -1022,7 +1045,7 @@
     <string name="error_group_item_id_required">Group ID and Item ID are required</string>
     <string name="error_group_location_id_required">Group ID and Location ID are required</string>
     <string name="error_cannot_settle_self">Cannot settle with yourself</string>
-    <string name="error_settle_self_only">You can only record settlements involving yourself</string>
+    <string name="error_settle_self_only">You can only record settlements involving yourself or be a group admin</string>
     <string name="error_invite_code_required">Invite code is required</string>
     <string name="error_invalid_invite_code">Invalid invite code</string>
     <string name="error_cannot_invite_self">You cannot invite yourself</string>
@@ -1052,6 +1075,7 @@
     <string name="error_notification_not_found">Notification not found</string>
     <string name="error_missing_fields">Missing required fields</string>
     <string name="error_exchange_rates">Failed to get exchange rates</string>
+    <string name="group_detail_rates_loading">Exchange rates are still loading. Please try again in a moment.</string>
     <string name="error_group_not_found">Group not found</string>
     <string name="error_expense_not_found">Expense not found</string>
     <string name="error_access_denied">Access denied</string>
@@ -1082,8 +1106,8 @@
     <string name="balance_youll_get">you\'ll get %1$s</string>
     <string name="balance_youll_pay">you\'ll pay %1$s</string>
     <string name="balance_settled_up">settled up</string>
-    <string name="balance_gets">gets %1$s</string>
-    <string name="balance_owes">owes %1$s</string>
+    <string name="balance_gets">will get %1$s</string>
+    <string name="balance_owes">will pay %1$s</string>
 
     <!-- ==================== OFFLINE BANNER ==================== -->
     <string name="offline_banner_message">You\'re offline. Some data may be outdated.</string>
@@ -1484,4 +1508,92 @@
     <string name="biometric_setup_later">Maybe later</string>
     <string name="biometric_setup_prompt_title">Verify it\'s you</string>
     <string name="biometric_setup_prompt_subtitle">Confirm your identity to enable Smart Lock</string>
+
+    <!-- ==================== TREVIO KARMA ==================== -->
+    <string name="karma_title">Trevio Karma</string>
+    <string name="karma_score">Karma Score</string>
+    <string name="karma_tier_bronze">Bronze</string>
+    <string name="karma_tier_silver">Silver</string>
+    <string name="karma_tier_gold">Gold</string>
+    <string name="karma_tier_platinum">Platinum</string>
+    <string name="karma_make_public">Make my Karma public</string>
+    <string name="karma_public_description">Show your Karma score on your public profile so friends can see you\'re a reliable splitter</string>
+    <string name="karma_not_shared">Your Karma is private — only you can see it</string>
+    <string name="karma_shared">Your Karma is visible on your public profile</string>
+    <string name="karma_component_reliability">Reliability</string>
+    <string name="karma_component_reliability_desc">Settles debts on time</string>
+    <string name="karma_component_generosity">Generosity</string>
+    <string name="karma_component_generosity_desc">Fronts money for the group</string>
+    <string name="karma_component_consistency">Consistency</string>
+    <string name="karma_component_consistency_desc">Regular expense logging</string>
+    <string name="karma_component_settlement_speed">Settlement Speed</string>
+    <string name="karma_component_settlement_speed_desc">How fast debts are settled</string>
+    <string name="karma_component_group_health">Group Health</string>
+    <string name="karma_component_group_health_desc">No stale debts across groups</string>
+    <string name="karma_breakdown">Score Breakdown</string>
+    <string name="karma_refresh">Refresh Score</string>
+    <string name="karma_refreshing">Refreshing…</string>
+    <string name="karma_public_badge">Karma Score</string>
+    <string name="karma_no_data">No Karma data yet. Refresh to compute your score.</string>
+    <string name="karma_computed_at">Last updated %1$s</string>
+
+    <!-- ==================== SMART NUDGES ==================== -->
+    <string name="nudges_title">Smart Nudges</string>
+    <string name="nudges_insights">Insights</string>
+    <string name="nudges_no_nudges">You\'re all caught up! No insights right now.</string>
+    <string name="nudges_dismiss">Dismiss</string>
+    <string name="nudges_view_all">View All Insights</string>
+    <string name="nudges_severity_info">Info</string>
+    <string name="nudges_severity_warning">Heads Up</string>
+    <string name="nudges_severity_positive">Great Job!</string>
+    <string name="nudges_type_stale_debt">Pending Balance</string>
+    <string name="nudges_type_large_expense">Big Expense</string>
+    <string name="nudges_type_inactive_group">Quiet Group</string>
+    <string name="nudges_type_settlement_reminder">Awaiting Settlement</string>
+    <string name="nudges_type_positive_streak">Logging Streak</string>
+    <string name="nudges_type_generosity_badge">Generosity Badge</string>
+
+    <!-- ==================== TREVIO WRAPPED ==================== -->
+    <string name="wrapped_title">Trevio Wrapped</string>
+    <string name="wrapped_year_in_review">Year in Review</string>
+    <string name="wrapped_monthly_recap">Monthly Recap</string>
+    <string name="wrapped_your_year">Your Year</string>
+    <string name="wrapped_total_spent">Total Spent</string>
+    <string name="wrapped_total_paid">Total You Paid</string>
+    <string name="wrapped_total_fronted">You Fronted for Others</string>
+    <string name="wrapped_expenses_logged">Expenses Logged</string>
+    <string name="wrapped_groups_active">Groups Active</string>
+    <string name="wrapped_top_category">Top Category</string>
+    <string name="wrapped_top_group">Top Group</string>
+    <string name="wrapped_busiest_month">Busiest Month</string>
+    <string name="wrapped_avg_expense">Average Expense</string>
+    <string name="wrapped_largest_expense">Largest Expense</string>
+    <string name="wrapped_personality">Your Splitter Personality</string>
+    <string name="wrapped_breakdown_category">Breakdown by Category</string>
+    <string name="wrapped_breakdown_month">Breakdown by Month</string>
+    <string name="wrapped_breakdown_group">Breakdown by Group</string>
+    <string name="wrapped_month_1">January</string>
+    <string name="wrapped_month_2">February</string>
+    <string name="wrapped_month_3">March</string>
+    <string name="wrapped_month_4">April</string>
+    <string name="wrapped_month_5">May</string>
+    <string name="wrapped_month_6">June</string>
+    <string name="wrapped_month_7">July</string>
+    <string name="wrapped_month_8">August</string>
+    <string name="wrapped_month_9">September</string>
+    <string name="wrapped_month_10">October</string>
+    <string name="wrapped_month_11">November</string>
+    <string name="wrapped_month_12">December</string>
+    <string name="wrapped_personality_generous">The Generous One</string>
+    <string name="wrapped_personality_active">The Active Splitter</string>
+    <string name="wrapped_personality_big_spender">The Big Spender</string>
+    <string name="wrapped_personality_social">The Social Butterfly</string>
+    <string name="wrapped_personality_steady">The Steady Splitter</string>
+    <string name="wrapped_generate">Generate My Wrapped</string>
+    <string name="wrapped_generating">Generating…</string>
+    <string name="wrapped_refresh">Refresh</string>
+    <string name="wrapped_no_data">No data for this year yet. Generate your Wrapped to see your year in review!</string>
+    <string name="wrapped_share">Share My Wrapped</string>
+    <string name="wrapped_view_monthly">View Monthly Recap</string>
+    <string name="wrapped_select_month">Select Month</string>
 </resources>

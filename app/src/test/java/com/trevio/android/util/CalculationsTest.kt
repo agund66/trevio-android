@@ -608,8 +608,8 @@ class CalculationsTest {
             Calculations.ExpenseBalanceData(
                 paidBy = "u1",
                 splits = mkSplits("u1" to (33.33 to 0.0), "u2" to (33.33 to 0.0), "u3" to (33.34 to 0.0)),
-                amount = 100.0,
-                exchangeRateToBase = 1.0
+                amountInGroupCurrency = 100.0,
+                exchangeRateToGroupCurrency = 1.0
             )
         )
         val result = Calculations.calculateBalances(expenses, emptyList(), listOf("u1", "u2", "u3"))
@@ -640,7 +640,7 @@ class CalculationsTest {
     @Test
     fun balances_expenseWithExchangeRate() {
         val expenses = listOf(
-            Calculations.ExpenseBalanceData("u1", mkSplits("u1" to (50.0 to 0.0), "u2" to (50.0 to 0.0)), 100.0, 83.5)
+            Calculations.ExpenseBalanceData("u1", mkSplits("u1" to (50.0 to 0.0), "u2" to (50.0 to 0.0)), 8350.0, 83.5)
         )
         val result = Calculations.calculateBalances(expenses, emptyList(), listOf("u1", "u2"))
         assertThat(result["u1"]).isEqualTo(4175.0)
@@ -747,7 +747,7 @@ class CalculationsTest {
     fun balances_mixedCurrencies() {
         val expenses = listOf(
             Calculations.ExpenseBalanceData("u1", mkSplits("u1" to (50.0 to 0.0), "u2" to (50.0 to 0.0)), 100.0, 1.0),
-            Calculations.ExpenseBalanceData("u2", mkSplits("u1" to (50.0 to 0.0), "u2" to (50.0 to 0.0)), 100.0, 83.5)
+            Calculations.ExpenseBalanceData("u2", mkSplits("u1" to (50.0 to 0.0), "u2" to (50.0 to 0.0)), 8350.0, 83.5)
         )
         val result = Calculations.calculateBalances(expenses, emptyList(), listOf("u1", "u2"))
         assertThat(result["u1"]).isEqualTo(-4125.0)
@@ -772,10 +772,10 @@ class CalculationsTest {
     @Test
     fun balances_eurExchangeRate() {
         val expenses = listOf(
-            Calculations.ExpenseBalanceData("u1", mkSplits("u1" to (30.0 to 0.0), "u2" to (30.0 to 0.0), "u3" to (40.0 to 0.0)), 100.0, 90.5)
+            Calculations.ExpenseBalanceData("u1", mkSplits("u1" to (30.0 to 0.0), "u2" to (30.0 to 0.0), "u3" to (40.0 to 0.0)), 9050.0, 90.5)
         )
         val result = Calculations.calculateBalances(expenses, emptyList(), listOf("u1", "u2", "u3"))
-        assertThat(result["u1"]).isEqualTo(100.0 * 90.5 - 30.0 * 90.5)
+        assertThat(result["u1"]).isEqualTo(9050.0 - 30.0 * 90.5)
         assertThat(result["u2"]).isEqualTo(-30.0 * 90.5)
     }
 

@@ -57,7 +57,8 @@ fun AnalyticsTab(
     groupId: String,
     groupName: String,
     expenses: List<Expense>,
-    members: List<Member>
+    members: List<Member>,
+    groupCurrency: String = "INR"
 ) {
     val currencyFormatter = rememberCurrencyFormatter()
     val analytics = remember(expenses, members) {
@@ -87,14 +88,14 @@ fun AnalyticsTab(
                 modifier = Modifier.weight(1f),
                 icon = Icons.Default.Receipt,
                 label = stringResource(R.string.analytics_total),
-                value = currencyFormatter.formatBase(analytics.totalExpenses),
+                value = currencyFormatter.formatAmount(analytics.totalExpenses, groupCurrency),
                 color = MaterialTheme.colorScheme.primary
             )
             StatCard(
                 modifier = Modifier.weight(1f),
                 icon = Icons.Default.BarChart,
                 label = stringResource(R.string.analytics_avg),
-                value = currencyFormatter.formatBase(analytics.avgExpenseAmount),
+                value = currencyFormatter.formatAmount(analytics.avgExpenseAmount, groupCurrency),
                 color = InfoBlue
             )
         }
@@ -136,7 +137,7 @@ fun AnalyticsTab(
                     ) {
                         val barHeight = ((trend.totalAmount / maxTrend) * 80.0).coerceAtLeast(2.0)
                         Text(
-                            text = if (trend.totalAmount > 0) currencyFormatter.formatBase(trend.totalAmount) else "",
+                            text = if (trend.totalAmount > 0) currencyFormatter.formatAmount(trend.totalAmount, groupCurrency) else "",
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -198,7 +199,7 @@ fun AnalyticsTab(
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 Text(
-                                    text = currencyFormatter.formatBase(cat.totalAmount),
+                                    text = currencyFormatter.formatAmount(cat.totalAmount, groupCurrency),
                                     style = MaterialTheme.typography.bodyMedium,
                                     fontWeight = FontWeight.SemiBold,
                                     color = MaterialTheme.colorScheme.onSurface
@@ -263,7 +264,7 @@ fun AnalyticsTab(
                         }
                         Column(horizontalAlignment = Alignment.End) {
                             Text(
-                                text = currencyFormatter.formatBase(member.totalPaid),
+                                text = currencyFormatter.formatAmount(member.totalPaid, groupCurrency),
                                 style = MaterialTheme.typography.bodyMedium,
                                 fontWeight = FontWeight.SemiBold,
                                 color = MaterialTheme.colorScheme.onSurface
@@ -305,7 +306,7 @@ fun AnalyticsTab(
                         }
                     }
                     Text(
-                        text = currencyFormatter.formatBase(highest.amount),
+                        text = currencyFormatter.formatAmount(highest.amount, groupCurrency),
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.primary

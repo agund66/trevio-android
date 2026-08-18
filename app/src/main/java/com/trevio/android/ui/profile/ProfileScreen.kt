@@ -321,6 +321,9 @@ private fun ViewProfileContent(
     ) {
         Spacer(modifier = Modifier.height(8.dp))
 
+        // Trevio Karma card
+        KarmaCard()
+
         val isDark = isSystemInDarkTheme()
         ProfileInfoCard(
             icon = Icons.Default.Person,

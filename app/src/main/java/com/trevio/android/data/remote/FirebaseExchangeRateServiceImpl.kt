@@ -54,14 +54,19 @@ class FirebaseExchangeRateServiceImpl @Inject constructor(
         }
     }
 
-    override suspend fun getRateToBase(currency: String): Result<Double> {
+    override suspend fun getRateToBase(currency: String): Result<Double> =
+        getRate(currency, AppConstants.BASE_CURRENCY)
+
+    override suspend fun getRate(sourceCurrency: String, targetCurrency: String): Result<Double> {
         return try {
-            if (currency == AppConstants.BASE_CURRENCY) return Result.success(1.0)
+            if (sourceCurrency == targetCurrency) return Result.success(1.0)
             val rates = getRates().getOrNull()
                 ?: return Result.failure(Exception("Failed to get exchange rates"))
-            val rate = rates.rates[currency]
-                ?: return Result.failure(Exception("Exchange rate not available for currency: $currency"))
-            Result.success(1.0 / rate)
+            val sourceRate = if (sourceCurrency == AppConstants.BASE_CURRENCY) 1.0 else
+                rates.rates[sourceCurrency] ?: return Result.failure(Exception("Exchange rate not available for currency: $sourceCurrency"))
+            val targetRate = if (targetCurrency == AppConstants.BASE_CURRENCY) 1.0 else
+                rates.rates[targetCurrency] ?: return Result.failure(Exception("Exchange rate not available for currency: $targetCurrency"))
+            Result.success(targetRate / sourceRate)
         } catch (e: Exception) {
             Result.failure(Exception(friendlyNetworkMessage(e) ?: e.message, e))
         }

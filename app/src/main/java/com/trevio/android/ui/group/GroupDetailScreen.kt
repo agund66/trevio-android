@@ -83,6 +83,7 @@ import com.trevio.android.domain.repository.UserService
 import com.trevio.android.ui.analytics.AnalyticsTab
 import com.trevio.android.ui.trip.TripTab
 import com.trevio.android.util.AppConstants
+import com.trevio.android.util.CurrencyConverter
 import com.trevio.android.data.remote.FirestoreObservers
 import com.trevio.android.util.DateUtils
 import com.trevio.android.util.MemberRole
@@ -360,7 +361,7 @@ class GroupViewModel @Inject constructor(
                 fromUid = debt.fromUid,
                 toUid = debt.toUid,
                 amount = debt.amount,
-                currency = com.trevio.android.util.AppConstants.BASE_CURRENCY,
+                currency = debt.currency,
                 method = com.trevio.android.domain.model.SettlementMethod.CASH,
                 upiRefId = null
             ).onSuccess {
@@ -660,7 +661,7 @@ fun GroupDetailScreen(
                     modifier = Modifier.padding(horizontal = 16.dp)
                 ) {
                     InfoChip(stringResource(R.string.group_detail_members_count, groupInfo?.memberCount ?: 0))
-                    InfoChip(currencyFormatter.formatBase(groupInfo?.totalExpenses ?: 0.0))
+                    InfoChip(currencyFormatter.formatAmount(groupInfo?.totalExpenses ?: 0.0, groupInfo?.currency ?: AppConstants.BASE_CURRENCY))
                     if (!groupInfo?.inviteCode.isNullOrBlank()) {
                         InfoChip(stringResource(R.string.group_detail_code, groupInfo?.inviteCode ?: ""))
                     }
@@ -729,14 +730,14 @@ fun GroupDetailScreen(
                     Tab(
                         selected = selectedTab == 0,
                         onClick = { selectedTab = 0 },
-                        text = { Text(stringResource(R.string.group_detail_expenses), maxLines = 1) },
-                        icon = { Icon(Icons.Default.Receipt, contentDescription = null, modifier = Modifier.size(18.dp)) }
+                        text = { Text(stringResource(R.string.group_detail_balances), maxLines = 1) },
+                        icon = { Icon(Icons.Default.AccountBalanceWallet, contentDescription = null, modifier = Modifier.size(18.dp)) }
                     )
                     Tab(
                         selected = selectedTab == 1,
                         onClick = { selectedTab = 1 },
-                        text = { Text(stringResource(R.string.group_detail_balances), maxLines = 1) },
-                        icon = { Icon(Icons.Default.AccountBalanceWallet, contentDescription = null, modifier = Modifier.size(18.dp)) }
+                        text = { Text(stringResource(R.string.group_detail_expenses), maxLines = 1) },
+                        icon = { Icon(Icons.Default.Receipt, contentDescription = null, modifier = Modifier.size(18.dp)) }
                     )
                     Tab(
                         selected = selectedTab == 2,
@@ -804,6 +805,54 @@ fun GroupDetailScreen(
                         }
                     )
                 } else item {
+                    BalancesTab(
+                        members = state.members,
+                        debts = state.debts,
+                        currentUserId = state.currentUserId,
+                        isAdmin = isAdmin,
+                        formatGroupCurrency = { amount -> currencyFormatter.formatAmount(amount, state.groupInfo?.currency ?: AppConstants.BASE_CURRENCY) },
+                        onSettleUp = { navController.navigate(TrevioRoute.SettleUp.createRoute(state.groupInfo?.groupId ?: "")) },
+                        onMemberClick = { uid -> navController.navigate(TrevioRoute.PublicProfile.createRoute(uid)) },
+                        onSettleDebt = { debt -> viewModel.settleDebt(debt) },
+                        onPayViaUpi = { debt ->
+                            val vpa = getUpiVpa(debt)
+                            if (vpa.isNotEmpty()) {
+                                val amountInInr = if (debt.currency == AppConstants.BASE_CURRENCY) {
+                                    debt.amount
+                                } else if (currencyFormatter.rates.isNotEmpty()) {
+                                    CurrencyConverter.convertCurrency(debt.amount, debt.currency, AppConstants.BASE_CURRENCY, currencyFormatter.rates)
+                                } else {
+                                    Toast.makeText(context, context.getString(R.string.group_detail_rates_loading), Toast.LENGTH_SHORT).show()
+                                    null
+                                }
+                                if (amountInInr != null) {
+                                    val upiUri = "upi://pay?pa=${android.net.Uri.encode(vpa)}&pn=${android.net.Uri.encode(debt.toName)}&am=$amountInInr&cu=${AppConstants.BASE_CURRENCY}&tn=${android.net.Uri.encode("Trevio")}"
+                                    val intent = android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(upiUri))
+                                    context.startActivity(android.content.Intent.createChooser(intent, context.getString(R.string.pay_with)))
+                                }
+                            }
+                        }
+                    )
+                }
+                1 -> if (isHousehold) item {
+                    com.trevio.android.ui.household.MonthlyReportTab(
+                        state = householdState,
+                        onPreviousMonth = {
+                            val cal = java.util.Calendar.getInstance().apply {
+                                set(householdState.selectedYear, householdState.selectedMonth, 1)
+                                add(java.util.Calendar.MONTH, -1)
+                            }
+                            householdViewModel.selectMonth(cal.get(java.util.Calendar.YEAR), cal.get(java.util.Calendar.MONTH))
+                        },
+                        onNextMonth = {
+                            val cal = java.util.Calendar.getInstance().apply {
+                                set(householdState.selectedYear, householdState.selectedMonth, 1)
+                                add(java.util.Calendar.MONTH, 1)
+                            }
+                            householdViewModel.selectMonth(cal.get(java.util.Calendar.YEAR), cal.get(java.util.Calendar.MONTH))
+                        }
+                    )
+                } else item {
                     val filtered = state.expenses.filter { e ->
                         (expenseSearch.isBlank() || e.description.contains(expenseSearch, ignoreCase = true)) &&
                         (categoryFilter == "all" || e.category == categoryFilter)
@@ -829,53 +878,20 @@ fun GroupDetailScreen(
                         onLoadMore = { viewModel.loadMoreExpenses() }
                     )
                 }
-                1 -> if (isHousehold) item {
-                    com.trevio.android.ui.household.MonthlyReportTab(
-                        state = householdState,
-                        onPreviousMonth = {
-                            val cal = java.util.Calendar.getInstance().apply {
-                                set(householdState.selectedYear, householdState.selectedMonth, 1)
-                                add(java.util.Calendar.MONTH, -1)
-                            }
-                            householdViewModel.selectMonth(cal.get(java.util.Calendar.YEAR), cal.get(java.util.Calendar.MONTH))
-                        },
-                        onNextMonth = {
-                            val cal = java.util.Calendar.getInstance().apply {
-                                set(householdState.selectedYear, householdState.selectedMonth, 1)
-                                add(java.util.Calendar.MONTH, 1)
-                            }
-                            householdViewModel.selectMonth(cal.get(java.util.Calendar.YEAR), cal.get(java.util.Calendar.MONTH))
-                        }
-                    )
-                } else item {
-                    BalancesTab(
-                        members = state.members,
-                        debts = state.debts,
-                        currentUserId = state.currentUserId,
-                        formatBase = currencyFormatter.formatBase,
-                        onSettleUp = { navController.navigate(TrevioRoute.SettleUp.createRoute(state.groupInfo?.groupId ?: "")) },
-                        onMemberClick = { uid -> navController.navigate(TrevioRoute.PublicProfile.createRoute(uid)) },
-                        onSettleDebt = { debt -> viewModel.settleDebt(debt) },
-                        onPayViaUpi = { debt ->
-                            val vpa = getUpiVpa(debt)
-                            if (vpa.isNotEmpty()) {
-                                val upiUri = "upi://pay?pa=${android.net.Uri.encode(vpa)}&pn=${android.net.Uri.encode(debt.toName)}&am=${debt.amount}&cu=${com.trevio.android.util.AppConstants.BASE_CURRENCY}&tn=${android.net.Uri.encode("Trevio")}"
-                                val intent = android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(upiUri))
-                                context.startActivity(android.content.Intent.createChooser(intent, context.getString(R.string.pay_with)))
-                            }
-                        }
-                    )
-                }
                 2 -> item {
                     AnalyticsTab(
                         groupId = state.groupInfo?.groupId ?: "",
                         groupName = state.groupInfo?.name ?: stringResource(R.string.group_detail_title),
                         expenses = state.expenses,
-                        members = state.members
+                        members = state.members,
+                        groupCurrency = state.groupInfo?.currency ?: AppConstants.BASE_CURRENCY
                     )
                 }
                 3 -> if (isTrip && !isHousehold) item {
-                    TripTab(groupId = state.groupInfo?.groupId ?: "")
+                    TripTab(
+                        groupId = state.groupInfo?.groupId ?: "",
+                        groupCurrency = state.groupInfo?.currency ?: AppConstants.BASE_CURRENCY
+                    )
                 } else if (isHousehold) item {
                     MembersTab(
                         members = state.members,
@@ -913,7 +929,7 @@ fun GroupDetailScreen(
                         currentUserId = state.currentUserId,
                         isLoading = state.activitiesLoading,
                         errorMessage = state.activitiesError,
-                        formatBase = currencyFormatter.formatBase,
+                        formatGroupCurrency = { amount -> currencyFormatter.formatAmount(amount, state.groupInfo?.currency ?: AppConstants.BASE_CURRENCY) },
                         formatDate = currencyFormatter.formatDate,
                         onLoadSettlements = { viewModel.loadSettlements() },
                         activitiesHasMore = state.activitiesHasMore,
@@ -1336,7 +1352,8 @@ private fun BalancesTab(
     members: List<Member>,
     debts: List<SimplifiedDebt>,
     currentUserId: String?,
-    formatBase: (Double) -> String,
+    isAdmin: Boolean,
+    formatGroupCurrency: (Double) -> String,
     onSettleUp: () -> Unit,
     onMemberClick: (String) -> Unit,
     onSettleDebt: (SimplifiedDebt) -> Unit = {},
@@ -1347,6 +1364,15 @@ private fun BalancesTab(
     val myCredits = debts.filter { it.toUid == currentUserId }
     val totalOwed = myDebts.sumOf { it.amount }
     val totalOwing = myCredits.sumOf { it.amount }
+
+    fun formatNames(names: List<String>): String {
+        if (names.isEmpty()) return ""
+        if (names.size == 1) return names[0]
+        if (names.size == 2) return "${names[0]} & ${names[1]}"
+        return "${names.dropLast(1).joinToString(", ")} & ${names.last()}"
+    }
+    val creditorNames = myDebts.map { it.toName.split(" ").firstOrNull() ?: it.toName }
+    val debtorNames = myCredits.map { it.fromName.split(" ").firstOrNull() ?: it.fromName }
 
     Column(
         modifier = Modifier.fillMaxWidth().padding(16.dp),
@@ -1368,7 +1394,7 @@ private fun BalancesTab(
                     Text(stringResource(R.string.group_detail_your_balance), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     Spacer(modifier = Modifier.height(4.dp))
                     Text(
-                        text = formatBase(myBalance),
+                        text = formatGroupCurrency(myBalance),
                         style = MaterialTheme.typography.headlineMedium,
                         fontWeight = FontWeight.Bold,
                         color = when {
@@ -1380,14 +1406,14 @@ private fun BalancesTab(
                     Spacer(modifier = Modifier.height(8.dp))
                     if (myDebts.isNotEmpty()) {
                         Text(
-                            stringResource(R.string.group_detail_you_owe_count, myDebts.size, if (myDebts.size == 1) stringResource(R.string.group_detail_person) else stringResource(R.string.group_detail_people), formatBase(totalOwed)),
+                            stringResource(R.string.group_detail_you_will_pay_names, formatNames(creditorNames), formatGroupCurrency(totalOwed)),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.error
                         )
                     }
                     if (myCredits.isNotEmpty()) {
                         Text(
-                            stringResource(R.string.group_detail_owes_you_count, myCredits.size, if (myCredits.size == 1) stringResource(R.string.group_detail_person_owes) else stringResource(R.string.group_detail_people_owe), formatBase(totalOwing)),
+                            stringResource(R.string.group_detail_names_will_pay_you, formatNames(debtorNames), formatGroupCurrency(totalOwing)),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.primary
                         )
@@ -1402,108 +1428,74 @@ private fun BalancesTab(
                 }
             }
 
-        // Settle Up button
-        if (members.isNotEmpty() && debts.isNotEmpty()) {
-            Button(
-                onClick = onSettleUp,
-                modifier = Modifier.fillMaxWidth().height(48.dp),
-                shape = RoundedCornerShape(12.dp)
+        // ── Section 1: You will pay ──
+        val myDebtsList = debts.filter { it.fromUid == currentUserId }
+        val myCreditsList = debts.filter { it.toUid == currentUserId }
+        val otherDebts = debts.filter { it.fromUid != currentUserId && it.toUid != currentUserId }
+        val sortedMembers = remember(members) { members.sortedByDescending { Math.abs(it.balance) } }
+        val unsettledCount = sortedMembers.count { Math.abs(it.balance) > 0.01 }
+        val settledCount = sortedMembers.size - unsettledCount
+
+        if (myDebtsList.isNotEmpty()) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Icon(Icons.Default.AccountBalanceWallet, contentDescription = null, modifier = Modifier.size(20.dp))
-                Spacer(modifier = Modifier.width(8.dp))
-                Text(stringResource(R.string.group_detail_settle_up))
+                Box(modifier = Modifier.size(8.dp).background(MaterialTheme.colorScheme.error, CircleShape))
+                Text(stringResource(R.string.group_detail_you_will_pay), style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.error)
+                Text(formatGroupCurrency(myDebtsList.sumOf { it.amount }), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.error.copy(alpha = 0.7f))
             }
-        }
-
-        // Suggested settlements header
-        if (debts.isNotEmpty()) {
-            Text(stringResource(R.string.group_detail_suggested_settlements), style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(top = 4.dp))
-
-            debts.forEach { debt ->
-                val isMyDebt = debt.fromUid == currentUserId
-                val isMyCredit = debt.toUid == currentUserId
-                val fromFirstName = debt.fromName.split(" ").firstOrNull() ?: debt.fromName
-                val toFirstName = debt.toName.split(" ").firstOrNull() ?: debt.toName
+            myDebtsList.forEach { debt ->
+                val toMember = members.find { it.uid == debt.toUid }
                 val paymentVpa = getUpiVpa(debt)
                 Card(
                     modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(12.dp),
+                    shape = RoundedCornerShape(16.dp),
                     elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
-                    colors = CardDefaults.cardColors(
-                        containerColor = when {
-                            isMyDebt -> MaterialTheme.colorScheme.error.copy(alpha = 0.05f)
-                            isMyCredit -> MaterialTheme.colorScheme.primary.copy(alpha = 0.05f)
-                            else -> MaterialTheme.colorScheme.surface
-                        }
-                    )
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.error.copy(alpha = 0.05f))
                 ) {
-                    Column(modifier = Modifier.fillMaxWidth().padding(16.dp)) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Column(modifier = Modifier.weight(1f)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(16.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        MemberAvatar(name = debt.toName ?: "", photoURL = toMember?.photoURL ?: "", size = 40)
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                stringResource(R.string.group_detail_you_will_pay_name, (debt.toName ?: "").split(" ").firstOrNull() ?: (debt.toName ?: "")),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            Text(
+                                formatGroupCurrency(debt.amount),
+                                style = MaterialTheme.typography.titleLarge,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.error
+                            )
+                            if (paymentVpa.isNotEmpty()) {
                                 Text(
-                                    text = when {
-                                        isMyDebt -> stringResource(R.string.group_detail_you_owe_name, toFirstName)
-                                        isMyCredit -> stringResource(R.string.group_detail_name_owes_you, fromFirstName)
-                                        else -> stringResource(R.string.group_detail_name_owes_name, fromFirstName, toFirstName)
-                                    },
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    color = when {
-                                        isMyDebt -> MaterialTheme.colorScheme.error
-                                        isMyCredit -> MaterialTheme.colorScheme.primary
-                                        else -> MaterialTheme.colorScheme.onSurface
-                                    }
+                                    stringResource(R.string.group_detail_pay_to, paymentVpa),
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
-                                Spacer(modifier = Modifier.height(2.dp))
-                                Text(
-                                    formatBase(debt.amount),
-                                    style = MaterialTheme.typography.titleLarge,
-                                    fontWeight = FontWeight.Bold,
-                                    color = when {
-                                        isMyDebt -> MaterialTheme.colorScheme.error
-                                        isMyCredit -> MaterialTheme.colorScheme.primary
-                                        else -> MaterialTheme.colorScheme.onSurface
-                                    }
-                                )
-                                if (paymentVpa.isNotEmpty() && isMyDebt) {
-                                    Spacer(modifier = Modifier.height(2.dp))
-                                    Text(
-                                        stringResource(R.string.group_detail_pay_to, paymentVpa),
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                                    )
-                                }
                             }
                         }
-                        if (isMyDebt) {
-                            Spacer(modifier = Modifier.height(12.dp))
-                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                if (paymentVpa.isNotEmpty()) {
-                                    OutlinedButton(
-                                        onClick = { onPayViaUpi(debt) },
-                                        modifier = Modifier.weight(1f),
-                                        shape = RoundedCornerShape(12.dp)
-                                    ) {
-                                        Text(stringResource(R.string.group_detail_pay_via_upi), style = MaterialTheme.typography.labelMedium)
-                                    }
-                                    Button(
-                                        onClick = { onSettleDebt(debt) },
-                                        modifier = Modifier.weight(1f),
-                                        shape = RoundedCornerShape(12.dp)
-                                    ) {
-                                        Text(stringResource(R.string.group_detail_mark_settled), style = MaterialTheme.typography.labelMedium)
-                                    }
-                                } else {
-                                    Button(
-                                        onClick = { onSettleDebt(debt) },
-                                        modifier = Modifier.fillMaxWidth(),
-                                        shape = RoundedCornerShape(12.dp)
-                                    ) {
-                                        Text(stringResource(R.string.group_detail_mark_settled), style = MaterialTheme.typography.labelMedium)
-                                    }
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            if (paymentVpa.isNotEmpty()) {
+                                OutlinedButton(
+                                    onClick = { onPayViaUpi(debt) },
+                                    shape = RoundedCornerShape(12.dp)
+                                ) {
+                                    Text(stringResource(R.string.group_detail_pay_via_upi), style = MaterialTheme.typography.labelMedium)
                                 }
+                            }
+                            Button(
+                                onClick = { onSettleDebt(debt) },
+                                shape = RoundedCornerShape(12.dp),
+                                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
+                            ) {
+                                Text(stringResource(R.string.group_detail_paid_by_you), style = MaterialTheme.typography.labelMedium)
                             }
                         }
                     }
@@ -1511,62 +1503,90 @@ private fun BalancesTab(
             }
         }
 
-        // Member balances header
-        Text(stringResource(R.string.group_detail_member_balances), style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(top = 4.dp))
-
-        members.forEach { member ->
-            val isMe = member.uid == currentUserId
-            Card(
-                onClick = { onMemberClick(member.uid) },
+        // ── Section 2: You will get ──
+        if (myCreditsList.isNotEmpty()) {
+            Row(
                 modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(12.dp),
-                elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
-                colors = CardDefaults.cardColors(
-                    containerColor = if (isMe) MaterialTheme.colorScheme.primary.copy(alpha = 0.05f) else MaterialTheme.colorScheme.surface
-                )
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth().padding(16.dp),
-                    verticalAlignment = Alignment.CenterVertically
+                Box(modifier = Modifier.size(8.dp).background(MaterialTheme.colorScheme.primary, CircleShape))
+                Text(stringResource(R.string.group_detail_you_will_get), style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.primary)
+                Text(formatGroupCurrency(myCreditsList.sumOf { it.amount }), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary.copy(alpha = 0.7f))
+            }
+            myCreditsList.forEach { debt ->
+                val fromMember = members.find { it.uid == debt.fromUid }
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(16.dp),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.05f))
                 ) {
-                    MemberAvatar(name = member.displayName, photoURL = member.photoURL, size = 40)
-                    Spacer(modifier = Modifier.width(12.dp))
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            member.displayName + if (isMe) stringResource(R.string.group_detail_you_suffix) else "",
-                            style = MaterialTheme.typography.titleSmall,
-                            fontWeight = FontWeight.Medium
-                        )
-                        Text("@${member.username}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    }
-                    if (member.status == "pending") {
-                        AssistChip(
-                            onClick = {},
-                            leadingIcon = { Icon(Icons.Default.Schedule, contentDescription = null, modifier = Modifier.size(14.dp)) },
-                            label = { Text(stringResource(R.string.group_detail_pending_label), style = MaterialTheme.typography.labelSmall) }
-                        )
-                    } else {
-                        val color = when {
-                            member.balance > 0.01 -> MaterialTheme.colorScheme.primary
-                            member.balance < -0.01 -> MaterialTheme.colorScheme.error
-                            else -> MaterialTheme.colorScheme.onSurfaceVariant
-                        }
-                        val text = when {
-                            member.balance > 0.01 -> if (isMe) stringResource(R.string.balance_youll_get, formatBase(member.balance)) else stringResource(R.string.balance_gets, formatBase(member.balance))
-                            member.balance < -0.01 -> if (isMe) stringResource(R.string.balance_youll_pay, formatBase(-member.balance)) else stringResource(R.string.balance_owes, formatBase(-member.balance))
-                            else -> stringResource(R.string.balance_settled_up)
-                        }
-                        Surface(
-                            color = color.copy(alpha = 0.12f),
-                            shape = RoundedCornerShape(8.dp)
-                        ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(16.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        MemberAvatar(name = debt.fromName ?: "", photoURL = fromMember?.photoURL ?: "", size = 40)
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Column(modifier = Modifier.weight(1f)) {
                             Text(
-                                text = text,
-                                color = color,
-                                style = MaterialTheme.typography.labelMedium,
-                                fontWeight = FontWeight.SemiBold,
-                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
+                                stringResource(R.string.group_detail_name_will_pay_you, (debt.fromName ?: "").split(" ").firstOrNull() ?: (debt.fromName ?: "")),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
+                            Text(
+                                formatGroupCurrency(debt.amount),
+                                style = MaterialTheme.typography.titleLarge,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                        }
+                        OutlinedButton(
+                            onClick = { onSettleDebt(debt) },
+                            shape = RoundedCornerShape(12.dp)
+                        ) {
+                            Text(stringResource(R.string.group_detail_received_from_name, (debt.fromName ?: "").split(" ").firstOrNull() ?: (debt.fromName ?: "")), style = MaterialTheme.typography.labelMedium)
+                        }
+                    }
+                }
+            }
+        }
+
+        // ── Section 3: Admin — settle between others ──
+        if (isAdmin && otherDebts.isNotEmpty()) {
+            Text(stringResource(R.string.group_detail_settle_between_members, otherDebts.size), style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(top = 4.dp))
+            otherDebts.forEach { debt ->
+                val fromFirst = (debt.fromName ?: "").split(" ").firstOrNull() ?: (debt.fromName ?: "")
+                val toFirst = (debt.toName ?: "").split(" ").firstOrNull() ?: (debt.toName ?: "")
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(12.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                "$fromFirst ${stringResource(R.string.group_detail_will_pay)} $toFirst",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                            Text(
+                                formatGroupCurrency(debt.amount),
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.SemiBold,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                        OutlinedButton(
+                            onClick = { onSettleDebt(debt) },
+                            shape = RoundedCornerShape(12.dp),
+                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp)
+                        ) {
+                            Text(stringResource(R.string.group_detail_paid_by_name, fromFirst), style = MaterialTheme.typography.labelMedium)
                         }
                     }
                 }
@@ -1686,7 +1706,7 @@ private fun ActivityTab(
     currentUserId: String?,
     isLoading: Boolean,
     @StringRes errorMessage: Int? = null,
-    formatBase: (Double) -> String,
+    formatGroupCurrency: (Double) -> String,
     formatDate: (Long, Boolean) -> String,
     onLoadSettlements: () -> Unit,
     activitiesHasMore: Boolean = false,
@@ -1799,7 +1819,7 @@ private fun ActivityTab(
                                         color = MaterialTheme.colorScheme.onSurfaceVariant
                                     )
                                 }
-                                Text(formatBase(s.amount), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = settlementColor)
+                                Text(formatGroupCurrency(s.amount), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = settlementColor)
                             }
                         }
                     }

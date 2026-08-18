@@ -9,6 +9,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Logout
+import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.AdminPanelSettings
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Description
@@ -198,6 +199,12 @@ fun MoreScreen(
                     onClick = { navController.navigate(TrevioRoute.Admin.route) }
                 )
             }
+
+            MoreMenuItem(
+                icon = Icons.Default.AutoAwesome,
+                label = stringResource(R.string.wrapped_title),
+                onClick = { navController.navigate(TrevioRoute.Wrapped.route) }
+            )
 
             MoreMenuItem(
                 icon = Icons.Default.Description,

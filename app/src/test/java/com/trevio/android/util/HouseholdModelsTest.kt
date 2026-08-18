@@ -129,7 +129,7 @@ class HouseholdModelsTest {
         assertThat(expense.splitType).isEqualTo(SplitType.EQUAL)
         assertThat(expense.category).isEqualTo("other")
         assertThat(expense.date).isEqualTo(0)
-        assertThat(expense.exchangeRateToBase).isEqualTo(1.0)
+        assertThat(expense.exchangeRateToGroupCurrency).isEqualTo(1.0)
         assertThat(expense.recurring).isNull()
         assertThat(expense.itemizedData).isNull()
     }
@@ -542,7 +542,7 @@ class HouseholdModelsTest {
             },
             category = data["category"] as? String ?: "other",
             createdBy = data["createdBy"] as? String ?: "",
-            exchangeRateToBase = (data["exchangeRateToBase"] as? Number)?.toDouble() ?: 1.0,
+            exchangeRateToGroupCurrency = (data["exchangeRateToGroupCurrency"] as? Number)?.toDouble() ?: 1.0,
             date = DateUtils.toMillis(data["date"]) ?: 0,
             note = data["note"] as? String ?: "",
             recurring = (data["recurring"] as? Map<*, *>)?.let { r ->
@@ -592,7 +592,7 @@ class HouseholdModelsTest {
             "category" to "food",
             "date" to Timestamp(Date(1705276800000L)),
             "createdBy" to "u1",
-            "exchangeRateToBase" to 1.0,
+            "exchangeRateToGroupCurrency" to 1.0,
             "note" to "Weekly groceries",
             "transactionType" to "expense"
         )
@@ -610,7 +610,7 @@ class HouseholdModelsTest {
         assertThat(expense.category).isEqualTo("food")
         assertThat(expense.date).isEqualTo(1705276800000L)
         assertThat(expense.createdBy).isEqualTo("u1")
-        assertThat(expense.exchangeRateToBase).isEqualTo(1.0)
+        assertThat(expense.exchangeRateToGroupCurrency).isEqualTo(1.0)
         assertThat(expense.note).isEqualTo("Weekly groceries")
         assertThat(expense.transactionType).isEqualTo(TransactionType.EXPENSE)
     }
@@ -729,7 +729,7 @@ class HouseholdModelsTest {
         assertThat(expense.currency).isEqualTo("INR")
         assertThat(expense.splitType).isEqualTo(SplitType.EQUAL)
         assertThat(expense.category).isEqualTo("other")
-        assertThat(expense.exchangeRateToBase).isEqualTo(1.0)
+        assertThat(expense.exchangeRateToGroupCurrency).isEqualTo(1.0)
         assertThat(expense.date).isEqualTo(0)
         assertThat(expense.note).isEmpty()
         assertThat(expense.recurring).isNull()

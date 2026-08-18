@@ -41,7 +41,11 @@ class FirebaseUserServiceImpl @Inject constructor(
                     upiId = data["upiId"] as? String ?: "",
                     phoneNumber = data["phoneNumber"] as? String ?: "",
                     countryCode = data["countryCode"] as? String ?: "",
-                    timezone = data["timezone"] as? String ?: AppConstants.DEFAULT_TIMEZONE
+                    timezone = data["timezone"] as? String ?: AppConstants.DEFAULT_TIMEZONE,
+                    karmaScore = (data["karmaScore"] as? Number)?.toInt() ?: 0,
+                    karmaTier = data["karmaTier"] as? String ?: "bronze",
+                    karmaPublic = data["karmaPublic"] as? Boolean ?: false,
+                    karmaUpdatedAt = (data["karmaUpdatedAt"] as? Number)?.toLong() ?: 0
                 )
             )
         } catch (e: Exception) {
@@ -97,6 +101,7 @@ class FirebaseUserServiceImpl @Inject constructor(
             val displayName = userDoc.getString("displayName") ?: ""
             val username = userDoc.getString("username") ?: ""
             val photoURL = userDoc.getString("photoURL") ?: ""
+            val defaultCurrency = userDoc.getString("defaultCurrency") ?: AppConstants.BASE_CURRENCY
 
             val toUpdate = memberSnapshot.documents.filter { it.getBoolean("isOffline") != true }
             val batchSize = 400
@@ -107,7 +112,8 @@ class FirebaseUserServiceImpl @Inject constructor(
                     batch.update(memberDoc.reference, mapOf(
                         "displayName" to displayName,
                         "username" to username,
-                        "photoURL" to photoURL
+                        "photoURL" to photoURL,
+                        "currency" to defaultCurrency
                     ))
                 }
                 batch.commit().await()

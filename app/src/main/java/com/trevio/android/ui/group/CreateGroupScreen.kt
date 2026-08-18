@@ -571,10 +571,9 @@ fun CreateGroupScreen(
                     if (budgetInUserCurrency != null && budgetInUserCurrency < 0) {
                         return@Button
                     }
-                    val budgetInBase = if (budgetInUserCurrency != null && budgetInUserCurrency > 0) {
-                        CurrencyConverter.convertToBase(budgetInUserCurrency, currencyFormatter.userCurrency, currencyFormatter.rates)
-                    } else null
-                    viewModel.createGroup(name, description, selectedTemplate, budgetInBase)
+                    // Budget is stored in the creator's default currency, which becomes
+                    // the group's permanent currency — no conversion needed.
+                    viewModel.createGroup(name, description, selectedTemplate, budgetInUserCurrency?.takeIf { it > 0 })
                 },
                 enabled = name.isNotBlank() && !state.isLoading,
                 modifier = Modifier.fillMaxWidth().height(54.dp),

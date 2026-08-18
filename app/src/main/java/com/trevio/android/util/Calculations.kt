@@ -153,12 +153,11 @@ object Calculations {
         memberUids.forEach { balances[it] = 0.0 }
 
         for (expense in expenses) {
-            val rate = expense.exchangeRateToBase
-            val amountInBase = expense.amount * rate
-            balances[expense.paidBy] = (balances[expense.paidBy] ?: 0.0) + amountInBase
+            // The total is explicitly locked in group currency at expense creation.
+            balances[expense.paidBy] = (balances[expense.paidBy] ?: 0.0) + expense.amountInGroupCurrency
             for ((uid, split) in expense.splits) {
-                val splitInBase = split.amount * rate
-                balances[uid] = (balances[uid] ?: 0.0) - splitInBase
+                val splitInGroupCurrency = split.amount * expense.exchangeRateToGroupCurrency
+                balances[uid] = (balances[uid] ?: 0.0) - splitInGroupCurrency
             }
         }
 
@@ -173,8 +172,8 @@ object Calculations {
     data class ExpenseBalanceData(
         val paidBy: String,
         val splits: Map<String, SplitEntry>,
-        val amount: Double,
-        val exchangeRateToBase: Double = 1.0
+        val amountInGroupCurrency: Double,
+        val exchangeRateToGroupCurrency: Double = 1.0
     )
 
     data class SimplifiedDebtRaw(

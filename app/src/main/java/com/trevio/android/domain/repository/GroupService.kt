@@ -40,6 +40,7 @@ interface GroupService {
     suspend fun updateGroup(groupId: String, name: String, description: String): Result<Unit>
     suspend fun updateGroupBudget(groupId: String, monthlyBudget: Double?, budgetCategories: Map<String, Double>?): Result<Unit>
     suspend fun transferAdminRole(groupId: String, newAdminUid: String): Result<Unit>
+    suspend fun updateMemberRole(groupId: String, memberUid: String, role: String): Result<Unit>
     suspend fun getUserGroups(): Result<List<Group>>
     suspend fun getGroupInfo(groupId: String): Result<GroupInfo>
     suspend fun getGroupActivities(groupId: String, pageSize: Int = 50, lastActivityId: String? = null): Result<PaginatedResult<Activity>>

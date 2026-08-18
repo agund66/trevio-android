@@ -80,7 +80,8 @@ class FirebaseGroupServiceImpl @Inject constructor(
                 "joinedAt" to now,
                 "balance" to 0.0,
                 "status" to MemberStatus.ACTIVE,
-                "isOffline" to false
+                "isOffline" to false,
+                "currency" to userCurrency
             ))
             batch.set(groupRef.collection("activities").document(), mapOf(
                 "type" to "group_created",
@@ -133,6 +134,7 @@ class FirebaseGroupServiceImpl @Inject constructor(
             val displayName = userDoc.getString("displayName") ?: ""
             val username = userDoc.getString("username") ?: ""
             val photoURL = userDoc.getString("photoURL") ?: ""
+            val userCurrency = userDoc.getString("defaultCurrency") ?: (groupData["currency"] as? String ?: AppConstants.BASE_CURRENCY)
 
             if (memberDoc.exists() && memberDoc.data?.get("status") == "pending") {
                 batch.update(memberDoc.reference, mapOf(
@@ -141,7 +143,8 @@ class FirebaseGroupServiceImpl @Inject constructor(
                     "displayName" to displayName,
                     "username" to username,
                     "photoURL" to photoURL,
-                    "isOffline" to false
+                    "isOffline" to false,
+                    "currency" to userCurrency
                 ))
             } else {
                 batch.set(groupDoc.reference.collection("members").document(uid), mapOf(
@@ -153,7 +156,8 @@ class FirebaseGroupServiceImpl @Inject constructor(
                     "joinedAt" to now,
                     "balance" to 0.0,
                     "status" to MemberStatus.ACTIVE,
-                    "isOffline" to false
+                    "isOffline" to false,
+                    "currency" to userCurrency
                 ))
                 batch.update(groupDoc.reference, mapOf(
                     "memberCount" to FieldValue.increment(1),
@@ -233,6 +237,7 @@ class FirebaseGroupServiceImpl @Inject constructor(
             val inviteeName = inviteeDoc.getString("displayName") ?: ""
             val inviteeUsername = inviteeDoc.getString("username") ?: ""
             val inviteePhoto = inviteeDoc.getString("photoURL") ?: ""
+            val inviteeCurrency = inviteeDoc.getString("defaultCurrency") ?: AppConstants.BASE_CURRENCY
             groupRef.collection("members").document(toUid).set(mapOf(
                 "uid" to toUid,
                 "displayName" to inviteeName,
@@ -242,7 +247,8 @@ class FirebaseGroupServiceImpl @Inject constructor(
                 "joinedAt" to now,
                 "balance" to 0.0,
                 "status" to "pending",
-                "isOffline" to false
+                "isOffline" to false,
+                "currency" to inviteeCurrency
             )).await()
             groupRef.update(mapOf("memberCount" to FieldValue.increment(1), "updatedAt" to now)).await()
         }
@@ -290,6 +296,7 @@ class FirebaseGroupServiceImpl @Inject constructor(
             val displayName = userDoc.getString("displayName") ?: ""
             val username = userDoc.getString("username") ?: ""
             val photoURL = userDoc.getString("photoURL") ?: ""
+            val userCurrency = userDoc.getString("defaultCurrency") ?: (groupData["currency"] as? String ?: AppConstants.BASE_CURRENCY)
 
             if (existingMemberDoc.exists() && existingMemberDoc.data?.get("status") == "pending") {
                 batch.update(groupDoc.reference.collection("members").document(uid), mapOf(
@@ -298,7 +305,8 @@ class FirebaseGroupServiceImpl @Inject constructor(
                     "displayName" to displayName,
                     "username" to username,
                     "photoURL" to photoURL,
-                    "isOffline" to false
+                    "isOffline" to false,
+                    "currency" to userCurrency
                 ))
             } else {
                 batch.set(groupDoc.reference.collection("members").document(uid), mapOf(
@@ -310,7 +318,8 @@ class FirebaseGroupServiceImpl @Inject constructor(
                     "joinedAt" to now,
                     "balance" to 0.0,
                     "status" to MemberStatus.ACTIVE,
-                    "isOffline" to false
+                    "isOffline" to false,
+                    "currency" to userCurrency
                 ))
                 batch.update(groupDoc.reference, mapOf(
                     "memberCount" to FieldValue.increment(1),
@@ -714,6 +723,47 @@ class FirebaseGroupServiceImpl @Inject constructor(
         }
     }
 
+    override suspend fun updateMemberRole(groupId: String, memberUid: String, role: String): Result<Unit> {
+        return try {
+            val uid = auth.currentUser?.uid ?: return Result.failure(Exception(ErrorMessages.USER_NOT_AUTHENTICATED))
+            if (groupId.isBlank() || memberUid.isBlank()) return Result.failure(Exception("Group ID and member UID are required"))
+            if (role != "admin" && role != "member") return Result.failure(Exception("Invalid role"))
+
+            val groupRef = firestore.collection("groups").document(groupId)
+            val currentMemberDoc = groupRef.collection("members").document(uid).get().await()
+            if (!currentMemberDoc.exists()) return Result.failure(Exception("You are not a member of this group"))
+            if (currentMemberDoc.data?.get("role") != MemberRole.ADMIN) return Result.failure(Exception("Only group admin can change member roles"))
+
+            val targetMemberDoc = groupRef.collection("members").document(memberUid).get().await()
+            if (!targetMemberDoc.exists()) return Result.failure(Exception("Target user is not a member of this group"))
+            if (targetMemberDoc.data?.get("status") != MemberStatus.ACTIVE) return Result.failure(Exception("Target user is not an active member"))
+            if (targetMemberDoc.data?.get("role") == role) return Result.failure(Exception("Member is already $role"))
+
+            val now = System.currentTimeMillis()
+            val userDoc = firestore.collection("users").document(uid).get().await()
+            val displayName = userDoc.getString("displayName") ?: ""
+            val photoURL = userDoc.getString("photoURL") ?: ""
+            val targetName = targetMemberDoc.getString("displayName") ?: "Someone"
+
+            val batch = firestore.batch()
+            batch.update(groupRef.collection("members").document(memberUid), mapOf("role" to role, "updatedAt" to now))
+            batch.set(groupRef.collection("activities").document(), mapOf(
+                "type" to "member_role_updated",
+                "description" to if (role == "admin") "$targetName is now an admin" else "$targetName is now a member",
+                "userId" to uid,
+                "userName" to displayName,
+                "userPhotoURL" to photoURL,
+                "data" to mapOf("memberUid" to memberUid, "newRole" to role),
+                "createdAt" to now
+            ))
+            batch.commit().await()
+
+            Result.success(Unit)
+        } catch (e: Exception) {
+            Result.failure(Exception(friendlyNetworkMessage(e) ?: e.message, e))
+        }
+    }
+
     override suspend fun addOfflineMember(groupId: String, displayName: String): Result<String> {
         return try {
             val uid = auth.currentUser?.uid ?: return Result.failure(Exception(ErrorMessages.USER_NOT_AUTHENTICATED))
@@ -722,6 +772,7 @@ class FirebaseGroupServiceImpl @Inject constructor(
             val groupRef = firestore.collection("groups").document(groupId)
             val groupDoc = groupRef.get().await()
             if (!groupDoc.exists()) return Result.failure(Exception(ErrorMessages.GROUP_NOT_FOUND))
+            val groupCurrency = groupDoc.getString("currency") ?: AppConstants.BASE_CURRENCY
 
             val callerMemberDoc = groupRef.collection("members").document(uid).get().await()
             if (!callerMemberDoc.exists() || callerMemberDoc.data?.get("status") != MemberStatus.ACTIVE) {
@@ -742,6 +793,7 @@ class FirebaseGroupServiceImpl @Inject constructor(
                 "balance" to 0.0,
                 "status" to MemberStatus.ACTIVE,
                 "isOffline" to true,
+                "currency" to groupCurrency,
                 "addedBy" to uid
             ))
             batch.update(groupRef, mapOf(
@@ -782,9 +834,11 @@ class FirebaseGroupServiceImpl @Inject constructor(
             val displayName = userDoc.getString("displayName") ?: ""
             val username = userDoc.getString("username") ?: ""
             val photoURL = userDoc.getString("photoURL") ?: ""
+            val userCurrency = userDoc.getString("defaultCurrency") ?: AppConstants.BASE_CURRENCY
             val batch = firestore.batch()
 
             if (existingMemberDoc.exists()) {
+                batch.update(existingMemberDoc.reference, mapOf("currency" to userCurrency))
                 // User already has a member doc (e.g. joined via invite code)
                 // Keep existing doc, just delete the offline profile doc
                 batch.delete(memberDoc.reference)
@@ -797,6 +851,7 @@ class FirebaseGroupServiceImpl @Inject constructor(
                 claimedData["username"] = username
                 claimedData["photoURL"] = photoURL
                 claimedData["isOffline"] = false
+                claimedData["currency"] = userCurrency
                 claimedData["claimedAt"] = now
                 claimedData["claimedBy"] = uid
                 batch.set(groupRef.collection("members").document(uid), claimedData)
@@ -847,9 +902,11 @@ class FirebaseGroupServiceImpl @Inject constructor(
             val targetUserDoc = firestore.collection("users").document(realUid).get().await()
             val targetUsername = targetUserDoc.getString("username") ?: ""
             val targetPhotoURL = targetUserDoc.getString("photoURL") ?: ""
+            val targetCurrency = targetUserDoc.getString("defaultCurrency") ?: AppConstants.BASE_CURRENCY
             val batch = firestore.batch()
 
             if (existingMemberDoc.exists()) {
+                batch.update(existingMemberDoc.reference, mapOf("currency" to targetCurrency))
                 // Target user already has a member doc (e.g. joined via invite code)
                 // Keep existing doc, just delete the offline profile doc
                 batch.delete(memberDoc.reference)
@@ -862,6 +919,7 @@ class FirebaseGroupServiceImpl @Inject constructor(
                 linkedData["username"] = targetUsername
                 linkedData["photoURL"] = targetPhotoURL
                 linkedData["isOffline"] = false
+                linkedData["currency"] = targetCurrency
                 linkedData["claimedAt"] = now
                 linkedData["claimedBy"] = uid
                 batch.set(groupRef.collection("members").document(realUid), linkedData)
@@ -1044,8 +1102,9 @@ class FirebaseGroupServiceImpl @Inject constructor(
                         shareValue = (v["shareValue"] as? Number)?.toDouble() ?: 0.0
                     )
                 },
-                amount = (data["amount"] as? Number)?.toDouble() ?: 0.0,
-                exchangeRateToBase = (data["exchangeRateToBase"] as? Number)?.toDouble() ?: 1.0
+                amountInGroupCurrency = (data["amountInGroupCurrency"] as? Number)?.toDouble()
+                    ?: (data["amount"] as? Number)?.toDouble() ?: 0.0,
+                exchangeRateToGroupCurrency = (data["exchangeRateToGroupCurrency"] as? Number)?.toDouble() ?: 1.0
             )
         }
 

@@ -241,7 +241,8 @@ class FirestoreObservers @Inject constructor(
                         },
                         category = data["category"] as? String ?: "other",
                         createdBy = data["createdBy"] as? String ?: "",
-                        exchangeRateToBase = (data["exchangeRateToBase"] as? Number)?.toDouble() ?: 1.0,
+                        exchangeRateToGroupCurrency = (data["exchangeRateToGroupCurrency"] as? Number)?.toDouble() ?: 1.0,
+                        amountInGroupCurrency = (data["amountInGroupCurrency"] as? Number)?.toDouble() ?: ((data["amount"] as? Number)?.toDouble() ?: 0.0),
                         date = DateUtils.toMillis(data["date"]) ?: 0,
                         note = data["note"] as? String ?: "",
                         recurring = (data["recurring"] as? Map<*, *>)?.let { r ->
@@ -313,7 +314,8 @@ class FirestoreObservers @Inject constructor(
                         balance = (data["balance"] as? Number)?.toDouble() ?: 0.0,
                         role = data["role"] as? String ?: "member",
                         status = data["status"] as? String ?: "active",
-                        isOffline = data["isOffline"] as? Boolean ?: false
+                        isOffline = data["isOffline"] as? Boolean ?: false,
+                        currency = data["currency"] as? String ?: AppConstants.BASE_CURRENCY
                     )
                 }
                 trySend(members)

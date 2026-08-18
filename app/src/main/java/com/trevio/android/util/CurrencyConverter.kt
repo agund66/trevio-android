@@ -237,11 +237,17 @@ object CurrencyConverter {
         CurrencyInfo(code, currencySymbols[code] ?: code, currencyNameResId(code))
     }
 
+    /** Returns a generic source-to-target rate using rates whose base is [AppConstants.BASE_CURRENCY]. */
+    fun getRate(sourceCurrency: String, targetCurrency: String, rates: Map<String, Double>): Double {
+        if (sourceCurrency == targetCurrency) return 1.0
+        val sourceRate = if (sourceCurrency == AppConstants.BASE_CURRENCY) 1.0 else rates[sourceCurrency] ?: return 1.0
+        val targetRate = if (targetCurrency == AppConstants.BASE_CURRENCY) 1.0 else rates[targetCurrency] ?: return 1.0
+        return targetRate / sourceRate
+    }
+
     fun convertCurrency(amount: Double, fromCurrency: String, toCurrency: String, rates: Map<String, Double>): Double {
         if (fromCurrency == toCurrency) return amount
-        val fromRate = rates[fromCurrency] ?: return amount
-        val toRate = rates[toCurrency] ?: return amount
-        return Math.round(amount * (toRate / fromRate) * 100) / 100.0
+        return Math.round(amount * getRate(fromCurrency, toCurrency, rates) * 100) / 100.0
     }
 
     fun getCurrencySymbol(currency: String): String {

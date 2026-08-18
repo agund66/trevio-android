@@ -60,8 +60,11 @@ import com.trevio.android.domain.model.Group
 import com.trevio.android.domain.model.GroupTemplate
 import com.trevio.android.data.remote.FirestoreObservers
 import com.trevio.android.domain.repository.AuthService
+import com.trevio.android.domain.repository.ExchangeRateService
 import com.trevio.android.domain.repository.GroupService
 import com.trevio.android.ui.group.JoinGroupSheet
+import com.trevio.android.util.AppConstants
+import com.trevio.android.util.CurrencyConverter
 import com.trevio.android.util.rememberCurrencyFormatter
 import com.trevio.android.util.toStringResId
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -76,7 +79,8 @@ class HomeViewModel @Inject constructor(
     private val groupService: GroupService,
     private val authService: AuthService,
     private val userRefreshNotifier: UserRefreshNotifier,
-    private val firestoreObservers: FirestoreObservers
+    private val firestoreObservers: FirestoreObservers,
+    private val exchangeRateService: ExchangeRateService
 ) : ViewModel() {
 
     data class HomeData(
@@ -121,11 +125,19 @@ class HomeViewModel @Inject constructor(
         groupsListenerJob?.cancel()
         groupsListenerJob = viewModelScope.launch {
             val user = authService.getCurrentUser()
+            val userCurrency = user?.defaultCurrency ?: AppConstants.BASE_CURRENCY
+            val rates = exchangeRateService.getRates().getOrNull()?.rates ?: emptyMap()
             try {
                 firestoreObservers.observeUserGroups().collect { groups ->
-                    val totalOwed = groups.filter { it.yourBalance > 0 }.sumOf { it.yourBalance }
-                    val totalOwing = groups.filter { it.yourBalance < 0 }.sumOf { -it.yourBalance }
-                    val totalExpenses = groups.sumOf { it.totalExpenses }
+                    val totalOwed = groups.filter { it.yourBalance > 0 }.sumOf {
+                        CurrencyConverter.convertCurrency(it.yourBalance, it.currency, userCurrency, rates)
+                    }
+                    val totalOwing = groups.filter { it.yourBalance < 0 }.sumOf {
+                        CurrencyConverter.convertCurrency(-it.yourBalance, it.currency, userCurrency, rates)
+                    }
+                    val totalExpenses = groups.sumOf {
+                        CurrencyConverter.convertCurrency(it.totalExpenses, it.currency, userCurrency, rates)
+                    }
                     val activeGroups = groups.count { !it.archived }
                     _state.value = _state.value.copy(
                         groups = groups,
@@ -276,7 +288,20 @@ fun HomeScreen(
                         netBalance = state.netBalance,
                         totalExpenses = state.totalExpenses,
                         activeGroups = state.activeGroups,
-                        formatBase = currencyFormatter.formatBase
+                        userCurrency = currencyFormatter.userCurrency,
+                        formatAmount = currencyFormatter.formatAmount
+                    )
+                }
+
+                item {
+                    NudgeInsightsCard(
+                        onNudgeAction = { nudge ->
+                            if (nudge.actionType == "view_group" || nudge.actionType == "settle_up") {
+                                nudge.actionData["groupId"]?.let { gid ->
+                                    navController.navigate(TrevioRoute.GroupDetail.createRoute(gid))
+                                }
+                            }
+                        }
                     )
                 }
 
@@ -307,7 +332,7 @@ fun HomeScreen(
                         onClick = {
                             navController.navigate(TrevioRoute.GroupDetail.createRoute(group.groupId))
                         },
-                        formatBase = currencyFormatter.formatBase
+                        formatAmount = currencyFormatter.formatAmount
                     )
                 }
 
@@ -435,7 +460,8 @@ private fun BalanceCard(
     netBalance: Double,
     totalExpenses: Double,
     activeGroups: Int,
-    formatBase: (Double) -> String
+    userCurrency: String,
+    formatAmount: (Double, String) -> String
 ) {
     val isDark = isSystemInDarkTheme()
     val greenColor = if (isDark) BalancePositiveDark else BalancePositive
@@ -475,7 +501,7 @@ private fun BalanceCard(
             }
             Spacer(modifier = Modifier.height(8.dp))
             Text(
-                text = formatBase(kotlin.math.abs(netBalance)),
+                text = formatAmount(kotlin.math.abs(netBalance), userCurrency),
                 style = MaterialTheme.typography.headlineMedium,
                 fontWeight = FontWeight.Bold,
                 color = netColor
@@ -491,19 +517,22 @@ private fun BalanceCard(
                     label = stringResource(R.string.home_youll_get),
                     amount = totalOwed,
                     color = greenColor,
-                    formatBase = formatBase
+                    userCurrency = userCurrency,
+                    formatAmount = formatAmount
                 )
                 BalanceColumn(
                     label = stringResource(R.string.home_youll_pay),
                     amount = totalOwing,
                     color = redColor,
-                    formatBase = formatBase
+                    userCurrency = userCurrency,
+                    formatAmount = formatAmount
                 )
                 BalanceColumn(
                     label = stringResource(R.string.home_total_spent),
                     amount = totalExpenses,
                     color = MaterialTheme.colorScheme.onSurface,
-                    formatBase = formatBase
+                    userCurrency = userCurrency,
+                    formatAmount = formatAmount
                 )
             }
             if (activeGroups > 0) {
@@ -523,7 +552,8 @@ private fun BalanceColumn(
     label: String,
     amount: Double,
     color: Color,
-    formatBase: (Double) -> String
+    userCurrency: String,
+    formatAmount: (Double, String) -> String
 ) {
     Column {
         Text(
@@ -533,7 +563,7 @@ private fun BalanceColumn(
         )
         Spacer(modifier = Modifier.height(2.dp))
         Text(
-            text = formatBase(amount),
+            text = formatAmount(amount, userCurrency),
             style = MaterialTheme.typography.titleLarge,
             fontWeight = FontWeight.Bold,
             color = color
@@ -563,7 +593,7 @@ private fun templateColorAdaptive(template: GroupTemplate): Color {
 private fun GroupCardItem(
     group: Group,
     onClick: () -> Unit,
-    formatBase: (Double) -> String
+    formatAmount: (Double, String) -> String
 ) {
     val icon = templateIcon(group.template)
     val accentColor = templateColorAdaptive(group.template)
@@ -574,10 +604,10 @@ private fun GroupCardItem(
     }
     val balanceText = when {
         group.template == GroupTemplate.HOUSEHOLD -> {
-            if (group.totalExpenses > 0) stringResource(R.string.group_item_spent, formatBase(group.totalExpenses)) else stringResource(R.string.group_item_no_entries)
+            if (group.totalExpenses > 0) stringResource(R.string.group_item_spent, formatAmount(group.totalExpenses, group.currency)) else stringResource(R.string.group_item_no_entries)
         }
-        group.yourBalance > 0.01 -> stringResource(R.string.group_item_owes_you, formatBase(group.yourBalance))
-        group.yourBalance < -0.01 -> stringResource(R.string.group_item_you_owe, formatBase(-group.yourBalance))
+        group.yourBalance > 0.01 -> stringResource(R.string.group_item_owes_you, formatAmount(group.yourBalance, group.currency))
+        group.yourBalance < -0.01 -> stringResource(R.string.group_item_you_owe, formatAmount(-group.yourBalance, group.currency))
         else -> stringResource(R.string.group_item_settled_up)
     }
 
@@ -618,7 +648,7 @@ private fun GroupCardItem(
                 )
                 Spacer(modifier = Modifier.height(2.dp))
                 Text(
-                    text = stringResource(R.string.home_members_total, group.memberCount, formatBase(group.totalExpenses)),
+                    text = stringResource(R.string.home_members_total, group.memberCount, formatAmount(group.totalExpenses, group.currency)),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -632,7 +662,7 @@ private fun GroupCardItem(
             }
             if (group.template != GroupTemplate.HOUSEHOLD) {
                 Text(
-                    text = formatBase(group.totalExpenses),
+                    text = formatAmount(group.totalExpenses, group.currency),
                     style = MaterialTheme.typography.titleSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     fontWeight = FontWeight.Medium

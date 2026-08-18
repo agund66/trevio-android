@@ -140,7 +140,7 @@ private val ERROR_MESSAGE_MAP: Map<String, Int> = mapOf(
 
     // Settlement errors
     "Cannot settle with yourself" to R.string.error_cannot_settle_self,
-    "You can only record settlements involving yourself" to R.string.error_settle_self_only,
+    "You can only record settlements involving yourself or be a group admin" to R.string.error_settle_self_only,
 
     // Invite errors
     "Invite code is required" to R.string.error_invite_code_required,

@@ -36,7 +36,11 @@ data class User(
     val upiId: String = "",
     val phoneNumber: String = "",
     val countryCode: String = "",
-    val timezone: String = "Asia/Kolkata"
+    val timezone: String = "Asia/Kolkata",
+    val karmaScore: Int = 0,
+    val karmaTier: String = "bronze",
+    val karmaPublic: Boolean = false,
+    val karmaUpdatedAt: Long = 0
 )
 
 data class Group(
@@ -64,7 +68,8 @@ data class Member(
     val balance: Double = 0.0,
     val role: String = "member",
     val status: String = "active",
-    val isOffline: Boolean = false
+    val isOffline: Boolean = false,
+    val currency: String = "INR"
 )
 
 data class SplitEntry(
@@ -99,7 +104,8 @@ data class Expense(
     val category: String = "other",
     val date: Long = 0,
     val createdBy: String = "",
-    val exchangeRateToBase: Double = 1.0,
+    val exchangeRateToGroupCurrency: Double = 1.0,
+    val amountInGroupCurrency: Double = 0.0,
     val note: String = "",
     val recurring: RecurringConfig? = null,
     val itemizedData: ItemizedSplitData? = null,
@@ -116,6 +122,10 @@ data class Settlement(
     val toName: String = "",
     val amount: Double = 0.0,
     val currency: String = "INR",
+    val originalAmount: Double = 0.0,
+    val originalCurrency: String = "INR",
+    val exchangeRateToGroupCurrency: Double = 1.0,
+    val amountInGroupCurrency: Double = 0.0,
     val method: SettlementMethod = SettlementMethod.CASH,
     val upiRefId: String = "",
     val date: Long = 0,
@@ -133,7 +143,8 @@ data class SimplifiedDebt(
     val fromUpiId: String = "",
     val toPhoneNumber: String = "",
     val toCountryCode: String = "",
-    val amount: Double = 0.0
+    val amount: Double = 0.0,
+    val currency: String = "INR"
 )
 
 data class Activity(
@@ -471,4 +482,83 @@ data class FeaturedMessage(
     val body: String,
     val startAt: Long,
     val endAt: Long
+)
+
+// ─── Trevio Karma / Fairness Score ────────────────────────────────
+
+data class KarmaBreakdown(
+    val uid: String = "",
+    val score: Int = 0,
+    val tier: String = "bronze",
+    val components: KarmaComponents = KarmaComponents(),
+    val updatedAt: Long = 0
+)
+
+data class KarmaComponents(
+    val reliabilityScore: Int = 0,
+    val generosityScore: Int = 0,
+    val consistencyScore: Int = 0,
+    val settlementSpeedScore: Int = 0,
+    val groupHealthScore: Int = 0
+)
+
+// ─── Smart Nudges (AI fairness insights) ─────────────────────────
+
+data class Nudge(
+    val nudgeId: String = "",
+    val uid: String = "",
+    val type: String = "",
+    val title: String = "",
+    val body: String = "",
+    val groupId: String = "",
+    val groupName: String = "",
+    val severity: String = "info",
+    val actionLabel: String = "",
+    val actionType: String = "",
+    val actionData: Map<String, String> = emptyMap(),
+    val createdAt: Long = 0,
+    val readAt: Long = 0,
+    val dismissedAt: Long = 0
+)
+
+// ─── Trevio Wrapped / Year-in-Review ─────────────────────────────
+
+data class WrappedSummary(
+    val uid: String = "",
+    val year: Int = 0,
+    val totalSpent: Double = 0.0,
+    val totalPaid: Double = 0.0,
+    val totalOwed: Double = 0.0,
+    val expenseCount: Int = 0,
+    val groupCount: Int = 0,
+    val topCategory: String = "",
+    val topCategoryAmount: Double = 0.0,
+    val topGroup: String = "",
+    val topGroupAmount: Double = 0.0,
+    val busiestMonth: Int = 0,
+    val busiestMonthAmount: Double = 0.0,
+    val avgExpense: Double = 0.0,
+    val largestExpense: Double = 0.0,
+    val largestExpenseDesc: String = "",
+    val personality: String = "",
+    val personalityDesc: String = "",
+    val categoryBreakdown: Map<String, Double> = emptyMap(),
+    val monthlyBreakdown: Map<Int, Double> = emptyMap(),
+    val groupBreakdown: Map<String, Double> = emptyMap(),
+    val generatedAt: Long = 0
+)
+
+data class MonthlyRecap(
+    val uid: String = "",
+    val year: Int = 0,
+    val month: Int = 0,
+    val totalSpent: Double = 0.0,
+    val expenseCount: Int = 0,
+    val topCategory: String = "",
+    val topCategoryAmount: Double = 0.0,
+    val topGroup: String = "",
+    val topGroupAmount: Double = 0.0,
+    val personality: String = "",
+    val personalityDesc: String = "",
+    val generatedAt: Long = 0
 )

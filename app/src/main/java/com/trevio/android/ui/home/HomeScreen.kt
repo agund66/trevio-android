@@ -1,13 +1,17 @@
 package com.trevio.android.ui.home
 
 import androidx.annotation.StringRes
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.slideInVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -21,6 +25,7 @@ import androidx.compose.material.icons.filled.LocalCafe
 import androidx.compose.material.icons.filled.SportsSoccer
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.*
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -36,6 +41,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.trevio.android.R
 import com.trevio.android.core.UserRefreshNotifier
+import com.trevio.android.core.designsystem.components.AnimatedCounter
 import com.trevio.android.core.designsystem.components.EmptyState
 import com.trevio.android.core.designsystem.components.ListItemSkeleton
 import com.trevio.android.core.designsystem.components.MemberAvatar
@@ -195,6 +201,7 @@ fun HomeScreen(
     val state by viewModel.state.collectAsState()
     val currencyFormatter = rememberCurrencyFormatter()
     var showJoinSheet by remember { mutableStateOf(false) }
+    var isRefreshing by remember { mutableStateOf(false) }
 
     val needsRefresh by navController.currentBackStackEntry
         ?.savedStateHandle?.getStateFlow<Boolean>("needsRefresh", false)
@@ -210,6 +217,17 @@ fun HomeScreen(
     LaunchedEffect(state.signedOut) {
         if (state.signedOut) {
             onSignOut()
+        }
+    }
+
+    // Reset the pull-to-refresh indicator shortly after a refresh is
+    // triggered.  Groups are kept fresh by a real-time Firestore listener,
+    // so refreshGroups() is near-instant — the delay gives the indicator
+    // enough time to be visible to the user.
+    LaunchedEffect(isRefreshing) {
+        if (isRefreshing) {
+            kotlinx.coroutines.delay(800)
+            isRefreshing = false
         }
     }
 
@@ -276,8 +294,16 @@ fun HomeScreen(
                     photoUrl = state.userPhotoUrl,
                     onProfileClick = { navController.navigate(TrevioRoute.Profile.route) }
                 )
+            PullToRefreshBox(
+                isRefreshing = isRefreshing,
+                onRefresh = {
+                    isRefreshing = true
+                    viewModel.refreshGroups()
+                },
+                modifier = Modifier.weight(1f)
+            ) {
             LazyColumn(
-                modifier = Modifier.weight(1f),
+                modifier = Modifier.fillMaxSize(),
                 contentPadding = PaddingValues(bottom = 100.dp),
                 verticalArrangement = Arrangement.spacedBy(0.dp)
             ) {
@@ -326,14 +352,22 @@ fun HomeScreen(
                     }
                 }
 
-                items(state.groups, key = { it.groupId }) { group ->
-                    GroupCardItem(
-                        group = group,
-                        onClick = {
-                            navController.navigate(TrevioRoute.GroupDetail.createRoute(group.groupId))
-                        },
-                        formatAmount = currencyFormatter.formatAmount
-                    )
+                itemsIndexed(state.groups, key = { _, it -> it.groupId }) { index, group ->
+                    androidx.compose.animation.AnimatedVisibility(
+                        visible = true,
+                        enter = fadeIn(animationSpec = tween(300, delayMillis = minOf(index, 10) * 50)) + slideInVertically(
+                            animationSpec = tween(300, delayMillis = minOf(index, 10) * 50),
+                            initialOffsetY = { it / 4 }
+                        )
+                    ) {
+                        GroupCardItem(
+                            group = group,
+                            onClick = {
+                                navController.navigate(TrevioRoute.GroupDetail.createRoute(group.groupId))
+                            },
+                            formatAmount = currencyFormatter.formatAmount
+                        )
+                    }
                 }
 
                 item {
@@ -349,6 +383,7 @@ fun HomeScreen(
                     }
                 }
             }
+            } // end PullToRefreshBox
             } // end Column
         }
 
@@ -500,9 +535,11 @@ private fun BalanceCard(
                 }
             }
             Spacer(modifier = Modifier.height(8.dp))
-            Text(
-                text = formatAmount(kotlin.math.abs(netBalance), userCurrency),
-                style = MaterialTheme.typography.headlineMedium,
+            AnimatedCounter(
+                targetValue = kotlin.math.abs(netBalance),
+                prefix = CurrencyConverter.getCurrencySymbol(userCurrency),
+                decimals = 2,
+                fontSize = MaterialTheme.typography.headlineMedium.fontSize,
                 fontWeight = FontWeight.Bold,
                 color = netColor
             )
@@ -562,9 +599,11 @@ private fun BalanceColumn(
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
         Spacer(modifier = Modifier.height(2.dp))
-        Text(
-            text = formatAmount(amount, userCurrency),
-            style = MaterialTheme.typography.titleLarge,
+        AnimatedCounter(
+            targetValue = amount,
+            prefix = CurrencyConverter.getCurrencySymbol(userCurrency),
+            decimals = 2,
+            fontSize = MaterialTheme.typography.titleLarge.fontSize,
             fontWeight = FontWeight.Bold,
             color = color
         )

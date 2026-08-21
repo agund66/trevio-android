@@ -16,6 +16,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.List
+import androidx.compose.material.icons.automirrored.filled.TrendingUp
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.material3.TabRowDefaults.tabIndicatorOffset
@@ -515,17 +516,20 @@ fun GroupDetailScreen(
     }
 
     val isHouseholdPreLoad = state.groupInfo?.template == com.trevio.android.domain.model.GroupTemplate.HOUSEHOLD
+    val isArchived = state.groupInfo?.archived == true
 
     Scaffold(
         floatingActionButton = {
-            FloatingActionButton(
-                onClick = {
-                    navController.navigate(TrevioRoute.AddExpense.createRoute(state.groupInfo?.groupId ?: ""))
-                },
-                shape = RoundedCornerShape(16.dp),
-                containerColor = MaterialTheme.colorScheme.primary
-            ) {
-                Icon(Icons.Default.Add, contentDescription = if (isHouseholdPreLoad) stringResource(R.string.group_detail_add_entry) else stringResource(R.string.group_detail_add_expense), tint = MaterialTheme.colorScheme.onPrimary)
+            if (!isArchived) {
+                FloatingActionButton(
+                    onClick = {
+                        navController.navigate(TrevioRoute.AddExpense.createRoute(state.groupInfo?.groupId ?: ""))
+                    },
+                    shape = RoundedCornerShape(16.dp),
+                    containerColor = MaterialTheme.colorScheme.primary
+                ) {
+                    Icon(Icons.Default.Add, contentDescription = if (isHouseholdPreLoad) stringResource(R.string.group_detail_add_entry) else stringResource(R.string.group_detail_add_expense), tint = MaterialTheme.colorScheme.onPrimary)
+                }
             }
         }
     ) { padding ->
@@ -831,7 +835,8 @@ fun GroupDetailScreen(
                                     context.startActivity(android.content.Intent.createChooser(intent, context.getString(R.string.pay_with)))
                                 }
                             }
-                        }
+                        },
+                        isArchived = isArchived
                     )
                 }
                 1 -> if (isHousehold) item {
@@ -875,7 +880,8 @@ fun GroupDetailScreen(
                         hasMore = state.expensesHasMore && expenseSearch.isBlank() && categoryFilter == "all",
                         loadingMore = state.expensesLoadingMore,
                         loadMoreError = state.loadMoreError,
-                        onLoadMore = { viewModel.loadMoreExpenses() }
+                        onLoadMore = { viewModel.loadMoreExpenses() },
+                        isArchived = isArchived
                     )
                 }
                 2 -> item {
@@ -903,7 +909,8 @@ fun GroupDetailScreen(
                             }
                         },
                         onAddOffline = { showAddOfflineDialog = true },
-                        onRemoveMember = { uid -> viewModel.removeMember(uid) }
+                        onRemoveMember = { uid -> viewModel.removeMember(uid) },
+                        isArchived = isArchived
                     )
                 }
                 membersTabIndex -> if (!isHousehold) item {
@@ -917,7 +924,8 @@ fun GroupDetailScreen(
                             }
                         },
                         onAddOffline = { showAddOfflineDialog = true },
-                        onRemoveMember = { uid -> viewModel.removeMember(uid) }
+                        onRemoveMember = { uid -> viewModel.removeMember(uid) },
+                        isArchived = isArchived
                     )
                 }
                 activityTabIndex -> item {
@@ -1091,7 +1099,7 @@ fun GroupDetailScreen(
                     entry = entry,
                     members = state.members,
                     isSaving = householdState.isSaving,
-                    canEdit = entry.createdBy == state.currentUserId || isAdmin,
+                    canEdit = !isArchived && (entry.createdBy == state.currentUserId || isAdmin),
                     currencySymbol = householdState.currencySymbol,
                     onUpdate = { expenseId, amount, description, category, paidBy, date, note, transactionType ->
                         householdViewModel.updateEntry(
@@ -1147,7 +1155,8 @@ private fun ExpensesTab(
     hasMore: Boolean = false,
     loadingMore: Boolean = false,
     @StringRes loadMoreError: Int? = null,
-    onLoadMore: () -> Unit = {}
+    onLoadMore: () -> Unit = {},
+    isArchived: Boolean = false
 ) {
     val categories = listOf("all", "food", "transport", "shopping", "turf", "accommodation", "other")
     val hasExpenses = expenses.isNotEmpty() || expenseSearch.isNotBlank() || categoryFilter != "all"
@@ -1214,7 +1223,38 @@ private fun ExpensesTab(
                 }
             } else {
                 expenses.forEach { expense ->
-                    ExpenseCard(expense, members, currentUserId, formatOriginal, onEditExpense, onDeleteExpense)
+                    val dismissState = rememberSwipeToDismissBoxState(
+                        confirmValueChange = { value ->
+                            if (value == SwipeToDismissBoxValue.EndToStart && !isArchived) {
+                                onDeleteExpense(expense.expenseId)
+                            }
+                            // Always snap back — the confirmation dialog
+                            // handles the actual deletion.
+                            false
+                        }
+                    )
+                    SwipeToDismissBox(
+                        state = dismissState,
+                        backgroundContent = {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .clip(RoundedCornerShape(14.dp))
+                                    .background(MaterialTheme.colorScheme.error)
+                                    .padding(horizontal = 20.dp),
+                                contentAlignment = Alignment.CenterEnd
+                            ) {
+                                Icon(
+                                    Icons.Default.Delete,
+                                    contentDescription = stringResource(R.string.group_detail_delete),
+                                    tint = Color.White
+                                )
+                            }
+                        },
+                        enableDismissFromStartToEnd = false
+                    ) {
+                        ExpenseCard(expense, members, currentUserId, formatOriginal, onEditExpense, onDeleteExpense, isArchived)
+                    }
                 }
                 if (loadingMore) {
                     LoadingIndicator(modifier = Modifier.fillMaxWidth().padding(16.dp))
@@ -1247,14 +1287,15 @@ private fun ExpenseCard(
     currentUserId: String?,
     formatOriginal: (Double, String) -> String,
     onEditExpense: (String) -> Unit = {},
-    onDeleteExpense: (String) -> Unit = {}
+    onDeleteExpense: (String) -> Unit = {},
+    isArchived: Boolean = false
 ) {
     val payer = members.find { it.uid == expense.paidBy }
     val payerName = payer?.displayName?.split(" ")?.firstOrNull() ?: stringResource(R.string.someone)
     val isPayerMe = payer?.uid == currentUserId
     val displayPayerName = if (isPayerMe) stringResource(R.string.you) else payerName
     val myShare = currentUserId?.let { expense.splits[it]?.amount }
-    val canEdit = expense.createdBy == currentUserId || members.find { it.uid == currentUserId }?.role == MemberRole.ADMIN
+    val canEdit = !isArchived && (expense.createdBy == currentUserId || members.find { it.uid == currentUserId }?.role == MemberRole.ADMIN)
     val categoryIcon = when (expense.category) {
         "food" -> Icons.Default.Restaurant
         "transport" -> Icons.Default.DirectionsCar
@@ -1357,7 +1398,8 @@ private fun BalancesTab(
     onSettleUp: () -> Unit,
     onMemberClick: (String) -> Unit,
     onSettleDebt: (SimplifiedDebt) -> Unit = {},
-    onPayViaUpi: (SimplifiedDebt) -> Unit = {}
+    onPayViaUpi: (SimplifiedDebt) -> Unit = {},
+    isArchived: Boolean = false
 ) {
     val myBalance = members.find { it.uid == currentUserId }?.balance ?: 0.0
     val myDebts = debts.filter { it.fromUid == currentUserId }
@@ -1485,6 +1527,7 @@ private fun BalancesTab(
                             if (paymentVpa.isNotEmpty()) {
                                 OutlinedButton(
                                     onClick = { onPayViaUpi(debt) },
+                                    enabled = !isArchived,
                                     shape = RoundedCornerShape(12.dp)
                                 ) {
                                     Text(stringResource(R.string.group_detail_pay_via_upi), style = MaterialTheme.typography.labelMedium)
@@ -1492,6 +1535,7 @@ private fun BalancesTab(
                             }
                             Button(
                                 onClick = { onSettleDebt(debt) },
+                                enabled = !isArchived,
                                 shape = RoundedCornerShape(12.dp),
                                 colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
                             ) {
@@ -1543,6 +1587,7 @@ private fun BalancesTab(
                         }
                         OutlinedButton(
                             onClick = { onSettleDebt(debt) },
+                            enabled = !isArchived,
                             shape = RoundedCornerShape(12.dp)
                         ) {
                             Text(stringResource(R.string.group_detail_received_from_name, (debt.fromName ?: "").split(" ").firstOrNull() ?: (debt.fromName ?: "")), style = MaterialTheme.typography.labelMedium)
@@ -1583,6 +1628,7 @@ private fun BalancesTab(
                         }
                         OutlinedButton(
                             onClick = { onSettleDebt(debt) },
+                            enabled = !isArchived,
                             shape = RoundedCornerShape(12.dp),
                             contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp)
                         ) {
@@ -1596,7 +1642,7 @@ private fun BalancesTab(
 }
 
 @Composable
-private fun MembersTab(members: List<Member>, currentUserId: String?, onInvite: () -> Unit, onMemberClick: (String) -> Unit, onAddOffline: () -> Unit, onRemoveMember: (String) -> Unit = {}) {
+private fun MembersTab(members: List<Member>, currentUserId: String?, onInvite: () -> Unit, onMemberClick: (String) -> Unit, onAddOffline: () -> Unit, onRemoveMember: (String) -> Unit = {}, isArchived: Boolean = false) {
     var memberToRemove by remember { mutableStateOf<Pair<String, String>?>(null) }
 
     Column(modifier = Modifier.fillMaxWidth().padding(16.dp)) {
@@ -1607,12 +1653,12 @@ private fun MembersTab(members: List<Member>, currentUserId: String?, onInvite: 
         ) {
             Text(stringResource(R.string.group_detail_members_with_count, members.size), style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Button(onClick = onAddOffline, shape = RoundedCornerShape(12.dp)) {
+                Button(onClick = onAddOffline, enabled = !isArchived, shape = RoundedCornerShape(12.dp)) {
                     Icon(Icons.Default.PersonAdd, contentDescription = null, modifier = Modifier.size(18.dp))
                     Spacer(modifier = Modifier.width(4.dp))
                     Text(stringResource(R.string.group_detail_add))
                 }
-                Button(onClick = onInvite, shape = RoundedCornerShape(12.dp)) {
+                Button(onClick = onInvite, enabled = !isArchived, shape = RoundedCornerShape(12.dp)) {
                     Icon(Icons.Default.PersonAdd, contentDescription = null, modifier = Modifier.size(18.dp))
                     Spacer(modifier = Modifier.width(4.dp))
                     Text(stringResource(R.string.group_detail_invite_btn))
@@ -1913,7 +1959,7 @@ private fun activityIcon(type: String): Pair<androidx.compose.ui.graphics.vector
     val isDark = isSystemInDarkTheme()
     return when (type) {
         "expense_added", "expense_updated", "expense_deleted" -> Icons.Default.Receipt to if (isDark) TemplateCasualDark else TemplateCasual
-        "income_added", "income_updated", "income_deleted" -> Icons.Default.TrendingUp to if (isDark) BalancePositiveDark else BalancePositive
+        "income_added", "income_updated", "income_deleted" -> Icons.AutoMirrored.Filled.TrendingUp to if (isDark) BalancePositiveDark else BalancePositive
         "settlement_added" -> Icons.Default.AccountBalanceWallet to if (isDark) BalancePositiveDark else BalancePositive
         "member_joined" -> Icons.Default.PersonAdd to if (isDark) TemplateTripDark else TemplateTrip
         "member_left" -> Icons.Default.PersonRemove to if (isDark) BalanceNegativeDark else BalanceNegative

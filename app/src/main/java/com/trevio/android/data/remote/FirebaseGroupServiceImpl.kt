@@ -196,6 +196,8 @@ class FirebaseGroupServiceImpl @Inject constructor(
             if (!groupDoc.exists()) return Result.failure(Exception(ErrorMessages.GROUP_NOT_FOUND))
 
             val groupData = groupDoc.data ?: return Result.failure(Exception("Invalid group data"))
+            if (groupData["archived"] == true) return Result.failure(Exception("Cannot invite members to an archived group"))
+
             val existingMember = groupDoc.reference.collection("members").document(toUid).get().await()
             if (existingMember.exists()) return Result.failure(Exception("User is already a member of this group"))
 
@@ -772,6 +774,11 @@ class FirebaseGroupServiceImpl @Inject constructor(
             val groupRef = firestore.collection("groups").document(groupId)
             val groupDoc = groupRef.get().await()
             if (!groupDoc.exists()) return Result.failure(Exception(ErrorMessages.GROUP_NOT_FOUND))
+
+            if (groupDoc.getBoolean("archived") == true) {
+                return Result.failure(Exception("Cannot add members to an archived group"))
+            }
+
             val groupCurrency = groupDoc.getString("currency") ?: AppConstants.BASE_CURRENCY
 
             val callerMemberDoc = groupRef.collection("members").document(uid).get().await()

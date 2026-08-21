@@ -1,5 +1,9 @@
 package com.trevio.android.ui.more
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.slideInVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -39,7 +43,6 @@ import com.trevio.android.core.security.AppLockViewModel
 import com.trevio.android.core.security.BiometricAuthenticator
 import com.trevio.android.domain.model.User
 import com.trevio.android.domain.repository.AuthService
-import com.trevio.android.ui.profile.TermsConditionsDialog
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -87,7 +90,6 @@ fun MoreScreen(
     appLockViewModel: AppLockViewModel = hiltViewModel()
 ) {
     val state by viewModel.state.collectAsState()
-    var showTermsDialog by remember { mutableStateOf(false) }
     val appLockEnabled by appLockViewModel.appLockEnabled.collectAsState()
     val context = LocalContext.current
     val activity = context as? FragmentActivity
@@ -192,86 +194,132 @@ fun MoreScreen(
             modifier = Modifier.padding(horizontal = 20.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
+            val baseIndex = if (state.isSuperadmin) 1 else 0
+
             if (state.isSuperadmin) {
+                AnimatedVisibility(
+                    visible = true,
+                    enter = fadeIn(animationSpec = tween(300, delayMillis = 0)) + slideInVertically(
+                        animationSpec = tween(300, delayMillis = 0),
+                        initialOffsetY = { it / 4 }
+                    )
+                ) {
+                    MoreMenuItem(
+                        icon = Icons.Default.AdminPanelSettings,
+                        label = stringResource(R.string.more_admin_dashboard),
+                        onClick = { navController.navigate(TrevioRoute.Admin.route) }
+                    )
+                }
+            }
+
+            AnimatedVisibility(
+                visible = true,
+                enter = fadeIn(animationSpec = tween(300, delayMillis = minOf(baseIndex, 10) * 50)) + slideInVertically(
+                    animationSpec = tween(300, delayMillis = minOf(baseIndex, 10) * 50),
+                    initialOffsetY = { it / 4 }
+                )
+            ) {
                 MoreMenuItem(
-                    icon = Icons.Default.AdminPanelSettings,
-                    label = stringResource(R.string.more_admin_dashboard),
-                    onClick = { navController.navigate(TrevioRoute.Admin.route) }
+                    icon = Icons.Default.AutoAwesome,
+                    label = stringResource(R.string.wrapped_title),
+                    onClick = { navController.navigate(TrevioRoute.Wrapped.route) }
                 )
             }
 
-            MoreMenuItem(
-                icon = Icons.Default.AutoAwesome,
-                label = stringResource(R.string.wrapped_title),
-                onClick = { navController.navigate(TrevioRoute.Wrapped.route) }
-            )
+            AnimatedVisibility(
+                visible = true,
+                enter = fadeIn(animationSpec = tween(300, delayMillis = (baseIndex + 1) * 50)) + slideInVertically(
+                    animationSpec = tween(300, delayMillis = (baseIndex + 1) * 50),
+                    initialOffsetY = { it / 4 }
+                )
+            ) {
+                MoreMenuItem(
+                    icon = Icons.Default.Description,
+                    label = stringResource(R.string.profile_terms_conditions),
+                    onClick = { navController.navigate(TrevioRoute.TermsView.route) }
+                )
+            }
 
-            MoreMenuItem(
-                icon = Icons.Default.Description,
-                label = stringResource(R.string.profile_terms_conditions),
-                onClick = { showTermsDialog = true }
-            )
-
-            MoreMenuItem(
-                icon = Icons.Default.Info,
-                label = stringResource(R.string.profile_help_support),
-                onClick = { navController.navigate(TrevioRouteSupport.Support.route) }
-            )
+            AnimatedVisibility(
+                visible = true,
+                enter = fadeIn(animationSpec = tween(300, delayMillis = (baseIndex + 2) * 50)) + slideInVertically(
+                    animationSpec = tween(300, delayMillis = (baseIndex + 2) * 50),
+                    initialOffsetY = { it / 4 }
+                )
+            ) {
+                MoreMenuItem(
+                    icon = Icons.Default.Info,
+                    label = stringResource(R.string.profile_help_support),
+                    onClick = { navController.navigate(TrevioRouteSupport.Support.route) }
+                )
+            }
 
             // ── Smart Lock toggle ──
-            SmartLockItem(
-                enabled = appLockEnabled,
-                onToggle = { enable ->
-                    if (enable) {
-                        // Check if the device has any authenticator enrolled
-                        if (!BiometricAuthenticator.canAuthenticate(context)) {
-                            showNoBiometricDialog = true
-                        } else if (activity != null && !isAuthenticating) {
-                            // Verify the user can authenticate before enabling.
-                            // Use the composition scope (not viewModelScope)
-                            // so the DataStore write in enableAppLock()
-                            // survives even if the user navigates away
-                            // from MoreScreen immediately after.
-                            isAuthenticating = true
-                            scope.launch {
-                                val result = BiometricAuthenticator.authenticate(
-                                    activity = activity,
-                                    title = context.getString(R.string.app_lock_enable_title),
-                                    subtitle = context.getString(R.string.app_lock_enable_subtitle)
-                                )
-                                isAuthenticating = false
-                                result.onSuccess {
-                                    // Suspend write — completes in the
-                                    // composition scope, not viewModelScope.
-                                    appLockViewModel.enableAppLockSuspend()
+            AnimatedVisibility(
+                visible = true,
+                enter = fadeIn(animationSpec = tween(300, delayMillis = (baseIndex + 3) * 50)) + slideInVertically(
+                    animationSpec = tween(300, delayMillis = (baseIndex + 3) * 50),
+                    initialOffsetY = { it / 4 }
+                )
+            ) {
+                SmartLockItem(
+                    enabled = appLockEnabled,
+                    onToggle = { enable ->
+                        if (enable) {
+                            // Check if the device has any authenticator enrolled
+                            if (!BiometricAuthenticator.canAuthenticate(context)) {
+                                showNoBiometricDialog = true
+                            } else if (activity != null && !isAuthenticating) {
+                                // Verify the user can authenticate before enabling.
+                                // Use the composition scope (not viewModelScope)
+                                // so the DataStore write in enableAppLock()
+                                // survives even if the user navigates away
+                                // from MoreScreen immediately after.
+                                isAuthenticating = true
+                                scope.launch {
+                                    val result = BiometricAuthenticator.authenticate(
+                                        activity = activity,
+                                        title = context.getString(R.string.app_lock_enable_title),
+                                        subtitle = context.getString(R.string.app_lock_enable_subtitle)
+                                    )
+                                    isAuthenticating = false
+                                    result.onSuccess {
+                                        // Suspend write — completes in the
+                                        // composition scope, not viewModelScope.
+                                        appLockViewModel.enableAppLockSuspend()
+                                    }
                                 }
                             }
-                        }
-                    } else {
-                        // Also use the composition scope for disable to
-                        // ensure the write completes.
-                        scope.launch {
-                            appLockViewModel.disableAppLockSuspend()
+                        } else {
+                            // Also use the composition scope for disable to
+                            // ensure the write completes.
+                            scope.launch {
+                                appLockViewModel.disableAppLockSuspend()
+                            }
                         }
                     }
-                }
-            )
+                )
+            }
 
             Spacer(modifier = Modifier.height(8.dp))
 
-            MoreMenuItem(
-                icon = Icons.AutoMirrored.Filled.Logout,
-                label = stringResource(R.string.more_sign_out),
-                onClick = { viewModel.signOut() },
-                isDestructive = true
-            )
+            AnimatedVisibility(
+                visible = true,
+                enter = fadeIn(animationSpec = tween(300, delayMillis = (baseIndex + 4) * 50)) + slideInVertically(
+                    animationSpec = tween(300, delayMillis = (baseIndex + 4) * 50),
+                    initialOffsetY = { it / 4 }
+                )
+            ) {
+                MoreMenuItem(
+                    icon = Icons.AutoMirrored.Filled.Logout,
+                    label = stringResource(R.string.more_sign_out),
+                    onClick = { viewModel.signOut() },
+                    isDestructive = true
+                )
+            }
 
             Spacer(modifier = Modifier.height(80.dp))
         }
-    }
-
-    if (showTermsDialog) {
-        TermsConditionsDialog(onDismiss = { showTermsDialog = false })
     }
 
     if (showNoBiometricDialog) {

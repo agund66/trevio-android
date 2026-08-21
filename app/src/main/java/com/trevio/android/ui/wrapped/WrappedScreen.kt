@@ -1,5 +1,9 @@
 package com.trevio.android.ui.wrapped
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.slideInVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -35,6 +39,8 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.navigation.NavHostController
 import com.trevio.android.R
+import com.trevio.android.core.designsystem.components.AnimatedCounter
+import com.trevio.android.core.designsystem.components.ConfettiView
 import com.trevio.android.core.designsystem.components.TrevioCard
 import com.trevio.android.core.designsystem.theme.TrevioAccent
 import com.trevio.android.core.designsystem.theme.TrevioSecondary
@@ -126,12 +132,23 @@ fun WrappedScreen(
     viewModel: WrappedViewModel = hiltViewModel()
 ) {
     val state by viewModel.state.collectAsState()
+    var showConfetti by remember { mutableStateOf(false) }
+    val shownConfettiYears = remember { mutableStateMapOf<Int, Boolean>() }
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(MaterialTheme.colorScheme.background)
-    ) {
+    // Celebrate with confetti when wrapped data finishes loading — once per year.
+    LaunchedEffect(state.summary, state.isLoading, state.year) {
+        if (state.summary != null && !state.isLoading && shownConfettiYears[state.year] != true) {
+            showConfetti = true
+            shownConfettiYears[state.year] = true
+        }
+    }
+
+    Box(modifier = Modifier.fillMaxSize()) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(MaterialTheme.colorScheme.background)
+        ) {
         // ── Gradient header ──
         Column(
             modifier = Modifier
@@ -333,6 +350,9 @@ fun WrappedScreen(
                 }
             }
         }
+        }
+
+        ConfettiView(visible = showConfetti, onComplete = { showConfetti = false })
     }
 }
 
@@ -389,48 +409,59 @@ private fun StatsGrid(summary: WrappedSummary) {
         StatItem(
             icon = Icons.Default.Payments,
             label = stringResource(R.string.wrapped_total_spent),
-            value = formatCurrency(summary.totalSpent)
+            value = summary.totalSpent
         ),
         StatItem(
             icon = Icons.Default.Receipt,
             label = stringResource(R.string.wrapped_expenses_logged),
-            value = summary.expenseCount.toString()
+            value = summary.expenseCount.toDouble(),
+            isCount = true
         ),
         StatItem(
             icon = Icons.Default.Group,
             label = stringResource(R.string.wrapped_groups_active),
-            value = summary.groupCount.toString()
+            value = summary.groupCount.toDouble(),
+            isCount = true
         ),
         StatItem(
             icon = Icons.Default.Savings,
             label = stringResource(R.string.wrapped_total_paid),
-            value = formatCurrency(summary.totalPaid)
+            value = summary.totalPaid
         ),
         StatItem(
             icon = Icons.Default.VolunteerActivism,
             label = stringResource(R.string.wrapped_total_fronted),
-            value = formatCurrency(fronted)
+            value = fronted
         ),
         StatItem(
             icon = Icons.Default.TrendingUp,
             label = stringResource(R.string.wrapped_avg_expense),
-            value = formatCurrency(summary.avgExpense)
+            value = summary.avgExpense
         )
     )
 
     // 2-column grid
     val rows = stats.chunked(2)
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        rows.forEach { rowItems ->
+        rows.forEachIndexed { rowIndex, rowItems ->
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                rowItems.forEach { item ->
-                    StatCard(
-                        stat = item,
-                        modifier = Modifier.weight(1f)
-                    )
+                rowItems.forEachIndexed { colIndex, item ->
+                    val flatIndex = rowIndex * 2 + colIndex
+                    AnimatedVisibility(
+                        visible = true,
+                        enter = fadeIn(animationSpec = tween(300, delayMillis = minOf(flatIndex, 10) * 50)) + slideInVertically(
+                            animationSpec = tween(300, delayMillis = minOf(flatIndex, 10) * 50),
+                            initialOffsetY = { it / 4 }
+                        )
+                    ) {
+                        StatCard(
+                            stat = item,
+                            modifier = Modifier.weight(1f)
+                        )
+                    }
                 }
                 // Pad the last row if it has only one item
                 if (rowItems.size == 1) {
@@ -444,7 +475,8 @@ private fun StatsGrid(summary: WrappedSummary) {
 private data class StatItem(
     val icon: ImageVector,
     val label: String,
-    val value: String
+    val value: Double,
+    val isCount: Boolean = false
 )
 
 @Composable
@@ -462,12 +494,23 @@ private fun StatCard(stat: StatItem, modifier: Modifier = Modifier) {
                 modifier = Modifier.size(24.dp)
             )
             Spacer(modifier = Modifier.height(12.dp))
-            Text(
-                text = stat.value,
-                style = MaterialTheme.typography.titleLarge,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onSurface
-            )
+            if (stat.isCount) {
+                AnimatedCounter(
+                    targetValue = stat.value.toInt(),
+                    fontSize = MaterialTheme.typography.titleLarge.fontSize,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+            } else {
+                AnimatedCounter(
+                    targetValue = stat.value,
+                    prefix = "₹",
+                    decimals = 0,
+                    fontSize = MaterialTheme.typography.titleLarge.fontSize,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+            }
             Spacer(modifier = Modifier.height(2.dp))
             Text(
                 text = stat.label,

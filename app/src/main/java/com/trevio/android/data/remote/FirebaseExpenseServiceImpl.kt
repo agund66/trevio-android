@@ -434,6 +434,14 @@ class FirebaseExpenseServiceImpl @Inject constructor(
             if (groupId.isBlank() || expenseId.isBlank()) return Result.failure(Exception("Group ID and Expense ID are required"))
 
             val groupRef = firestore.collection("groups").document(groupId)
+            val groupDoc = groupRef.get().await()
+            if (!groupDoc.exists()) return Result.failure(Exception(ErrorMessages.GROUP_NOT_FOUND))
+
+            // Reject expense deletion in archived groups
+            if (groupDoc.getBoolean("archived") == true) {
+                return Result.failure(Exception("Cannot delete expenses in an archived group"))
+            }
+
             val expenseRef = groupRef.collection("expenses").document(expenseId)
             val expenseDoc = expenseRef.get().await()
             if (!expenseDoc.exists()) return Result.failure(Exception(ErrorMessages.EXPENSE_NOT_FOUND))
@@ -448,7 +456,6 @@ class FirebaseExpenseServiceImpl @Inject constructor(
             if (!isCreator && !isAdmin) return Result.failure(Exception("Only the expense creator or group admin can delete this expense"))
 
             // Check if household group
-            val groupDoc = groupRef.get().await()
             val templateStr = groupDoc.getString("template") ?: "casual"
             val isHousehold = templateStr.equals("household", ignoreCase = true)
 

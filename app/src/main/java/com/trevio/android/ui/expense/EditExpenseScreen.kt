@@ -401,7 +401,12 @@ fun EditExpenseScreen(
                 }
 
                 Button(
-                    onClick = { viewModel.save { navController.popBackStack() } },
+                    onClick = {
+                        viewModel.save {
+                            navController.previousBackStackEntry?.savedStateHandle?.set("needsRefresh", true)
+                            navController.popBackStack()
+                        }
+                    },
                     enabled = !state.isSaving && state.description.isNotBlank() && state.amount.isNotBlank() && isSplitValid,
                     modifier = Modifier.fillMaxWidth()
                 ) {

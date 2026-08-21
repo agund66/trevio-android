@@ -1,5 +1,8 @@
 package com.trevio.android.core.navigation
 
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.isSystemInDarkTheme
@@ -8,6 +11,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.draw.scale
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Group
 import androidx.compose.material.icons.filled.Home
@@ -45,6 +49,7 @@ import androidx.navigation.navArgument
 import androidx.navigation.compose.rememberNavController
 import com.trevio.android.core.designsystem.theme.TrevioBorder
 import com.trevio.android.core.designsystem.theme.TrevioBorderDark
+import com.trevio.android.core.designsystem.animation.AnimationSpecs
 import com.trevio.android.core.designsystem.components.OfflineBanner
 import com.trevio.android.ui.admin.AdminScreen
 import com.trevio.android.util.NetworkMonitor
@@ -154,9 +159,18 @@ fun MainShell(
                                 }
                             },
                             icon = {
+                                val scale by animateFloatAsState(
+                                    targetValue = if (currentRoute == item.route) 1.08f else 1f,
+                                    animationSpec = spring(
+                                        dampingRatio = Spring.DampingRatioNoBouncy,
+                                        stiffness = Spring.StiffnessMedium
+                                    ),
+                                    label = "navIconScale"
+                                )
                                 Icon(
                                     imageVector = if (currentRoute == item.route) item.selectedIcon else item.unselectedIcon,
-                                    contentDescription = stringResource(item.labelResId)
+                                    contentDescription = stringResource(item.labelResId),
+                                    modifier = Modifier.scale(scale)
                                 )
                             },
                             label = {
@@ -187,7 +201,11 @@ fun MainShell(
                 NavHost(
                     navController = innerNavController,
                     startDestination = TrevioRoute.Home.route,
-                    modifier = Modifier.fillMaxSize()
+                    modifier = Modifier.fillMaxSize(),
+                    enterTransition = { AnimationSpecs.enterTransition },
+                    exitTransition = { AnimationSpecs.exitTransition },
+                    popEnterTransition = { AnimationSpecs.popEnterTransition },
+                    popExitTransition = { AnimationSpecs.popExitTransition }
                 ) {
                     mainTabGraph(
                         innerNavController = innerNavController,

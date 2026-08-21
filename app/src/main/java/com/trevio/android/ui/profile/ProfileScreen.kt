@@ -91,7 +91,9 @@ class ProfileViewModel @Inject constructor(
         val isLoading: Boolean = true,
         val isEditing: Boolean = false,
         val isSaving: Boolean = false,
+        val isDeleting: Boolean = false,
         @StringRes val error: Int? = null,
+        val deleteError: String? = null,
         val signedOut: Boolean = false
     )
 
@@ -148,15 +150,24 @@ class ProfileViewModel @Inject constructor(
     }
 
     fun deleteAccount() {
-        _state.value = _state.value.copy(isSaving = true, error = null)
+        _state.value = _state.value.copy(isDeleting = true, deleteError = null)
         viewModelScope.launch {
             userService.deleteAccount()
                 .onSuccess {
                     authService.signOut()
-                    _state.value = _state.value.copy(isSaving = false, signedOut = true)
+                    _state.value = _state.value.copy(isDeleting = false, signedOut = true)
                 }
                 .onFailure { e ->
-                    _state.value = _state.value.copy(isSaving = false, error = e.toStringResId())
+                    val msg = if (e.message == "REQUIRES_RECENT_LOGIN") {
+                        null // Signal to use string resource
+                    } else {
+                        e.message
+                    }
+                    _state.value = _state.value.copy(
+                        isDeleting = false,
+                        deleteError = msg,
+                        error = if (msg == null) R.string.profile_delete_recent_login else null
+                    )
                 }
         }
     }
@@ -293,6 +304,9 @@ fun ProfileScreen(
                 user = user,
                 onEdit = { viewModel.startEditing() },
                 onDelete = { viewModel.deleteAccount() },
+                isDeleting = state.isDeleting,
+                deleteError = state.deleteError,
+                deleteErrorResId = state.error,
                 themeMode = themeMode,
                 onThemeModeChange = { themeViewModel.setThemeMode(it) }
             )
@@ -305,6 +319,9 @@ private fun ViewProfileContent(
     user: User,
     onEdit: () -> Unit,
     onDelete: () -> Unit,
+    isDeleting: Boolean = false,
+    deleteError: String? = null,
+    @StringRes deleteErrorResId: Int? = null,
     themeMode: ThemeMode,
     onThemeModeChange: (ThemeMode) -> Unit
 ) {
@@ -501,25 +518,53 @@ private fun ViewProfileContent(
 
     if (showDeleteDialog) {
         AlertDialog(
-            onDismissRequest = { showDeleteDialog = false },
+            onDismissRequest = { if (!isDeleting) showDeleteDialog = false },
             icon = { Icon(Icons.Default.Warning, contentDescription = null, tint = MaterialTheme.colorScheme.error) },
             title = { Text(stringResource(R.string.profile_delete_account)) },
             text = {
-                Text(stringResource(R.string.profile_delete_confirm))
+                Column {
+                    Text(stringResource(R.string.profile_delete_confirm))
+                    val errorMsg = deleteError
+                        ?: deleteErrorResId?.let { stringResource(it) }
+                    if (errorMsg != null) {
+                        Spacer(modifier = Modifier.height(12.dp))
+                        Surface(
+                            color = MaterialTheme.colorScheme.errorContainer,
+                            shape = RoundedCornerShape(8.dp),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text(
+                                text = errorMsg,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onErrorContainer,
+                                modifier = Modifier.padding(12.dp)
+                            )
+                        }
+                    }
+                }
             },
             confirmButton = {
                 TextButton(
-                    onClick = {
-                        showDeleteDialog = false
-                        onDelete()
-                    },
+                    onClick = { onDelete() },
+                    enabled = !isDeleting,
                     colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)
                 ) {
-                    Text(stringResource(R.string.group_detail_delete))
+                    if (isDeleting) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(16.dp),
+                            strokeWidth = 2.dp,
+                            color = MaterialTheme.colorScheme.error
+                        )
+                    } else {
+                        Text(stringResource(R.string.group_detail_delete))
+                    }
                 }
             },
             dismissButton = {
-                TextButton(onClick = { showDeleteDialog = false }) {
+                TextButton(
+                    onClick = { showDeleteDialog = false },
+                    enabled = !isDeleting
+                ) {
                     Text(stringResource(R.string.profile_cancel))
                 }
             }

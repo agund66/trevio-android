@@ -36,4 +36,5 @@ sealed class TrevioRoute(val route: String) {
     data object Admin : TrevioRoute("admin")
     data object More : TrevioRoute("more")
     data object Wrapped : TrevioRoute("wrapped")
+    data object TermsView : TrevioRoute("terms_view")
 }

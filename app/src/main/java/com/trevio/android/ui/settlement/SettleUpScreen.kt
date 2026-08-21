@@ -32,6 +32,9 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.trevio.android.R
+import com.trevio.android.core.designsystem.components.ConfettiView
+import com.trevio.android.core.designsystem.components.PressableScale
+import com.trevio.android.core.designsystem.components.SuccessCheckmark
 import com.trevio.android.core.designsystem.components.TrevioCard
 import com.trevio.android.core.designsystem.components.TrevioHeader
 import com.trevio.android.core.designsystem.theme.SettlementBgStart
@@ -48,6 +51,7 @@ import com.trevio.android.util.CurrencyConverter
 import com.trevio.android.util.rememberCurrencyFormatter
 import com.trevio.android.util.toStringResId
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
@@ -125,7 +129,28 @@ fun SettleUpScreen(
     val currencyFormatter = rememberCurrencyFormatter()
     val context = LocalContext.current
 
-    Column(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
+    var showSuccess by remember { mutableStateOf(false) }
+    var justSettled by remember { mutableStateOf(false) }
+    var showConfetti by remember { mutableStateOf(false) }
+
+    // When a settle action clears the last debt, celebrate with confetti.
+    LaunchedEffect(state.debts, state.isLoading) {
+        if (justSettled && !state.isLoading && state.debts.isEmpty()) {
+            justSettled = false
+            showConfetti = true
+        }
+    }
+
+    // Auto-hide the success checkmark after the animation + brief delay.
+    LaunchedEffect(showSuccess) {
+        if (showSuccess) {
+            delay(800)
+            showSuccess = false
+        }
+    }
+
+    Box(modifier = Modifier.fillMaxSize()) {
+        Column(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
         TrevioHeader(
             title = stringResource(R.string.settle_up_title),
             onBack = { navController.popBackStack() }
@@ -235,6 +260,8 @@ fun SettleUpScreen(
                     onSettle = {
                         viewModel.settleDebt(debt)
                         navController.previousBackStackEntry?.savedStateHandle?.set("needsRefresh", true)
+                        showSuccess = true
+                        justSettled = true
                     },
                     onPayViaUpi = {
                         val vpa = getUpiVpa(debt)
@@ -257,6 +284,38 @@ fun SettleUpScreen(
                 )
             }
         }
+        }
+
+        if (showSuccess) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(Color.Black.copy(alpha = 0.32f)),
+                contentAlignment = Alignment.Center
+            ) {
+                Surface(
+                    shape = RoundedCornerShape(20.dp),
+                    color = MaterialTheme.colorScheme.surface,
+                    tonalElevation = 6.dp,
+                    shadowElevation = 8.dp
+                ) {
+                    Column(
+                        modifier = Modifier.padding(28.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        SuccessCheckmark(visible = true, size = 56.dp)
+                        Spacer(modifier = Modifier.height(12.dp))
+                        Text(
+                            text = stringResource(R.string.settle_up_settled),
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                }
+            }
+        }
+
+        ConfettiView(visible = showConfetti, onComplete = { showConfetti = false })
     }
 }
 
@@ -317,20 +376,30 @@ private fun DebtCard(
                     ) {
                         Text(stringResource(R.string.settle_up_pay_upi))
                     }
-                    Button(
+                    PressableScale(
                         onClick = onSettle,
-                        modifier = Modifier.weight(1f),
-                        shape = RoundedCornerShape(12.dp)
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(40.dp)
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(MaterialTheme.colorScheme.primary)
                     ) {
-                        Text(stringResource(R.string.settle_up_settle))
+                        Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+                            Text(stringResource(R.string.settle_up_settle), color = MaterialTheme.colorScheme.onPrimary, style = MaterialTheme.typography.labelLarge)
+                        }
                     }
                 } else {
-                    Button(
+                    PressableScale(
                         onClick = onSettle,
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(12.dp)
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(40.dp)
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(MaterialTheme.colorScheme.primary)
                     ) {
-                        Text(stringResource(R.string.settle_up_settle))
+                        Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+                            Text(stringResource(R.string.settle_up_settle), color = MaterialTheme.colorScheme.onPrimary, style = MaterialTheme.typography.labelLarge)
+                        }
                     }
                 }
             }

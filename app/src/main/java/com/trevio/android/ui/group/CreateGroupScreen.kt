@@ -44,6 +44,8 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.trevio.android.R
 import com.trevio.android.core.designsystem.components.MemberAvatar
+import com.trevio.android.core.designsystem.components.PressableScale
+import com.trevio.android.core.designsystem.components.SuccessCheckmark
 import com.trevio.android.core.designsystem.components.TrevioHeader
 import com.trevio.android.core.designsystem.theme.TemplateTrip
 import com.trevio.android.core.designsystem.theme.TemplateTripDark
@@ -194,11 +196,14 @@ fun CreateGroupScreen(
     val currencySymbol = CurrencyConverter.getCurrencySymbol(currencyFormatter.userCurrency)
     val currentUserId = state.currentUserId
     val isDark = isSystemInDarkTheme()
+    var showSuccess by remember { mutableStateOf(false) }
 
     LaunchedEffect(state.createdGroupId) {
         if (state.createdGroupId != null) {
             navController.getBackStackEntry(TrevioRoute.Home.route)
                 .savedStateHandle["needsRefresh"] = true
+            showSuccess = true
+            delay(800)
             navController.popBackStack(TrevioRoute.Home.route, inclusive = false)
         }
     }
@@ -565,37 +570,69 @@ fun CreateGroupScreen(
             }
 
             // Create Button
-            Button(
+            val createEnabled = name.isNotBlank() && !state.isLoading
+            PressableScale(
                 onClick = {
                     val budgetInUserCurrency = monthlyBudget.toDoubleOrNull()
                     if (budgetInUserCurrency != null && budgetInUserCurrency < 0) {
-                        return@Button
+                        return@PressableScale
                     }
                     // Budget is stored in the creator's default currency, which becomes
                     // the group's permanent currency — no conversion needed.
                     viewModel.createGroup(name, description, selectedTemplate, budgetInUserCurrency?.takeIf { it > 0 })
                 },
-                enabled = name.isNotBlank() && !state.isLoading,
-                modifier = Modifier.fillMaxWidth().height(54.dp),
-                shape = RoundedCornerShape(16.dp),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = MaterialTheme.colorScheme.primary
-                )
+                enabled = createEnabled,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(54.dp)
+                    .clip(RoundedCornerShape(16.dp))
+                    .background(if (createEnabled) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant)
             ) {
-                if (state.isLoading) {
-                    CircularProgressIndicator(
-                        color = MaterialTheme.colorScheme.onPrimary,
-                        strokeWidth = 2.dp,
-                        modifier = Modifier.size(22.dp)
-                    )
-                } else {
-                    Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(20.dp))
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text(stringResource(R.string.create_group_create), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+                    if (state.isLoading) {
+                        CircularProgressIndicator(
+                            color = MaterialTheme.colorScheme.onPrimary,
+                            strokeWidth = 2.dp,
+                            modifier = Modifier.size(22.dp)
+                        )
+                    } else {
+                        Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(20.dp), tint = if (createEnabled) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant)
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(stringResource(R.string.create_group_create), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, color = if (createEnabled) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
                 }
             }
 
             Spacer(modifier = Modifier.height(24.dp))
+        }
+    }
+
+    if (showSuccess) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(Color.Black.copy(alpha = 0.32f)),
+            contentAlignment = Alignment.Center
+        ) {
+            Surface(
+                shape = RoundedCornerShape(20.dp),
+                color = MaterialTheme.colorScheme.surface,
+                tonalElevation = 6.dp,
+                shadowElevation = 8.dp
+            ) {
+                Column(
+                    modifier = Modifier.padding(28.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    SuccessCheckmark(visible = true, size = 56.dp)
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Text(
+                        text = stringResource(R.string.create_group_created),
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            }
         }
     }
 }

@@ -33,6 +33,8 @@ import androidx.annotation.StringRes
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.trevio.android.core.designsystem.components.PressableScale
+import com.trevio.android.core.designsystem.components.SuccessCheckmark
 import com.trevio.android.core.designsystem.components.TrevioHeader
 import com.trevio.android.core.designsystem.theme.*
 import com.trevio.android.domain.model.BillItem
@@ -810,7 +812,8 @@ fun AddExpenseScreen(
             }
 
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                Button(
+                val saveEnabled = description.isNotBlank() && amountStr.isNotBlank() && (isHousehold || isSplitValid) && !state.isLoading
+                PressableScale(
                     onClick = {
                         if (description.isNotBlank() && amount > 0 && effectivePaidBy.isNotEmpty()) {
                             viewModel.prepareAndSaveExpense(
@@ -830,14 +833,23 @@ fun AddExpenseScreen(
                             )
                         }
                     },
-                    enabled = description.isNotBlank() && amountStr.isNotBlank() && (isHousehold || isSplitValid) && !state.isLoading,
-                    modifier = Modifier.weight(1f).height(56.dp),
-                    shape = RoundedCornerShape(16.dp)
+                    enabled = saveEnabled,
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(56.dp)
+                        .clip(RoundedCornerShape(16.dp))
+                        .background(if (saveEnabled) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant)
                 ) {
-                    if (state.isLoading) {
-                        CircularProgressIndicator(color = MaterialTheme.colorScheme.onPrimary, strokeWidth = 2.dp, modifier = Modifier.size(24.dp))
-                    } else {
-                        Text(stringResource(R.string.add_expense_save), style = MaterialTheme.typography.titleMedium)
+                    Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+                        if (state.isLoading) {
+                            CircularProgressIndicator(color = MaterialTheme.colorScheme.onPrimary, strokeWidth = 2.dp, modifier = Modifier.size(24.dp))
+                        } else {
+                            Text(
+                                stringResource(R.string.add_expense_save),
+                                style = MaterialTheme.typography.titleMedium,
+                                color = if (saveEnabled) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
                     }
                 }
                 OutlinedButton(
@@ -920,20 +932,7 @@ fun AddExpenseScreen(
                         modifier = Modifier.padding(28.dp),
                         horizontalAlignment = Alignment.CenterHorizontally
                     ) {
-                        Box(
-                            modifier = Modifier
-                                .size(56.dp)
-                                .clip(RoundedCornerShape(28.dp))
-                                .background(SaveButtonGreen),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Icon(
-                                imageVector = Icons.Filled.Check,
-                                contentDescription = null,
-                                tint = Color.White,
-                                modifier = Modifier.size(32.dp)
-                            )
-                        }
+                        SuccessCheckmark(visible = true, size = 56.dp)
                         Spacer(modifier = Modifier.height(12.dp))
                         Text(
                             text = stringResource(R.string.add_expense_saved),

@@ -325,7 +325,13 @@ class FirebaseUserServiceImpl @Inject constructor(
 
             Result.success(Unit)
         } catch (e: Exception) {
-            Result.failure(Exception(friendlyNetworkMessage(e) ?: e.message, e))
+            val message = if (e.message?.contains("requires-recent-login") == true ||
+                e.message?.contains("ERROR_REQUIRES_RECENT_LOGIN") == true) {
+                "REQUIRES_RECENT_LOGIN"
+            } else {
+                friendlyNetworkMessage(e) ?: e.message
+            }
+            Result.failure(Exception(message, e))
         }
     }
 }

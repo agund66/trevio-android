@@ -1,12 +1,16 @@
 package com.trevio.android.ui.group
 
 import androidx.annotation.StringRes
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.slideInVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
@@ -18,6 +22,7 @@ import androidx.compose.material.icons.filled.Flight
 import androidx.compose.material.icons.filled.SportsSoccer
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.*
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -136,6 +141,7 @@ fun GroupsListScreen(
     val state by viewModel.state.collectAsState()
     val currencyFormatter = rememberCurrencyFormatter()
     var showJoinSheet by remember { mutableStateOf(false) }
+    var isRefreshing by remember { mutableStateOf(false) }
 
     val needsRefresh by navController.currentBackStackEntry
         ?.savedStateHandle?.getStateFlow<Boolean>("needsRefresh", false)
@@ -145,6 +151,17 @@ fun GroupsListScreen(
         if (needsRefresh) {
             viewModel.refreshGroups()
             navController.currentBackStackEntry?.savedStateHandle?.set("needsRefresh", false)
+        }
+    }
+
+    // Reset the pull-to-refresh indicator shortly after a refresh is
+    // triggered.  Groups are kept fresh by a real-time Firestore listener,
+    // so refreshGroups() is a no-op — the delay gives the indicator
+    // enough time to be visible to the user.
+    LaunchedEffect(isRefreshing) {
+        if (isRefreshing) {
+            kotlinx.coroutines.delay(800)
+            isRefreshing = false
         }
     }
 
@@ -182,8 +199,16 @@ fun GroupsListScreen(
         Column(modifier = Modifier.fillMaxSize()) {
             TrevioHeader(title = stringResource(R.string.groups_title))
 
+            PullToRefreshBox(
+                isRefreshing = isRefreshing,
+                onRefresh = {
+                    isRefreshing = true
+                    viewModel.loadGroups()
+                },
+                modifier = Modifier.weight(1f)
+            ) {
             LazyColumn(
-                modifier = Modifier.weight(1f),
+                modifier = Modifier.fillMaxSize(),
                 contentPadding = PaddingValues(bottom = 100.dp),
                 verticalArrangement = Arrangement.spacedBy(0.dp)
             ) {
@@ -214,17 +239,26 @@ fun GroupsListScreen(
                     }
                 }
 
-                items(state.groups, key = { it.groupId }) { group ->
-                    GroupsListItem(
-                        group = group,
-                        onClick = {
-                            navController.navigate(TrevioRoute.GroupDetail.createRoute(group.groupId))
-                        },
-                        formatAmount = currencyFormatter.formatAmount
-                    )
+                itemsIndexed(state.groups, key = { _, it -> it.groupId }) { index, group ->
+                    androidx.compose.animation.AnimatedVisibility(
+                        visible = true,
+                        enter = fadeIn(animationSpec = tween(300, delayMillis = minOf(index, 10) * 50)) + slideInVertically(
+                            animationSpec = tween(300, delayMillis = minOf(index, 10) * 50),
+                            initialOffsetY = { it / 4 }
+                        )
+                    ) {
+                        GroupsListItem(
+                            group = group,
+                            onClick = {
+                                navController.navigate(TrevioRoute.GroupDetail.createRoute(group.groupId))
+                            },
+                            formatAmount = currencyFormatter.formatAmount
+                        )
+                    }
                 }
             }
             }
+            } // end PullToRefreshBox
         }
 
         Column(

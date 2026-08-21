@@ -1,6 +1,11 @@
 package com.trevio.android.ui.admin
 
 import androidx.annotation.StringRes
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.isSystemInDarkTheme
@@ -231,13 +236,21 @@ fun AdminScreen(
             }
         }
 
-        if (state.selectedTab == 1) {
-            BroadcastsScreen()
-        } else if (state.selectedTab == 2) {
-            AdminSupportScreen()
-        } else if (state.selectedTab == 3) {
-            RemindersScreen()
-        } else if (state.isLoading) {
+        AnimatedContent(
+            targetState = state.selectedTab,
+            transitionSpec = {
+                fadeIn(animationSpec = tween(250)) togetherWith fadeOut(animationSpec = tween(200))
+            },
+            label = "tabContent",
+            modifier = Modifier.fillMaxSize()
+        ) { tab ->
+            if (tab == 1) {
+                BroadcastsScreen()
+            } else if (tab == 2) {
+                AdminSupportScreen()
+            } else if (tab == 3) {
+                RemindersScreen()
+            } else if (state.isLoading) {
             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 CircularProgressIndicator()
             }
@@ -315,6 +328,7 @@ fun AdminScreen(
                     }
                 }
             }
+        }
         }
     }
 }

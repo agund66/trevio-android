@@ -6,11 +6,15 @@ import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.annotation.StringRes
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.slideInVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -24,6 +28,7 @@ import androidx.compose.material.icons.filled.Payments
 import androidx.compose.material.icons.filled.Receipt
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.*
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -220,6 +225,7 @@ fun NotificationsScreen(
         derivedStateOf { state.notifications.count { !it.read } }
     }
     val context = androidx.compose.ui.platform.LocalContext.current
+    var isRefreshing by remember { mutableStateOf(false) }
 
     // Lazily request POST_NOTIFICATIONS when the user opens the Notifications screen
     // for the first time (not at app launch). Only needed on Android 13+ (TIRAMISU).
@@ -239,6 +245,17 @@ fun NotificationsScreen(
             if (!granted) {
                 notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
             }
+        }
+    }
+
+    // Reset the pull-to-refresh indicator shortly after a refresh is
+    // triggered.  Notifications are kept fresh by a real-time Firestore
+    // listener, so loadNotifications() returns quickly — the delay gives
+    // the indicator enough time to be visible to the user.
+    LaunchedEffect(isRefreshing) {
+        if (isRefreshing) {
+            kotlinx.coroutines.delay(800)
+            isRefreshing = false
         }
     }
 
@@ -286,10 +303,17 @@ fun NotificationsScreen(
         )
 
         if (state.notifications.isEmpty() && state.broadcasts.isEmpty()) {
+            PullToRefreshBox(
+                isRefreshing = isRefreshing,
+                onRefresh = {
+                    isRefreshing = true
+                    viewModel.loadNotifications()
+                },
+                modifier = Modifier.fillMaxWidth().weight(1f)
+            ) {
             Box(
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .weight(1f),
+                    .fillMaxSize(),
                 contentAlignment = Alignment.Center
             ) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
@@ -313,24 +337,50 @@ fun NotificationsScreen(
                     )
                 }
             }
+            } // end PullToRefreshBox
         } else {
+            PullToRefreshBox(
+                isRefreshing = isRefreshing,
+                onRefresh = {
+                    isRefreshing = true
+                    viewModel.loadNotifications()
+                },
+                modifier = Modifier.weight(1f)
+            ) {
             LazyColumn(
-                modifier = Modifier.weight(1f),
+                modifier = Modifier.fillMaxSize(),
                 contentPadding = PaddingValues(bottom = 100.dp)
             ) {
-                items(state.broadcasts, key = { it.id }) { broadcast ->
-                    BroadcastNotificationCard(broadcast)
+                itemsIndexed(state.broadcasts, key = { _, it -> it.id }) { index, broadcast ->
+                    androidx.compose.animation.AnimatedVisibility(
+                        visible = true,
+                        enter = fadeIn(animationSpec = tween(300, delayMillis = minOf(index, 10) * 50)) + slideInVertically(
+                            animationSpec = tween(300, delayMillis = minOf(index, 10) * 50),
+                            initialOffsetY = { it / 4 }
+                        )
+                    ) {
+                        BroadcastNotificationCard(broadcast)
+                    }
                 }
-                items(state.notifications, key = { it.notificationId }) { notification ->
-                    NotificationCard(
-                        notification = notification,
-                        navController = navController,
-                        invitationLoading = state.invitationLoading,
-                        invitationResult = state.invitationResult,
-                        formatDate = currencyFormatter.formatDate,
-                        onAccept = { notificationId, invitationId -> viewModel.acceptInvitation(notificationId, invitationId) },
-                        onDecline = { notificationId, invitationId -> viewModel.declineInvitation(notificationId, invitationId) }
-                    )
+                itemsIndexed(state.notifications, key = { _, it -> it.notificationId }) { index, notification ->
+                    val staggerIndex = state.broadcasts.size + index
+                    androidx.compose.animation.AnimatedVisibility(
+                        visible = true,
+                        enter = fadeIn(animationSpec = tween(300, delayMillis = minOf(staggerIndex, 10) * 50)) + slideInVertically(
+                            animationSpec = tween(300, delayMillis = minOf(staggerIndex, 10) * 50),
+                            initialOffsetY = { it / 4 }
+                        )
+                    ) {
+                        NotificationCard(
+                            notification = notification,
+                            navController = navController,
+                            invitationLoading = state.invitationLoading,
+                            invitationResult = state.invitationResult,
+                            formatDate = currencyFormatter.formatDate,
+                            onAccept = { notificationId, invitationId -> viewModel.acceptInvitation(notificationId, invitationId) },
+                            onDecline = { notificationId, invitationId -> viewModel.declineInvitation(notificationId, invitationId) }
+                        )
+                    }
                 }
                 if (state.hasMore) {
                     item {
@@ -343,6 +393,7 @@ fun NotificationsScreen(
                     }
                 }
             }
+            } // end PullToRefreshBox
         }
     }
 }

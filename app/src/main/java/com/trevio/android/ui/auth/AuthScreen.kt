@@ -2,9 +2,12 @@ package com.trevio.android.ui.auth
 
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material3.*
@@ -12,16 +15,17 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
-import android.app.Activity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import android.app.Activity
 import com.trevio.android.R
+import com.trevio.android.core.designsystem.components.PressableScale
 import com.trevio.android.core.designsystem.theme.*
 import androidx.credentials.CredentialManager
 import androidx.credentials.GetCredentialRequest
@@ -178,94 +182,147 @@ fun AuthScreen(
         }
     }
 
-    val gradient = Brush.verticalGradient(
-        colors = listOf(
-            MaterialTheme.colorScheme.primary,
-            MaterialTheme.colorScheme.primary.copy(alpha = 0.85f),
-            MaterialTheme.colorScheme.primaryContainer
+    // Story chapters data
+    val isDark = isSystemInDarkTheme()
+    val chapters = remember {
+        listOf(
+            StoryChapterData(
+                title = context.getString(R.string.story_chapter1_title),
+                description = context.getString(R.string.story_chapter1_desc)
+            ) { SplitReceiptMockup() },
+            StoryChapterData(
+                title = context.getString(R.string.story_chapter2_title),
+                description = context.getString(R.string.story_chapter2_desc)
+            ) { SplitMethodsMockup() },
+            StoryChapterData(
+                title = context.getString(R.string.story_chapter3_title),
+                description = context.getString(R.string.story_chapter3_desc)
+            ) { SettlementMockup() },
+            StoryChapterData(
+                title = context.getString(R.string.story_chapter4_title),
+                description = context.getString(R.string.story_chapter4_desc)
+            ) { BudgetInsightsMockup() }
         )
-    )
+    }
 
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(gradient)
-    ) {
+    // Theme-aware text colors
+    val primaryTextColor = if (isDark) Color.White else Color(0xFF0F172A)
+    val secondaryTextColor = if (isDark) Color.White.copy(alpha = 0.7f) else Color(0xFF475569)
+    val tertiaryTextColor = if (isDark) Color.White.copy(alpha = 0.5f) else Color(0xFF64748B)
+    val logoBgColor = if (isDark) Color.White.copy(alpha = 0.1f) else Color.White.copy(alpha = 0.6f)
+
+    Box(modifier = Modifier.fillMaxSize()) {
+        // Aurora animated background
+        AuroraBackground()
+
+        // Main content — scrollable immersive experience
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(32.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center
+                .verticalScroll(rememberScrollState())
+                .padding(top = 48.dp, bottom = 32.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
         ) {
+            // ─── Hero Section ───
+            // Logo + branding
             Box(
                 modifier = Modifier
-                    .size(120.dp)
+                    .size(64.dp)
                     .clip(CircleShape)
-                    .background(Color.White.copy(alpha = 0.15f)),
+                    .background(logoBgColor),
                 contentAlignment = Alignment.Center
             ) {
                 Image(
                     painter = painterResource(R.drawable.ic_trevio_logo),
                     contentDescription = stringResource(R.string.app_name),
-                    modifier = Modifier.size(72.dp)
+                    modifier = Modifier.size(40.dp)
                 )
             }
-            Spacer(modifier = Modifier.height(24.dp))
+            Spacer(modifier = Modifier.height(10.dp))
             Text(
                 text = stringResource(R.string.app_name),
-                style = MaterialTheme.typography.headlineMedium,
+                style = MaterialTheme.typography.headlineSmall,
                 fontWeight = FontWeight.Bold,
-                color = Color.White
+                color = primaryTextColor
+            )
+            Spacer(modifier = Modifier.height(2.dp))
+            Text(
+                text = stringResource(R.string.auth_tagline),
+                style = MaterialTheme.typography.bodySmall,
+                color = secondaryTextColor
+            )
+
+            Spacer(modifier = Modifier.height(20.dp))
+
+            // Hero headline
+            Text(
+                text = stringResource(R.string.hero_headline),
+                fontSize = 26.sp,
+                fontWeight = FontWeight.Bold,
+                color = primaryTextColor,
+                textAlign = TextAlign.Center,
+                lineHeight = 32.sp,
+                modifier = Modifier.padding(horizontal = 24.dp)
             )
             Spacer(modifier = Modifier.height(8.dp))
             Text(
-                text = stringResource(R.string.auth_tagline),
-                style = MaterialTheme.typography.bodyLarge,
-                color = Color.White.copy(alpha = 0.85f)
+                text = stringResource(R.string.hero_subheadline),
+                fontSize = 14.sp,
+                color = secondaryTextColor,
+                textAlign = TextAlign.Center,
+                lineHeight = 20.sp,
+                modifier = Modifier.padding(horizontal = 24.dp)
             )
 
-            Spacer(modifier = Modifier.height(32.dp))
-            FeaturePoint(stringResource(R.string.auth_feature_track))
-            Spacer(modifier = Modifier.height(8.dp))
-            FeaturePoint(stringResource(R.string.auth_feature_split))
-            Spacer(modifier = Modifier.height(8.dp))
-            FeaturePoint(stringResource(R.string.auth_feature_settle))
+            Spacer(modifier = Modifier.height(24.dp))
 
-            Spacer(modifier = Modifier.height(40.dp))
+            // Story carousel
+            StoryCarousel(chapters = chapters)
+
+            Spacer(modifier = Modifier.height(24.dp))
+
+            // Google sign-in button
             if (state is AuthViewModel.AuthState.Loading) {
-                CircularProgressIndicator(color = Color.White)
+                CircularProgressIndicator(color = primaryTextColor)
             } else {
-                OutlinedButton(
+                PressableScale(
                     onClick = { launchGoogleSignIn() },
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(56.dp),
-                    shape = RoundedCornerShape(16.dp),
-                    colors = ButtonDefaults.outlinedButtonColors(
-                        containerColor = Color.White
-                    )
+                        .padding(horizontal = 24.dp)
+                        .height(52.dp)
+                        .clip(RoundedCornerShape(16.dp))
+                        .background(Color.White)
                 ) {
-                    Text(
-                        text = stringResource(R.string.auth_sign_in),
-                        color = MaterialTheme.colorScheme.primary,
-                        fontWeight = FontWeight.SemiBold,
-                        style = MaterialTheme.typography.titleMedium
-                    )
+                    Box(modifier = Modifier.fillMaxWidth().fillMaxHeight(), contentAlignment = Alignment.Center) {
+                        Text(
+                            text = stringResource(R.string.auth_sign_in),
+                            color = MaterialTheme.colorScheme.primary,
+                            fontWeight = FontWeight.SemiBold,
+                            style = MaterialTheme.typography.titleMedium
+                        )
+                    }
                 }
             }
-            Spacer(modifier = Modifier.height(16.dp))
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            // Terms notice
             Text(
                 text = stringResource(R.string.auth_terms_notice),
                 style = MaterialTheme.typography.bodySmall,
-                color = Color.White.copy(alpha = 0.7f),
-                textAlign = TextAlign.Center
+                color = tertiaryTextColor,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.padding(horizontal = 24.dp)
             )
+
+            // Error display
             if (state is AuthViewModel.AuthState.Error) {
                 Spacer(modifier = Modifier.height(12.dp))
                 Surface(
-                    color = Color.White.copy(alpha = 0.15f),
-                    shape = RoundedCornerShape(12.dp)
+                    color = if (isDark) Color(0xFFEF4444).copy(alpha = 0.2f) else Color(0xFFFEE2E2),
+                    shape = RoundedCornerShape(12.dp),
+                    modifier = Modifier.padding(horizontal = 24.dp)
                 ) {
                     Text(
                         text = buildString {
@@ -275,43 +332,27 @@ fun AuthScreen(
                                 append(it)
                             }
                         },
-                        color = Color.White,
+                        color = if (isDark) Color(0xFFFCA5A5) else Color(0xFFDC2626),
                         style = MaterialTheme.typography.bodySmall,
                         textAlign = TextAlign.Center,
                         modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp)
                     )
                 }
             }
-        }
-    }
-}
 
-@Composable
-private fun FeaturePoint(text: String) {
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.Center
-    ) {
-        Box(
-            modifier = Modifier
-                .size(20.dp)
-                .clip(CircleShape)
-                .background(Color.White.copy(alpha = 0.2f)),
-            contentAlignment = Alignment.Center
-        ) {
-            Icon(
-                Icons.Default.Check,
-                contentDescription = null,
-                tint = Color.White,
-                modifier = Modifier.size(14.dp)
-            )
+            // ─── Use Cases Section ───
+            Spacer(modifier = Modifier.height(16.dp))
+            UseCasesSection()
+
+            // ─── Stats Banner ───
+            StatsBanner()
+
+            // ─── How It Works ───
+            HowItWorksSection()
+
+            // ─── Final CTA ───
+            CTASection(onSignIn = { launchGoogleSignIn() })
         }
-        Spacer(modifier = Modifier.width(10.dp))
-        Text(
-            text = text,
-            style = MaterialTheme.typography.bodyMedium,
-            color = Color.White.copy(alpha = 0.9f)
-        )
     }
 }
 

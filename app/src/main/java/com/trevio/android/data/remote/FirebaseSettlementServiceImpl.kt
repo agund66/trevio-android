@@ -51,6 +51,11 @@ class FirebaseSettlementServiceImpl @Inject constructor(
             val groupDoc = groupRef.get().await()
             if (!groupDoc.exists()) return Result.failure(Exception(ErrorMessages.GROUP_NOT_FOUND))
 
+            // Reject settlements in archived groups
+            if (groupDoc.getBoolean("archived") == true) {
+                return Result.failure(Exception("Cannot settle up in an archived group"))
+            }
+
             val memberDoc = groupRef.collection("members").document(uid).get().await()
             if (!memberDoc.exists()) return Result.failure(Exception("You are not a member of this group"))
 
